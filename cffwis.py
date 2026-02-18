@@ -431,8 +431,10 @@ def dailyDMC(dmc0: Union[int, float, np.ndarray],
         warnings.filterwarnings('ignore', category=UserWarning)
         warnings.filterwarnings('ignore', category=RuntimeWarning)
 
-        # ### YESTERDAYS MOISTURE CONTENT
-        m0 = 20 + np.exp((244.72 - dmc0) / 43.43)
+        # ### YESTERDAY'S MOISTURE CONTENT
+        # Original equation: 20.0 + np.exp(-(dmc - 244.72) / 43.43)
+        # Use alteration to Eq. 12 for more accurate calculation
+        m0 = 20 + 280 / np.exp(0.023 * dmc0)
 
         # ### DRYING PHASE
         # Reference latitude for DMC day length adjustment, addressing latitudinal differences
