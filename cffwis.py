@@ -28,7 +28,6 @@ month_dict = {
     'Feb': 2,
     'Mar': 3,
     'Apr': 4,
-    'May': 5,
     'Jun': 6,
     'Jul': 7,
     'Aug': 8,
@@ -51,10 +50,12 @@ month_dict = {
 }
 
 
-def diurnalFFMC_lawson(ffmc0_1600: Union[float, np.ndarray],
-                       rh_1200: Union[float, np.ndarray],
-                       current_hour: int,
-                       current_minute: int) -> float:
+def diurnalFFMC_lawson(
+        ffmc0_1600: Union[float, np.ndarray],
+        rh_1200: Union[float, np.ndarray],
+        current_hour: int,
+        current_minute: int
+) -> float:
     """
     Predict hourly (diurnal) FFMC using the Lawson interpolation method.
     Valid for times from noon (12:00) of the current day to 5:59 the next morning.
@@ -81,12 +82,15 @@ def diurnalFFMC_lawson(ffmc0_1600: Union[float, np.ndarray],
     return hourly_ffmc_lawson_vectorized(ffmc=ffmc0_1600, rh=rh_1200, hour=current_hour, minute=current_minute)
 
 
-def hourlyFFMC(ffmc0: Union[int, float, np.ndarray],
-               temp: Union[int, float, np.ndarray],
-               rh: Union[int, float, np.ndarray],
-               wind: Union[int, float, np.ndarray],
-               precip: Union[int, float, np.ndarray],
-               use_precise_values: bool = False) -> Union[float, np.ndarray]:
+def hourlyFFMC(
+        ffmc0: Union[int, float, np.ndarray],
+        temp: Union[int, float, np.ndarray],
+        rh: Union[int, float, np.ndarray],
+        wind: Union[int, float, np.ndarray],
+        precip: Union[int, float, np.ndarray],
+        time_step: Union[int, float, np.ndarray] = 1,
+        use_precise_values: bool = False
+) -> Union[float, np.ndarray]:
     """
     Function to calculate hourly FFMC values per Van Wagner (1977) and Alexander et al. (1984).
 
@@ -95,7 +99,8 @@ def hourlyFFMC(ffmc0: Union[int, float, np.ndarray],
     :param rh: relative humidity value (%)
     :param wind: wind speed value (km/h)
     :param precip: precipitation value (mm)
-    :param use_precise_values: use higher precision for m0 & Daily FFMC equations for drying/wetting moisture
+    :param time_step: time step in hours (default 1 hour)
+    :param use_precise_values: use higher precision for mo & Daily FFMC equations for drying/wetting moisture
     :return: the hourly FFMC value
     """
     # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
@@ -146,62 +151,62 @@ def hourlyFFMC(ffmc0: Union[int, float, np.ndarray],
         precip = np.ma.array([precip], mask=np.isnan([precip]))
 
     # ### PREVIOUS HOURS ESTIMATED FINE FUEL MOISTURE CONTENT
+    # FFMC coefficient
+    if use_precise_values:
+        FFMC_COEFFICIENT = 250.0 * 59.5 / 101.0
+    else:
+        FFMC_COEFFICIENT = 147.2
     # This equation has been revised from Van Wagner (1977) to match Van Wagner (1987)
     # Doing this uses the newer FF scale, over the old F scale (per Anderson 2009)
-    if use_precise_values:
-        # This equation uses a more precise multiplier (~147.27723 instead of 147.2) per Wang et al. (2017)
-        ffmc_coeff = 250.0 * 59.5 / 101.0
-        m0 = ffmc_coeff * (101 - ffmc0) / (59.5 + ffmc0)
-    else:
-        m0 = 147.2 * (101 - ffmc0) / (59.5 + ffmc0)
+    mo = FFMC_COEFFICIENT * (101 - ffmc0) / (59.5 + ffmc0)
+
+    # ### RAINFALL PHASE
+    # Rainfall Effectiveness (delta_mrf)
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+        delta_mrf = np.where(
+            precip == 0,
+            0.0,
+            42.5 * precip * np.exp(-100 / (251 - mo)) * (1 - np.exp(-6.93 / precip))
+        )
+        mr = np.where(
+            mo > 150,
+            mo + delta_mrf + 0.0015 * ((mo - 150) ** 2) * (precip ** 0.5),
+            mo + delta_mrf
+        )
+    mr = np.ma.clip(mr, 0, 250)
+    mo = np.where(precip > 0.0, mr, mo)
 
     # ### DRYING PHASE
     # Equilibrium Moisture Content (E)
     # Drying from above
-    ed = (0.942 * rh ** 0.679 + 11 * np.exp((rh - 100) / 10) +
-          0.18 * (21.1 - temp) * (1 - np.exp(-0.115 * rh)))
+    ed = (0.942 * (rh ** 0.679) + 11 * np.exp((rh - 100) / 10)
+          + 0.18 * (21.1 - temp) * (1 - np.exp(-0.115 * rh)))
     # Wetting from below
-    ew = (0.618 * rh ** 0.753 + 10 * np.exp((rh - 100) / 10) +
-          0.18 * (21.1 - temp) * (1 - np.exp(-0.115 * rh)))
+    ew = (0.618 * (rh ** 0.753) + 10 * np.exp((rh - 100) / 10)
+          + 0.18 * (21.1 - temp) * (1 - np.exp(-0.115 * rh)))
 
     # LOG DRYING RATE (k)
     # Calculate wetting rate
-    k0d = (0.424 * (1 - (rh / 100) ** 1.7) +
-           0.0694 * (wind ** 0.5) * (1 - (rh / 100) ** 8))
-    kd = k0d * 0.0579 * np.exp(0.0365 * temp)
+    ko = (0.424 * (1 - (rh / 100) ** 1.7)
+          + 0.0694 * (wind ** 0.5) * (1 - (rh / 100) ** 8))
+    kd = ko * 0.0579 * np.exp(0.0365 * temp)
     # Calculate drying rate
-    k0w = (0.424 * (1 - ((100 - rh) / 100) ** 1.7) +
-           0.0694 * (wind ** 0.5) * (1 - ((100 - rh) / 100) ** 8))
-    kw = k0w * 0.0579 * np.exp(0.0365 * temp)
+    k1 = (0.424 * (1 - ((100 - rh) / 100) ** 1.7)
+          + 0.0694 * (wind ** 0.5) * (1 - ((100 - rh) / 100) ** 8))
+    kw = k1 * 0.0579 * np.exp(0.0365 * temp)
 
-    # Calculate drying/wetting moisture content (mdw)
+    # Calculate drying/wetting moisture content (md/mw)
     if use_precise_values:
         # USES DAILY EQUATIONS FOR BETTER PRECISION
-        mdw = np.ma.where(m0 > ed,
-                          ed + (m0 - ed) * (10 ** -kd),
-                          np.ma.where(m0 < ew,
-                                      ew - (ew - m0) * (10 ** -kw),
-                                      m0))
+        md = ed + (mo - ed) * (10 ** (-kd * time_step))
+        mw = ew - (ew - mo) * (10 ** (-kw * time_step))
     else:
         # ORIGINAL HOURLY EQUATIONS
-        mdw = np.ma.where(m0 > ed,
-                          ed + (m0 - ed) * np.exp(-2.303 * kd),
-                          np.ma.where(m0 < ew,
-                                      ew - (ew - m0) * np.exp(-2.303 * kw),
-                                      m0))
-
-    # ### RAINFALL PHASE
-    # Rainfall Effectiveness (delta_mrf)
-    np.seterr(over='ignore')
-    delta_mrf = np.ma.where(precip > 0,
-                            m0 + 42.5 * precip * np.exp(-100 / (251 - m0)) * (1 - np.exp(-6.93 / precip)),
-                            mdw)
-    np.seterr(over='warn')
-
-    # Rainfall Moisture
-    m = np.ma.where(m0 > 150,
-                    delta_mrf + 0.0015 * ((m0 - 150) ** 2) * (precip ** 0.5),
-                    delta_mrf)
+        md = ed + (mo - ed) * np.exp(-2.303 * kd * time_step)
+        mw = ew - (ew - mo) * np.exp(-2.303 * kw * time_step)
+    # Constraints
+    m = np.where(mo > ed, md, mw)
+    m = np.where((ed >= mo) & (mo >= ew), mo, m)
 
     # Cap m from 0 to 250 to reflect max moisture content of pine litter
     m = np.ma.clip(m, 0, 250)
@@ -209,20 +214,23 @@ def hourlyFFMC(ffmc0: Union[int, float, np.ndarray],
     # ### RETURN FINAL FFMC VALUE
     # This equation has been revised from Van Wagner (1977) to match Van Wagner (1987)
     # Doing this uses the newer FF scale, over the old F scale (per Anderson 2009)
-    if use_precise_values:
-        # This equation uses a more precise multiplier (147.27723 instead of 147.2) per Wang et al. (2017)
-        ffmc_coeff = 250.0 * 59.5 / 101.0
-        ffmc = 59.5 * (250 - m) / (ffmc_coeff + m)
-    else:
-        ffmc = 59.5 * (250 - m) / (147.2 + m)
+    ffmc = 59.5 * (250 - m) / (FFMC_COEFFICIENT + m)
+    ffmc = np.where(ffmc <= 0, 0, ffmc)
 
     # Restrict FFMC values to range between 0 and 101
     ffmc = np.ma.clip(ffmc, 0, 101)
 
+    # Return
     if return_array:
-        return ffmc.data
+        if isinstance(ffmc, np.ma.MaskedArray):
+            return ffmc.filled(np.nan)
+        else:
+            return ffmc
     else:
-        return ffmc.data[0]
+        if isinstance(ffmc, np.ma.MaskedArray):
+            return float(ffmc.filled(np.nan)[0])
+        else:
+            return float(np.atleast_1d(ffmc)[0])
 
 
 def dailyFFMC(ffmc0: Union[int, float, np.ndarray],
@@ -286,71 +294,79 @@ def dailyFFMC(ffmc0: Union[int, float, np.ndarray],
     else:
         precip = np.ma.array([precip], mask=np.isnan([precip]))
 
-    # ### YESTERDAY'S ESTIMATED FINE FUEL MOISTURE CONTENT
-    m0 = 147.2 * (101 - ffmc0) / (59.5 + ffmc0)
-
-    # ### DRYING PHASE
-    # LOG DRYING RATE (k)
-    # Calculate wetting rate
-    k0d = (0.424 * (1 - (rh / 100) ** 1.7) +
-           (0.0694 * (wind ** 0.5)) * (1 - (rh / 100) ** 8))
-    kd = k0d * 0.581 * np.exp(0.0365 * temp)
-    # Calculate drying rate
-    k0w = (0.424 * (1 - ((100 - rh) / 100) ** 1.7) +
-           (0.0694 * wind ** 0.5) * (1 - ((100 - rh) / 100) ** 8))
-    kw = k0w * 0.581 * np.exp(0.0365 * temp)
-
-    # Equilibrium Moisture Content (E)
-    # Drying from above
-    ed = (0.942 * rh ** 0.679 + 11 * np.exp((rh - 100) / 10) +
-          0.18 * (21.1 - temp) * (1 - np.exp(-0.115 * rh)))
-    # Wetting from below
-    ew = (0.618 * rh ** 0.753 + 10 * np.exp((rh - 100) / 10) +
-          0.18 * (21.1 - temp) * (1 - np.exp(-0.115 * rh)))
-
-    # MOISTURE CONTENT (m)
-    m = np.ma.where(m0 > ed,
-                    ed + (m0 - ed) * 10 ** -kd,
-                    np.ma.where(m0 < ew,
-                                ew - (ew - m0) * 10 ** -kw,
-                                m0))
+    # ### PREVIOUS HOURS ESTIMATED FINE FUEL MOISTURE CONTENT
+    # FFMC coefficient
+    FFMC_COEFFICIENT = 250.0 * 59.5 / 101.0
+    # This equation has been revised from Van Wagner (1977) to match Van Wagner (1987)
+    # Doing this uses the newer FF scale, over the old F scale (per Anderson 2009)
+    mo = FFMC_COEFFICIENT * (101 - ffmc0) / (59.5 + ffmc0)
 
     # ### RAINFALL PHASE
-    # Rainfall Effectiveness (delta_mrf)
-    rf = precip - 0.5
-    np.seterr(over='ignore')
-    delta_mrf = 42.5 * np.exp(-100 / (251 - m0)) * (1 - np.exp(-6.93 / rf))
-    np.seterr(over='warn')
+    rf = precip - 0.5 if precip > 0.5 else precip
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+        # Rainfall Effectiveness (delta_mrf)
+        delta_mrf = np.where(
+            rf == 0,
+            0.0,
+            42.5 * rf * np.exp(-100 / (251 - mo)) * (1 - np.exp(-6.93 / rf))
+        )
+        # Rainfall Moisture
+        mr = np.where(
+            mo > 150,
+            mo + delta_mrf + 0.0015 * (mo - 150) * (mo - 150) * (rf ** 0.5),
+            mo + delta_mrf
+        )
+    mr = np.ma.clip(mr, 0, 250)
+    mo = np.where(precip > 0.0, mr, mo)
 
-    # Rainfall Moisture
-    m = np.ma.where(rf <= 0,
-                    m,
-                    np.ma.where(m0 > 150,
-                                m + delta_mrf + 0.0015 * ((m0 - 150) ** 2) * (rf ** 0.5),
-                                m + delta_mrf))
+    # ### DRYING PHASE
+    # Equilibrium Moisture Content (E)
+    # Drying from above
+    ed = (0.942 * (rh ** 0.679) + (11 * np.exp((rh - 100) / 10)) +
+          0.18 * (21.1 - temp) * (1 - 1 / np.exp(rh * 0.115)))
+    # Wetting from below
+    ew = (0.618 * (rh ** 0.753) + (10 * np.exp((rh - 100) / 10)) +
+          0.18 * (21.1 - temp) * (1 - 1 / np.exp(rh * 0.115)))
+
+    # LOG DRYING RATE (k)
+    # Calculate wetting rate
+    k0w = (0.424 * (1 - (((100 - rh) / 100) ** 1.7)) + 0.0694 * np.sqrt(wind) * (1 - ((100 - rh) / 100) ** 8))
+    kw = k0w * 0.581 * np.exp(0.0365 * temp)
+    # Calculate drying rate
+    k0d = (0.424 * (1 - (rh / 100) ** 1.7) + 0.0694 * np.sqrt(wind) * (1 - (rh / 100) ** 8))
+    kd = k0d * 0.581 * np.exp(0.0365 * temp)
+
+    # MOISTURE CONTENT (m)
+    m = np.ma.where((mo < ed) & (mo < ew),
+                    ew - (ew - mo) / (10 ** kw),
+                    np.ma.where(mo > ed,
+                                ed + (mo - ed) / (10 ** kd),
+                                mo))
 
     # Cap m from 0 to 250 to reflect max moisture content of pine litter
     m = np.ma.clip(m, 0, 250)
 
     # ### RETURN FINAL FFMC VALUE
-    ffmc = 59.5 * (250 - m) / (147.2 + m)
+    ffmc = 59.5 * (250 - m) / (FFMC_COEFFICIENT + m)
 
     # Restrict FFMC values to range between 0 and 101
     ffmc = np.ma.clip(ffmc, 0, 101)
 
     if return_array:
-        return ffmc.data
+        return ffmc.filled(np.nan)
     else:
-        return ffmc.data[0]
+        return float(ffmc.filled(np.nan)[0])
 
 
-def dailyDMC(dmc0: Union[int, float, np.ndarray],
-             temp: Union[int, float, np.ndarray],
-             rh: Union[int, float, np.ndarray],
-             precip: Union[int, float, np.ndarray],
-             month: Union[int, str],
-             lat: Union[int, float, np.ndarray] = 49.0,
-             lat_adjust: bool = False) -> Union[float, np.ndarray]:
+def dailyDMC(
+        dmc0: Union[int, float, np.ndarray],
+        temp: Union[int, float, np.ndarray],
+        rh: Union[int, float, np.ndarray],
+        precip: Union[int, float, np.ndarray],
+        month: Union[int, str],
+        lat: Union[int, float, np.ndarray] = 49.0,
+        lat_adjust: bool = False
+) -> Union[float, np.ndarray]:
     """
     Function to calculate today's DMC per Van Wagner (1987).
 
@@ -434,7 +450,7 @@ def dailyDMC(dmc0: Union[int, float, np.ndarray],
         # ### YESTERDAY'S MOISTURE CONTENT
         # Original equation: 20.0 + np.exp(-(dmc - 244.72) / 43.43)
         # Use alteration to Eq. 12 for more accurate calculation
-        m0 = 20 + 280 / np.exp(0.023 * dmc0)
+        mo = 20 + 280 / np.exp(0.023 * dmc0)
 
         # ### DRYING PHASE
         # Reference latitude for DMC day length adjustment, addressing latitudinal differences
@@ -493,7 +509,7 @@ def dailyDMC(dmc0: Union[int, float, np.ndarray],
                          0)
 
         # Moisture content after rain (mr)
-        mr = m0 + 1000 * re / (48.77 + b * re)
+        mr = mo + 1000 * re / (48.77 + b * re)
         mr = np.ma.clip(mr, 0, None)
 
         # ### RETURN FINAL DMC VALUES
@@ -504,17 +520,19 @@ def dailyDMC(dmc0: Union[int, float, np.ndarray],
         dmc += k
 
     if return_array:
-        return dmc.data
+        return dmc.filled(np.nan)
     else:
-        return dmc.data[0]
+        return float(dmc.filled(np.nan)[0])
 
 
-def dailyDC(dc0: Union[int, float, np.ndarray],
-            temp: Union[int, float, np.ndarray],
-            precip: Union[int, float, np.ndarray],
-            month: Union[int, str],
-            lat: Union[int, float, np.ndarray] = 49.0,
-            lat_adjust: bool = False) -> Union[float, np.ndarray]:
+def dailyDC(
+        dc0: Union[int, float, np.ndarray],
+        temp: Union[int, float, np.ndarray],
+        precip: Union[int, float, np.ndarray],
+        month: Union[int, str],
+        lat: Union[int, float, np.ndarray] = 49.0,
+        lat_adjust: bool = False
+) -> Union[float, np.ndarray]:
     """
     Function to calculate today's DMC per Van Wagner (1987).
     :param dc0: yesterday's DC value (unitless code)
@@ -637,14 +655,16 @@ def dailyDC(dc0: Union[int, float, np.ndarray],
     dc = np.ma.clip(dc, 0, None)
 
     if return_array:
-        return dc.data
+        return dc.filled(np.nan)
     else:
-        return dc.data[0]
+        return float(dc.filled(np.nan)[0])
 
 
-def dailyISI(wind: Union[int, float, np.ndarray],
-             ffmc: Union[int, float, np.ndarray],
-             fbp_mod: bool = False) -> Union[float, np.ndarray]:
+def dailyISI(
+        wind: Union[int, float, np.ndarray],
+        ffmc: Union[int, float, np.ndarray],
+        fbp_mod: bool = False
+) -> Union[float, np.ndarray]:
     """
     Function to calculate ISI per Van Wagner (1987).
     The daily ISI equation is used for both hourly and daily ISI calculations.\n
@@ -701,13 +721,15 @@ def dailyISI(wind: Union[int, float, np.ndarray],
     isi = np.ma.clip(isi, 0, None)
 
     if return_array:
-        return isi.data
+        return isi.filled(np.nan)
     else:
-        return isi.data[0]
+        return isi.filled(np.nan)[0]
 
 
-def dailyBUI(dmc: Union[int, float, np.ndarray],
-             dc: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
+def dailyBUI(
+        dmc: Union[int, float, np.ndarray],
+        dc: Union[int, float, np.ndarray]
+) -> Union[float, np.ndarray]:
     """
     Function to calculate daily Build Up Index values per Van Wagner (1987).
     :param dmc: current DMC value (unitless code)
@@ -748,13 +770,15 @@ def dailyBUI(dmc: Union[int, float, np.ndarray],
     bui = np.ma.clip(bui, 0, None)
 
     if return_array:
-        return bui.data
+        return bui.filled(np.nan)
     else:
-        return bui.data[0]
+        return float(bui.filled(np.nan)[0])
 
 
-def dailyFWI(isi: Union[int, float, np.ndarray],
-             bui: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
+def dailyFWI(
+        isi: Union[int, float, np.ndarray],
+        bui: Union[int, float, np.ndarray]
+) -> Union[float, np.ndarray]:
     """
     Function to calculate FWI per Van Wagner (1987).
     The daily FWI equation is used for both hourly and daily FWI calculations.\n
@@ -808,9 +832,9 @@ def dailyFWI(isi: Union[int, float, np.ndarray],
     fwi = np.ma.clip(fwi, 0, None)
 
     if return_array:
-        return fwi.data
+        return fwi.filled(np.nan)
     else:
-        return fwi.data[0]
+        return float(fwi.filled(np.nan)[0])
 
 
 def dailyDSR(fwi: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
@@ -841,19 +865,21 @@ def dailyDSR(fwi: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
     dsr = np.ma.clip(dsr, 0, None)
 
     if return_array:
-        return dsr.data
+        return dsr.filled(np.nan)
     else:
-        return dsr.data[0]
+        return float(dsr.filled(np.nan)[0])
 
 
-def startupDC(dc_stop: Union[int, float, np.ndarray],
-              moist_stop: Union[int, float, np.ndarray],
-              moist_start: Union[int, float, np.ndarray],
-              precip_ow: Union[int, float, np.ndarray],
-              temp: Union[int, float, np.ndarray],
-              month: Union[int, str],
-              lat: Union[int, float, np.ndarray] = 49.0,
-              lat_adjust: bool = False) -> Union[float, np.ndarray]:
+def startupDC(
+        dc_stop: Union[int, float, np.ndarray],
+        moist_stop: Union[int, float, np.ndarray],
+        moist_start: Union[int, float, np.ndarray],
+        precip_ow: Union[int, float, np.ndarray],
+        temp: Union[int, float, np.ndarray],
+        month: Union[int, str],
+        lat: Union[int, float, np.ndarray] = 49.0,
+        lat_adjust: bool = False
+) -> Union[float, np.ndarray]:
     """
     Function to calculate the DC startup values after overwintering.\n
     This function implements new procedures outlined in Hanes and Wotton (2024).
@@ -1000,6 +1026,6 @@ def startupDC(dc_stop: Union[int, float, np.ndarray],
     dc_start[dc_start < 0] = 0
 
     if return_array:
-        return dc_start.data
+        return dc_start.filled(np.nan)
     else:
-        return dc_start.data[0]
+        return float(dc_start.filled(np.nan)[0])
