@@ -14,20 +14,21 @@ fuel_type_lookup = {
 }
 
 # Set directory
-# You can change this to your working directory by typing data_folder =  r'path_to_your_directory'
-data_folder = os.path.join(os.path.dirname(__file__), 'data')
+# You can change this to your working directory by typing data_dir =  r'path_to_your_directory'
+data_dir = os.path.join(os.path.dirname(__file__), 'data')
+inputs_dir = os.path.join(data_dir, 'inputs')
+outputs_dir = os.path.join(data_dir, 'outputs')
 
 # Input and output data names
 input_data = 'Inputs_for_Test_Cases_Wotton2009.csv'
-output_file = 'Outputs_for_Test_Cases_Wotton2009.csv'
+output_data = 'Outputs_for_Test_Cases_Wotton2009.csv'
 
-# Create results folder
-results_folder = os.path.join(data_folder, 'outputs', 'wotton2009')
-if not os.path.exists(results_folder):
-    os.mkdir(results_folder)
+# Create results dir
+results_dir = os.path.join(outputs_dir, 'wotton2009')
+os.makedirs(results_dir, exist_ok=True)
 
 # Load CSV
-data_path = os.path.join(data_folder, input_data) # path to input data
+data_path = os.path.join(data_dir, input_data) # path to input data
 df = pd.read_csv(data_path, na_values=['NA', ''])
 
 # Convert d0 and dj to nullable integers (preserve NaN values)
@@ -74,7 +75,7 @@ results_df = pd.DataFrame(results)
 final_df = pd.merge(df, results_df, on='id', how='left')
 
 final_df.to_csv(
-    os.path.join(results_folder, output_file), # path for output data
+    os.path.join(results_dir, output_data), # path for output data
     index=False
 )
 
