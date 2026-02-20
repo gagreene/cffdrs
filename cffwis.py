@@ -302,22 +302,22 @@ def dailyFFMC(ffmc0: Union[int, float, np.ndarray],
     mo = FFMC_COEFFICIENT * (101 - ffmc0) / (59.5 + ffmc0)
 
     # ### RAINFALL PHASE
-    rf = precip - 0.5 if precip > 0.5 else precip
+    rf = np.ma.where(precip > 0.5, precip - 0.5, precip)
     with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
         # Rainfall Effectiveness (delta_mrf)
-        delta_mrf = np.where(
+        delta_mrf = np.ma.where(
             rf == 0,
             0.0,
             42.5 * rf * np.exp(-100 / (251 - mo)) * (1 - np.exp(-6.93 / rf))
         )
         # Rainfall Moisture
-        mr = np.where(
+        mr = np.ma.where(
             mo > 150,
             mo + delta_mrf + 0.0015 * (mo - 150) * (mo - 150) * (rf ** 0.5),
             mo + delta_mrf
         )
     mr = np.ma.clip(mr, 0, 250)
-    mo = np.where(precip > 0.0, mr, mo)
+    mo = np.ma.where(precip > 0.0, mr, mo)
 
     # ### DRYING PHASE
     # Equilibrium Moisture Content (E)
