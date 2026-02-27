@@ -1328,30 +1328,31 @@ class FBP:
         # Initialize CFB array
         self.cfb = np.full_like(self.fuel_type, 0, dtype=np.float64)
 
-        # Create masks for C-6 and other fuel types
-        is_c6 = mask.where(self.fuel_type == 6, True, False)
-        non_crowning = mask.where(np.isin(self.fuel_type, self.non_crowning_fuels), True, False)
-        is_other = mask.where(np.isin(self.fuel_type, self.ftypes) & ~is_c6 & ~non_crowning, True, False)
+        with np.errstate(over='ignore'):
+            # Create masks for C-6 and other fuel types
+            is_c6 = mask.where(self.fuel_type == 6, True, False)
+            non_crowning = mask.where(np.isin(self.fuel_type, self.non_crowning_fuels), True, False)
+            is_other = mask.where(np.isin(self.fuel_type, self.ftypes) & ~is_c6 & ~non_crowning, True, False)
 
-        # Precompute rate of spread differences
-        delta_sros_c6 = self.sros - self.rso
-        delta_hros_other = self.hros - self.rso
+            # Precompute rate of spread differences
+            delta_sros_c6 = self.sros - self.rso
+            delta_hros_other = self.hros - self.rso
 
-        # Compute CFB for C-6 and other fuel types
-        cfb_c6 = mask.where(delta_sros_c6 < -3086, 0, 1 - np.exp(-0.23 * delta_sros_c6))
-        cfb_other = mask.where(delta_hros_other < -3086, 0, 1 - np.exp(-0.23 * delta_hros_other))
+            # Compute CFB for C-6 and other fuel types
+            cfb_c6 = mask.where(delta_sros_c6 < -3086, 0, 1 - np.exp(-0.23 * delta_sros_c6))
+            cfb_other = mask.where(delta_hros_other < -3086, 0, 1 - np.exp(-0.23 * delta_hros_other))
 
-        # Apply the calculations
-        self.cfb = mask.where(is_c6, cfb_c6, self.cfb)
-        self.cfb = mask.where(is_other, cfb_other, self.cfb)
+            # Apply the calculations
+            self.cfb = mask.where(is_c6, cfb_c6, self.cfb)
+            self.cfb = mask.where(is_other, cfb_other, self.cfb)
 
-        # Ensure self.cfb is finite and ranges between 0 and 1
-        is_finite = mask.where(np.isfinite(self.cfb), True, False)
-        self.cfb = mask.where(is_finite, self.cfb, 0)  # Replace NaNs/Infs with 0
-        self.cfb = mask.clip(self.cfb, 0, 1)  # Prevent extremely high values causing overflow
+            # Ensure self.cfb is finite and ranges between 0 and 1
+            is_finite = mask.where(np.isfinite(self.cfb), True, False)
+            self.cfb = mask.where(is_finite, self.cfb, 0)  # Replace NaNs/Infs with 0
+            self.cfb = mask.clip(self.cfb, 0, 1)  # Prevent extremely high values causing overflow
 
-        # Clean up memory
-        del is_c6, non_crowning, is_other, delta_sros_c6, delta_hros_other, cfb_c6, cfb_other, is_finite
+            # Clean up memory
+            del is_c6, non_crowning, is_other, delta_sros_c6, delta_hros_other, cfb_c6, cfb_other, is_finite
 
         return
 
