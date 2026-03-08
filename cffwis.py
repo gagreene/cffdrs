@@ -514,10 +514,10 @@ def dailyDMC(
 
         # ### RETURN FINAL DMC VALUES
         dmc = np.ma.where(precip > 1.5, (244.72 - 43.43 * np.log(mr - 20)), dmc0)
-        # Ensure DMC >= 0
-        dmc = np.ma.clip(dmc, 0, None)
         # Add the log drying rate (k) to the DMC value
         dmc += k
+        # Ensure DMC >= 0
+        dmc = np.ma.clip(dmc, 0, None)
 
     if return_array:
         return dmc.filled(np.nan)
