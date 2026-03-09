@@ -74,7 +74,7 @@ def diurnalFFMC_lawson(
 
     # Validate time: noon (12:00) to 11:59 the next day
     if not (0 <= forecast_hour <= 23):
-        raise ValueError('forecast_hour must be between 12 and 23, or between 0 and 11 (inclusive)')
+        raise ValueError('forecast_hour must be between 12 and 23 (day 1), or between 0 and 11 (day 2)')
 
     if not (0 <= forecast_minute <= 59):
         raise ValueError('forecast_minute must be between 0 and 59 (inclusive)')
