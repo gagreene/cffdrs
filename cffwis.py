@@ -51,19 +51,20 @@ month_dict = {
 
 
 def diurnalFFMC_lawson(
-        ffmc0_1600: Union[float, np.ndarray],
+        ffmc_1200: Union[float, np.ndarray],
         rh_1200: Union[float, np.ndarray],
         current_hour: int,
         current_minute: int
 ) -> float:
     """
     Predict hourly (diurnal) FFMC using the Lawson interpolation method.
-    Valid for times from noon (12:00) of the current day to 5:59 the next morning.
+    Valid for times from noon (12:00) of the current day to 11:59 the next morning.
 
-    This function wraps the `hourlyFFMC_lawson` function from `diurnal_ffmc_lawson.py'.
+    This function wraps the `hourly_ffmc_lawson_vectorized` function from `diurnal_ffmc_lawson.py'.
 
-    :param ffmc0_1600: Yesterday's 4pm (16:00) FFMC value (unitless code).
-        Max FFMC is assumed to occur at 4pm each day.
+    :param ffmc_1200: Current standard daily FFMC value (unitless code).
+        "Daily FFMC is calculated from noon weather observations, but represents fine fuel moisture at 1600 LST,
+        when the fine fuel moisture content is at or near the daily minimum." (Taylor et al. 1997)
     :param rh_1200: Today's noon time relative humidity value (%).
     :param current_hour: Current hour of the day (12–5).
     :param current_minute: Current minute (0–59).
@@ -79,7 +80,7 @@ def diurnalFFMC_lawson(
         raise ValueError('current_minute must be between 0 and 59 (inclusive)')
 
     # Return the requested hourly FFMC value using the Lawson method
-    return hourly_ffmc_lawson_vectorized(ffmc=ffmc0_1600, rh=rh_1200, hour=current_hour, minute=current_minute)
+    return hourly_ffmc_lawson_vectorized(ffmc=ffmc_1200, rh=rh_1200, hour=current_hour, minute=current_minute)
 
 
 def hourlyFFMC(
