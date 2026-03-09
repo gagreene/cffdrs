@@ -58,11 +58,11 @@ def diurnalFFMC_lawson(
 ) -> float:
     """
     Predict hourly (diurnal) FFMC using the Lawson interpolation method.
-    Valid for times from noon (12:00) of the current day to 11:59 the next morning.
+    Valid for times from noon (12:00 LST) of the current day to 11:59 LST the next morning.
 
     This function wraps the `hourly_ffmc_lawson_vectorized` function from `diurnal_ffmc_lawson.py'.
 
-    :param ffmc_1200: Current standard daily FFMC value (unitless code).
+    :param ffmc_1200: Current standard (LST) daily FFMC value (unitless code).
         "Daily FFMC is calculated from noon weather observations, but represents fine fuel moisture at 1600 LST,
         when the fine fuel moisture content is at or near the daily minimum." (Taylor et al. 1997)
     :param rh_1200: Today's noon time relative humidity value (%).
