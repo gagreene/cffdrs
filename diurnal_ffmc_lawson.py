@@ -378,10 +378,12 @@ RHCLASS = [
 #     return result if result.size > 1 else result[0]
 
 
-def hourly_ffmc_lawson_vectorized(ffmc: Union[float, np.ndarray],
-                                  rh: Union[float, np.ndarray],
-                                  hour: int,
-                                  minute: int) -> Union[float, np.ndarray]:
+def hourly_ffmc_lawson_vectorized(
+        ffmc: Union[float, np.ndarray],
+        rh: Union[float, np.ndarray],
+        hour: int,
+        minute: int
+) -> Union[float, np.ndarray]:
     """
     Vectorized implementation of the Lawson hourly FFMC interpolation.
 
@@ -391,115 +393,102 @@ def hourly_ffmc_lawson_vectorized(ffmc: Union[float, np.ndarray],
     :param rh: Array of relative humidity values (%)
     :return: Array of hourly FFMC values
     """
-    # Import the Lawson tables and convert to numpy arrays
-    global MAIN, L, M, H, RHCLASS
-    MAIN = np.array(MAIN, dtype=np.float32)
-    L = np.array(L, dtype=np.float32)
-    M = np.array(M, dtype=np.float32)
-    H = np.array(H, dtype=np.float32)
-    RHCLASS = np.array(RHCLASS, dtype=np.float32)
+    main_tbl = np.asarray(MAIN, dtype=np.float64)
+    low_tbl = np.asarray(L, dtype=np.float64)
+    med_tbl = np.asarray(M, dtype=np.float64)
+    high_tbl = np.asarray(H, dtype=np.float64)
+    rhclass_tbl = np.asarray(RHCLASS, dtype=np.float64)
 
-    # Convert inputs to numpy arrays with appropriate data types
-    ffmc = np.asarray(ffmc, dtype=np.float32)
-    hour = np.asarray(hour, dtype=np.int32)
-    minute = np.asarray(minute, dtype=np.int32)
-    rh = np.asarray(rh, dtype=np.float32)
+    ffmc_ma = np.ma.asarray(ffmc, dtype=np.float64)
+    rh_ma = np.ma.asarray(rh, dtype=np.float64)
+    hour_arr = np.asarray(hour, dtype=np.int32)
+    minute_arr = np.asarray(minute, dtype=np.int32)
 
-    # Clip FFMC values to the valid range [17.5, 101.0]
-    ffmc = np.clip(ffmc, 17.5, 101.0)
+    ffmc_data, rh_data, hour_data, minute_data = np.broadcast_arrays(
+        np.ma.getdata(ffmc_ma),
+        np.ma.getdata(rh_ma),
+        hour_arr,
+        minute_arr
+    )
+    ffmc_mask, rh_mask = np.broadcast_arrays(
+        np.ma.getmaskarray(ffmc_ma),
+        np.ma.getmaskarray(rh_ma)
+    )
+    combined_mask = ffmc_mask | rh_mask
 
-    # Clip RH values to the valid range [1, 100] and convert to integers
-    rh = np.clip(np.round(rh), 1, 100).astype(np.int32)
+    ffmc_data = np.clip(ffmc_data, 17.5, 101.0)
+    rh_data = np.clip(np.rint(rh_data), 1, 100).astype(np.int32)
 
-    # Initialize the output array with a default value of -98.0
-    ffmc_out = np.full(ffmc.shape, -98.0, dtype=np.float32)
+    ffmc_out = np.full(ffmc_data.shape, np.nan, dtype=np.float64)
 
-    # Calculate the time value for MAIN table use (convert hour and minute to a single value)
-    hour_val = hour * 100 + minute
-    hour_val = np.where(hour_val < 100, hour_val + 2400, hour_val)  # Adjust for times past midnight
+    hour_val = hour_data * 100 + minute_data
+    hour_val = np.where(hour_val < 100, hour_val + 2400, hour_val)
 
-    # Determine whether the time is in the morning (06:00–11:59) or MAIN period (12:00–05:59)
-    is_morning = (hour >= 6) & (hour <= 11)
-    is_main = ~is_morning
+    is_morning = (~combined_mask) & (hour_data >= 6) & (hour_data <= 11)
+    is_main = (~combined_mask) & (~((hour_data >= 6) & (hour_data <= 11)))
 
-    # MAIN interpolation (12:00–05:59)
     if np.any(is_main):
-        # Extract relevant values for MAIN period
-        ffmc_main = ffmc[is_main]
-        hour_main = hour[is_main]
-        minute_main = minute[is_main]
+        ffmc_main = ffmc_data[is_main]
+        hour_main = hour_data[is_main]
+        minute_main = minute_data[is_main]
         hour_val_main = hour_val[is_main]
 
-        # Find the row index in the MAIN table for the given time
-        tindex = np.searchsorted(MAIN[:, 0], hour_val_main, side='right') - 1
-        tindex = np.clip(tindex, 1, MAIN.shape[0] - 2)
+        tindex = np.searchsorted(main_tbl[:, 0], hour_val_main, side='right') - 1
+        tindex = np.clip(tindex, 1, main_tbl.shape[0] - 2)
 
-        # Find the column index in the MAIN table for the given FFMC value
-        fidx = np.searchsorted(MAIN[0], ffmc_main, side='right') - 1
-        fidx = np.clip(fidx, 1, len(MAIN[0]) - 2)
+        fidx = np.searchsorted(main_tbl[0], ffmc_main, side='right') - 1
+        fidx = np.clip(fidx, 1, main_tbl.shape[1] - 2)
 
-        # Perform bilinear interpolation in the MAIN table
-        frac = (ffmc_main - MAIN[0, fidx]) / (MAIN[0, fidx + 1] - MAIN[0, fidx])
-        i12 = MAIN[tindex, fidx] + (MAIN[tindex, fidx + 1] - MAIN[tindex, fidx]) * frac
-        i34 = MAIN[tindex + 1, fidx] + (MAIN[tindex + 1, fidx + 1] - MAIN[tindex + 1, fidx]) * frac
+        frac = (ffmc_main - main_tbl[0, fidx]) / (main_tbl[0, fidx + 1] - main_tbl[0, fidx])
+        i12 = main_tbl[tindex, fidx] + (main_tbl[tindex, fidx + 1] - main_tbl[tindex, fidx]) * frac
+        i34 = main_tbl[tindex + 1, fidx] + (main_tbl[tindex + 1, fidx + 1] - main_tbl[tindex + 1, fidx]) * frac
 
-        # Adjust interpolation based on the minute of the hour
         divisor = np.where(hour_main == 11, 59.0, 60.0)
-        ffmc_interp = i12 + (i34 - i12) * (minute_main / divisor)
+        ffmc_out[is_main] = i12 + (i34 - i12) * (minute_main / divisor)
 
-        # Store the interpolated values in the output array
-        ffmc_out[is_main] = ffmc_interp
-
-    # L/M/H table interpolation (06:00–11:59)
     if np.any(is_morning):
-        # Extract RH cutoff values for classification
-        rh_cutoff = np.array([r[0] for r in RHCLASS[:8]])
-        rh_class_L = np.array([r[0] for r in RHCLASS[24:32]])
-        rh_class_H = np.array([r[0] for r in RHCLASS[8:16]])
+        rh_cutoff = rhclass_tbl[:8, 0]
+        rh_class_l = rhclass_tbl[24:32, 0]
+        rh_class_h = rhclass_tbl[8:16, 0]
 
-        # Extract relevant values for the morning period
-        ffmc_morning = ffmc[is_morning]
-        rh_morning = rh[is_morning]
-        hour_morning = hour[is_morning]
-        minute_morning = minute[is_morning]
+        ffmc_morning = ffmc_data[is_morning]
+        rh_morning = rh_data[is_morning]
+        hour_morning = hour_data[is_morning]
+        minute_morning = minute_data[is_morning]
         hour_val_morning = hour_morning * 100 + minute_morning
 
-        # Find the row index in the RHCLASS table for the given time
         tindex = np.searchsorted(rh_cutoff, hour_val_morning, side='right')
         tindex = np.clip(tindex, 1, 7)
 
-        # Classify RH values into Low (L), Medium (M), or High (H)
-        rh_class = np.full_like(rh_morning, 'M', dtype='<U1')
-        rh_class[rh_morning > rh_class_H[tindex]] = 'H'
-        rh_class[rh_morning < rh_class_L[tindex]] = 'L'
+        rh_class = np.full(rh_morning.shape, 'M', dtype='<U1')
+        rh_class[rh_morning > rh_class_h[tindex]] = 'H'
+        rh_class[rh_morning < rh_class_l[tindex]] = 'L'
 
-        # Map RH classes to their respective tables
-        table_map = {'L': L, 'M': M, 'H': H}
-        out_vals = np.zeros_like(ffmc_morning, dtype=np.float32)
+        table_map = {'L': low_tbl, 'M': med_tbl, 'H': high_tbl}
+        out_vals = np.zeros(ffmc_morning.shape, dtype=np.float64)
 
-        # Perform interpolation for each RH class
         for cls in ['L', 'M', 'H']:
-            sel = (rh_class == cls)
-            if not np.any(sel):
+            sel_idx = np.flatnonzero(rh_class == cls)
+            if sel_idx.size == 0:
                 continue
 
-            # Extract selected values for the current RH class
-            ffmc_sel = ffmc_morning[sel]
-            minute_sel = minute_morning[sel]
-            t_sel = tindex[sel]
+            ffmc_sel = ffmc_morning[sel_idx]
+            minute_sel = minute_morning[sel_idx]
+            hour_sel = hour_morning[sel_idx]
+            t_sel = tindex[sel_idx]
+            tbl = table_map[cls]
 
-            # Perform bilinear interpolation for each selected value
-            for i, (f, m, ti) in enumerate(zip(ffmc_sel, minute_sel, t_sel)):
-                iidx = np.searchsorted(table_map[cls][0], f, side='right') - 1
-                iidx = np.clip(iidx, 1, len(table_map[cls][0]) - 2)
-                frac = (f - table_map[cls][0][iidx]) / (table_map[cls][0][iidx + 1] - table_map[cls][0][iidx])
-                i12 = table_map[cls][ti][iidx] + (table_map[cls][ti][iidx + 1] - table_map[cls][ti][iidx]) * frac
-                i34 = table_map[cls][ti + 1][iidx] + (
-                        table_map[cls][ti + 1][iidx + 1] - table_map[cls][ti + 1][iidx]) * frac
-                div = 59.0 if hour_morning[sel][i] == 11 else 60.0
-                out_vals[sel.nonzero()[0][i]] = i12 + (i34 - i12) * (m / div)
+            for local_i, (f, m, h, ti) in enumerate(zip(ffmc_sel, minute_sel, hour_sel, t_sel)):
+                iidx = np.searchsorted(tbl[0], f, side='right') - 1
+                iidx = int(np.clip(iidx, 1, tbl.shape[1] - 2))
+                frac = (f - tbl[0, iidx]) / (tbl[0, iidx + 1] - tbl[0, iidx])
+                i12 = tbl[ti, iidx] + (tbl[ti, iidx + 1] - tbl[ti, iidx]) * frac
+                i34 = tbl[ti + 1, iidx] + (tbl[ti + 1, iidx + 1] - tbl[ti + 1, iidx]) * frac
+                div = 59.0 if h == 11 else 60.0
+                out_vals[sel_idx[local_i]] = i12 + (i34 - i12) * (m / div)
 
-        # Store the interpolated values in the output array
         ffmc_out[is_morning] = out_vals
 
+    if ffmc_out.shape == ():
+        return float(ffmc_out)
     return ffmc_out

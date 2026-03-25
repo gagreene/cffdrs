@@ -50,12 +50,29 @@ month_dict = {
 }
 
 
+def _verify_valid_data(arrays, return_array: bool):
+    """
+    Verify that input masked arrays contain at least some valid data.
+
+    :param arrays: list of masked arrays to check
+    :param return_array: whether the caller expects an array return value
+    :return: True if data are valid, otherwise a NaN scalar or NaN array
+    """
+    if any(np.ma.getmaskarray(arr).all() for arr in arrays):
+        if return_array:
+            out_shape = np.broadcast(*[np.asarray(arr) for arr in arrays]).shape
+            return np.full(out_shape, np.nan, dtype=float)
+        return float('nan')
+
+    return True
+
+
 def diurnalFFMC_lawson(
         ffmc_1200: Union[float, np.ndarray],
         rh_1200: Union[float, np.ndarray],
         forecast_hour: int,
         forecast_minute: int
-) -> float:
+) -> Union[float, np.ndarray]:
     """
     Predict hourly (diurnal) FFMC using the Lawson interpolation method.
     Valid for times from noon (12:00 LST) of the current day to 11:59 LST the next morning.
@@ -72,6 +89,32 @@ def diurnalFFMC_lawson(
     """
     from diurnal_ffmc_lawson import hourly_ffmc_lawson_vectorized
 
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if any(isinstance(data, np.ndarray) for data in [ffmc_1200, rh_1200]):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    if not isinstance(ffmc_1200, (int, float, np.ndarray, np.ma.MaskedArray)):
+        raise TypeError('ffmc_1200 must be either int, float or numpy ndarray data types')
+    elif isinstance(ffmc_1200, (np.ndarray, np.ma.MaskedArray)):
+        ffmc_1200 = np.ma.array(ffmc_1200, mask=np.isnan(np.asarray(ffmc_1200, dtype=float)))
+    else:
+        ffmc_1200 = np.ma.array([ffmc_1200], mask=np.isnan([ffmc_1200]))
+
+    if not isinstance(rh_1200, (int, float, np.ndarray, np.ma.MaskedArray)):
+        raise TypeError('rh_1200 must be either int, float or numpy ndarray data types')
+    elif isinstance(rh_1200, (np.ndarray, np.ma.MaskedArray)):
+        rh_1200 = np.ma.array(rh_1200, mask=np.isnan(np.asarray(rh_1200, dtype=float)))
+    else:
+        rh_1200 = np.ma.array([rh_1200], mask=np.isnan([rh_1200]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([ffmc_1200, rh_1200], return_array)
+    if verification_result is not True:
+        return verification_result
+
     # Validate time: noon (12:00) to 11:59 the next day
     if not (0 <= forecast_hour <= 23):
         raise ValueError('forecast_hour must be between 12 and 23 (day 1), or between 0 and 11 (day 2)')
@@ -80,7 +123,10 @@ def diurnalFFMC_lawson(
         raise ValueError('forecast_minute must be between 0 and 59 (inclusive)')
 
     # Return the requested hourly FFMC value using the Lawson method
-    return hourly_ffmc_lawson_vectorized(ffmc=ffmc_1200, rh=rh_1200, hour=forecast_hour, minute=forecast_minute)
+    ffmc_out = hourly_ffmc_lawson_vectorized(ffmc=ffmc_1200, rh=rh_1200, hour=forecast_hour, minute=forecast_minute)
+    if return_array:
+        return np.asarray(ffmc_out, dtype=float)
+    return float(np.atleast_1d(ffmc_out)[0])
 
 
 def hourlyFFMC(
@@ -150,6 +196,11 @@ def hourlyFFMC(
         precip = np.ma.array(precip, mask=np.isnan(precip))
     else:
         precip = np.ma.array([precip], mask=np.isnan([precip]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([ffmc0, temp, rh, wind, precip], return_array)
+    if verification_result is not True:
+        return verification_result
 
     # ### PREVIOUS HOURS ESTIMATED FINE FUEL MOISTURE CONTENT
     # FFMC coefficient
@@ -294,6 +345,11 @@ def dailyFFMC(ffmc0: Union[int, float, np.ndarray],
         precip = np.ma.array(precip, mask=np.isnan(precip))
     else:
         precip = np.ma.array([precip], mask=np.isnan([precip]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([ffmc0, temp, rh, wind, precip], return_array)
+    if verification_result is not True:
+        return verification_result
 
     # ### PREVIOUS HOURS ESTIMATED FINE FUEL MOISTURE CONTENT
     # FFMC coefficient
@@ -443,6 +499,11 @@ def dailyDMC(
     # Verify lat_adjust
     if not isinstance(lat_adjust, bool):
         raise TypeError('lat_adjust must be a boolean value (True or False)')
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([dmc0, temp, rh, precip, lat], return_array)
+    if verification_result is not True:
+        return verification_result
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=UserWarning)
@@ -599,6 +660,11 @@ def dailyDC(
     if not isinstance(lat_adjust, bool):
         raise TypeError('lat_adjust must be a boolean value (True or False)')
 
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([dc0, temp, precip, lat], return_array)
+    if verification_result is not True:
+        return verification_result
+
     # ### YESTERDAYS MOISTURE EQUIVALENT VALUE
     q0 = 800 / np.exp(dc0 / 400)
 
@@ -703,6 +769,11 @@ def dailyISI(
     if not isinstance(fbp_mod, bool):
         raise ValueError('fbp_mod must be True or False')
 
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([wind, ffmc], return_array)
+    if verification_result is not True:
+        return verification_result
+
     # ### CURRENT ESTIMATED FINE FUEL MOISTURE CONTENT
     m = 147.2 * (101 - ffmc) / (59.5 + ffmc)
 
@@ -760,6 +831,11 @@ def dailyBUI(
     else:
         dc = np.ma.array([dc], mask=np.isnan([dc]))
 
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([dmc, dc], return_array)
+    if verification_result is not True:
+        return verification_result
+
     # ### RETURN FINAL BUI VALUE
     bui = np.ma.where(dmc == 0,
                       0,
@@ -812,6 +888,11 @@ def dailyFWI(
     else:
         bui = np.ma.array([bui], mask=np.isnan([bui]))
 
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([isi, bui], return_array)
+    if verification_result is not True:
+        return verification_result
+
     # ### DUFF MOISTURE FUNCTION (fD)
     np.seterr(over='ignore')
     fd = np.ma.where(bui <= 80,
@@ -858,6 +939,11 @@ def dailyDSR(fwi: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
         fwi = np.ma.array(fwi, mask=np.isnan(fwi))
     else:
         fwi = np.ma.array([fwi], mask=np.isnan([fwi]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([fwi], return_array)
+    if verification_result is not True:
+        return verification_result
 
     # ### RETURN DSR VALUE
     dsr = 0.0272 * fwi ** 1.77
@@ -964,6 +1050,11 @@ def startupDC(
     # Verify lat_adjust
     if not isinstance(lat_adjust, bool):
         raise TypeError('lat_adjust must be a boolean value (True or False)')
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([dc_stop, moist_stop, moist_start, precip_ow, temp, lat], return_array)
+    if verification_result is not True:
+        return verification_result
 
     # ### DRYING PHASE
     # Day length factor for DC Calculations (per CFS cffdrs_r/cffwis module)
