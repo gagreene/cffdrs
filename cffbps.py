@@ -360,7 +360,8 @@ class FBP:
 
             self.ref_array = mask.array(
                 np.full(first_array.shape, 0, dtype=np.float64),
-                mask=np.isnan([first_array])
+                mask=np.isnan([first_array]),
+                fill_value=np.nan
             )
 
             self.ref_int_array = mask.array(
@@ -370,7 +371,9 @@ class FBP:
         else:
             self.return_array = False
             # Get first input parameter array as a masked array
-            self.ref_array = mask.array([0], mask=np.isnan([self.fuel_type])).astype(np.float64)
+            self.ref_array = mask.array([0],
+                                        mask=np.isnan([self.fuel_type]),
+                                        fill_value=np.nan).astype(np.float64)
             self.ref_int_array = mask.array([0], mask=-99).astype(np.int8)
 
         return
@@ -1664,17 +1667,26 @@ class FBP:
             'fi_class': self.fi_class,  # Fire intensity class (1-6)
         }
 
+        def _to_plain(arr):
+            # Guard to fill returned arrays with NaN at masked cells so downstream nanmax/isfinite guards
+            # treat them as missing instead of as real values.
+            if isinstance(arr, np.ma.MaskedArray) and np.issubdtype(arr.dtype, np.floating):
+                return arr.filled(np.nan)
+            return arr.data
+
         # Retrieve requested parameters
         if self.return_array:
             return [
-                fbp_params.get(var).data[0] if fbp_params.get(var, None) is not None and fbp_params.get(var).ndim > 3
-                else fbp_params.get(var).data if fbp_params.get(var, None) is not None
+                _to_plain(fbp_params.get(var))[0] if fbp_params.get(var, None) is not None
+                                                     and fbp_params.get(var).ndim > 3
+                else _to_plain(fbp_params.get(var)) if fbp_params.get(var, None) is not None
                 else np.nan
                 for var in out_request
             ]
         else:
             return [
-                fbp_params.get(var).item() if fbp_params.get(var, None) is not None and fbp_params.get(var).ndim == 0
+                fbp_params.get(var).item() if fbp_params.get(var, None) is not None
+                                              and fbp_params.get(var).ndim == 0
                 else (fbp_params.get(var))[0].item() if fbp_params.get(var, None) is not None
                 else np.nan
                 for var in out_request
