@@ -371,9 +371,11 @@ class FBP:
         else:
             self.return_array = False
             # Get first input parameter array as a masked array
-            self.ref_array = mask.array([0],
-                                        mask=np.isnan([self.fuel_type]),
-                                        fill_value=np.nan).astype(np.float64)
+            self.ref_array = mask.array(
+                np.array([0.0], dtype=np.float64),
+                mask=False,
+                fill_value=np.nan
+            )
             self.ref_int_array = mask.array([0], mask=-99).astype(np.int8)
 
         return
