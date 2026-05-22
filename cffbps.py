@@ -408,10 +408,11 @@ class FBP:
         if self.convert_fuel_type_codes:
             self.fuel_type = convert_grid_codes(self.fuel_type)
 
-        # Apply an additional mask to assign invalid fuel types as non-fuel (19)
-        valid_fuel_types = fbpFTCode_NumToAlpha_LUT.keys()  # Get valid numeric codes
-        invalid_mask = ~np.isin(self.fuel_type, list(valid_fuel_types))
-        self.fuel_type = mask.where(invalid_mask, 19, self.fuel_type)
+        # Apply an additional mask to exclude invalid fuel types (valid range: 1-20)
+        valid_fuel_types = np.arange(1, 21, dtype=np.int8)
+        current_mask = np.ma.getmaskarray(self.fuel_type)
+        invalid_mask = ~np.isin(self.fuel_type.data, valid_fuel_types)
+        self.fuel_type = mask.array(self.fuel_type.data, mask=(current_mask | invalid_mask))
 
         # Get unique fuel types present in the dataset
         self.ftypes = [ftype for ftype in np.unique(self.fuel_type) if ftype in list(self.rosParams.keys())]
