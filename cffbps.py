@@ -969,6 +969,11 @@ class FBP:
                 np.degrees(angle_rad)
             )
 
+            # When wsv == 0 (calm wind on flat ground, or exact wind/slope cancellation) the
+            # azimuth is undefined. Spread is circular in this state (lb_ratio == 1),
+            # so the direction is immaterial — substitute 0° to keep raz finite for downstream consumers.
+            self.raz = mask.where(self.wsv > 0, self.raz, 0.0)
+
             # Compute head fire and backfire wind function
             self.fW = mask.where(
                 self.wsv > 40,
