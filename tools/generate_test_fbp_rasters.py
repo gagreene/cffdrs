@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thur Aug 8 17:30:00 2024
 
@@ -6,13 +5,14 @@ Created on Thur Aug 8 17:30:00 2024
 """
 
 import os
+from datetime import datetime as dt
+
 import numpy as np
 import ProcessRasters as pr
-from datetime import datetime as dt
-from typing import Union, Optional
 
-# Get input folder
-input_folder = os.path.join(os.path.dirname(__file__), 'tests', 'cffbps', 'data', 'inputs')
+# Get input folder (this script lives in tools/; the fixtures live at the repo root)
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+input_folder = os.path.join(_REPO_ROOT, 'tests', 'cffbps', 'data', 'inputs')
 
 # Get input dataset paths
 fuel_type_path = os.path.join(input_folder, 'FuelType.tif')
@@ -24,19 +24,19 @@ fuel_type_array = fuel_type_ras.read()
 
 
 def gen_test_data(wx_date: int,
-                  lat: Union[float, int],
-                  long: Union[float, int],
-                  elevation: Union[float, int],
-                  slope: Union[float, int],
-                  aspect: Union[float, int],
-                  ws: Union[float, int],
-                  wd: Union[float, int],
-                  ffmc: Union[float, int],
-                  bui: Union[float, int],
-                  pc: Optional[Union[float, int]] = 50,
-                  pdf: Optional[Union[float, int]] = 35,
-                  gfl: Optional[Union[float, int]] = 0.35,
-                  gcf: Optional[Union[float, int]] = 80,
+                  lat: float | int,
+                  long: float | int,
+                  elevation: float | int,
+                  slope: float | int,
+                  aspect: float | int,
+                  ws: float | int,
+                  wd: float | int,
+                  ffmc: float | int,
+                  bui: float | int,
+                  pc: float | int | None = 50,
+                  pdf: float | int | None = 35,
+                  gfl: float | int | None = 0.35,
+                  gcf: float | int | None = 80,
                   dtype=np.float32):
     # ### VERIFY ALL INPUTS
     # Verify wx_date

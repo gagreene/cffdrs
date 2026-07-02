@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thur Apr 17 13:00:00 2025
 
@@ -7,8 +6,8 @@ Created on Thur Apr 17 13:00:00 2025
 The hourlyFFMC_lawson function.
 This code was translated to Python from the C++ code in the WISE_FWI_Module.
 """
+
 import numpy as np
-from typing import Union
 
 # Morning hour lookup tables for low (L) RH class
 L = [
@@ -379,11 +378,11 @@ RHCLASS = [
 
 
 def hourly_ffmc_lawson_vectorized(
-        ffmc: Union[float, np.ndarray],
-        rh: Union[float, np.ndarray],
+        ffmc: float | np.ndarray,
+        rh: float | np.ndarray,
         hour: int,
         minute: int
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """
     Vectorized implementation of the Lawson hourly FFMC interpolation.
 
@@ -478,7 +477,7 @@ def hourly_ffmc_lawson_vectorized(
             t_sel = tindex[sel_idx]
             tbl = table_map[cls]
 
-            for local_i, (f, m, h, ti) in enumerate(zip(ffmc_sel, minute_sel, hour_sel, t_sel)):
+            for local_i, (f, m, h, ti) in enumerate(zip(ffmc_sel, minute_sel, hour_sel, t_sel, strict=False)):
                 iidx = np.searchsorted(tbl[0], f, side='right') - 1
                 iidx = int(np.clip(iidx, 1, tbl.shape[1] - 2))
                 frac = (f - tbl[0, iidx]) / (tbl[0, iidx + 1] - tbl[0, iidx])

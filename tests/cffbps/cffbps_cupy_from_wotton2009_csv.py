@@ -1,7 +1,19 @@
-from cffbps_cupy import FBP
+"""Manual GPU (CuPy) Wotton-2009 validation script — NOT collected by pytest.
+
+Depends on the deferred ``cffbps_cupy`` module at the repo root (the CuPy variant
+is not packaged or refactored yet), plus a CUDA-capable
+environment. Run from the repo root with the root on PYTHONPATH once the CuPy
+variant is revisited.
+"""
 import os
-import pandas as pd
+import sys
+
 import numpy as np
+import pandas as pd
+
+# cffbps_cupy still lives at the repo root (deferred, unpackaged — Decision A).
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from cffbps_cupy import FBP
 
 # Fuel types
 fuel_type_lookup = {

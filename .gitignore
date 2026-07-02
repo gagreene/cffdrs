@@ -67,3 +67,6 @@ Desktop.ini
 
 /tests/cffwis/data/outputs/
 /tests/cffbps/data/outputs/
+
+# Local working documents (kept out of the repo)
+/REFACTOR_PLAN.md

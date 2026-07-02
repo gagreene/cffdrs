@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 20 15:00:00 2024
 
@@ -6,9 +5,9 @@ Created on Wed Mar 20 15:00:00 2024
 """
 __author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
 
-import numpy as np
-from typing import Union
 import warnings
+
+import numpy as np
 
 # Month dictionary for converting month names or zero-padded strings to integers
 month_dict = {
@@ -68,11 +67,11 @@ def _verify_valid_data(arrays, return_array: bool):
 
 
 def diurnalFFMC_lawson(
-        ffmc_1200: Union[float, np.ndarray],
-        rh_1200: Union[float, np.ndarray],
+        ffmc_1200: float | np.ndarray,
+        rh_1200: float | np.ndarray,
         forecast_hour: int,
         forecast_minute: int
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """
     Predict hourly (diurnal) FFMC using the Lawson interpolation method.
     Valid for times from noon (12:00 LST) of the current day to 11:59 LST the next morning.
@@ -87,7 +86,7 @@ def diurnalFFMC_lawson(
     :param forecast_minute: Forecast minute (0–59).
     :return: Predicted hourly FFMC value using the Lawson method
     """
-    from diurnal_ffmc_lawson import hourly_ffmc_lawson_vectorized
+    from .diurnal_ffmc_lawson import hourly_ffmc_lawson_vectorized
 
     # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
     if any(isinstance(data, np.ndarray) for data in [ffmc_1200, rh_1200]):
@@ -132,14 +131,14 @@ def diurnalFFMC_lawson(
 
 
 def hourlyFFMC(
-        ffmc0: Union[int, float, np.ndarray],
-        temp: Union[int, float, np.ndarray],
-        rh: Union[int, float, np.ndarray],
-        wind: Union[int, float, np.ndarray],
-        precip: Union[int, float, np.ndarray],
-        time_step: Union[int, float, np.ndarray] = 1,
+        ffmc0: int | float | np.ndarray,
+        temp: int | float | np.ndarray,
+        rh: int | float | np.ndarray,
+        wind: int | float | np.ndarray,
+        precip: int | float | np.ndarray,
+        time_step: int | float | np.ndarray = 1,
         use_precise_values: bool = False
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """
     Function to calculate hourly FFMC values per Van Wagner (1977) and Alexander et al. (1984).
 
@@ -290,11 +289,11 @@ def hourlyFFMC(
             return float(np.atleast_1d(ffmc)[0])
 
 
-def dailyFFMC(ffmc0: Union[int, float, np.ndarray],
-              temp: Union[int, float, np.ndarray],
-              rh: Union[int, float, np.ndarray],
-              wind: Union[int, float, np.ndarray],
-              precip: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
+def dailyFFMC(ffmc0: int | float | np.ndarray,
+              temp: int | float | np.ndarray,
+              rh: int | float | np.ndarray,
+              wind: int | float | np.ndarray,
+              precip: int | float | np.ndarray) -> float | np.ndarray:
     """
     Function to calculate daily FFMC values per Van Wagner (1987).
     :param ffmc0: yesterday's FFMC value (unitless code)
@@ -425,14 +424,14 @@ def dailyFFMC(ffmc0: Union[int, float, np.ndarray],
 
 
 def dailyDMC(
-        dmc0: Union[int, float, np.ndarray],
-        temp: Union[int, float, np.ndarray],
-        rh: Union[int, float, np.ndarray],
-        precip: Union[int, float, np.ndarray],
-        month: Union[int, str],
-        lat: Union[int, float, np.ndarray] = 49.0,
+        dmc0: int | float | np.ndarray,
+        temp: int | float | np.ndarray,
+        rh: int | float | np.ndarray,
+        precip: int | float | np.ndarray,
+        month: int | str,
+        lat: int | float | np.ndarray = 49.0,
         lat_adjust: bool = False
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """
     Function to calculate today's DMC per Van Wagner (1987).
 
@@ -600,13 +599,13 @@ def dailyDMC(
 
 
 def dailyDC(
-        dc0: Union[int, float, np.ndarray],
-        temp: Union[int, float, np.ndarray],
-        precip: Union[int, float, np.ndarray],
-        month: Union[int, str],
-        lat: Union[int, float, np.ndarray] = 49.0,
+        dc0: int | float | np.ndarray,
+        temp: int | float | np.ndarray,
+        precip: int | float | np.ndarray,
+        month: int | str,
+        lat: int | float | np.ndarray = 49.0,
         lat_adjust: bool = False
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """
     Function to calculate today's DMC per Van Wagner (1987).
     :param dc0: yesterday's DC value (unitless code)
@@ -743,10 +742,10 @@ def dailyDC(
 
 
 def dailyISI(
-        wind: Union[int, float, np.ndarray],
-        ffmc: Union[int, float, np.ndarray],
+        wind: int | float | np.ndarray,
+        ffmc: int | float | np.ndarray,
         fbp_mod: bool = False
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """
     Function to calculate ISI per Van Wagner (1987).
     The daily ISI equation is used for both hourly and daily ISI calculations.\n
@@ -816,9 +815,9 @@ def dailyISI(
 
 
 def dailyBUI(
-        dmc: Union[int, float, np.ndarray],
-        dc: Union[int, float, np.ndarray]
-) -> Union[float, np.ndarray]:
+        dmc: int | float | np.ndarray,
+        dc: int | float | np.ndarray
+) -> float | np.ndarray:
     """
     Function to calculate daily Build Up Index values per Van Wagner (1987).
     :param dmc: current DMC value (unitless code)
@@ -872,9 +871,9 @@ def dailyBUI(
 
 
 def dailyFWI(
-        isi: Union[int, float, np.ndarray],
-        bui: Union[int, float, np.ndarray]
-) -> Union[float, np.ndarray]:
+        isi: int | float | np.ndarray,
+        bui: int | float | np.ndarray
+) -> float | np.ndarray:
     """
     Function to calculate FWI per Van Wagner (1987).
     The daily FWI equation is used for both hourly and daily FWI calculations.\n
@@ -940,7 +939,7 @@ def dailyFWI(
         return float(fwi.filled(np.nan)[0])
 
 
-def dailyDSR(fwi: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
+def dailyDSR(fwi: int | float | np.ndarray) -> float | np.ndarray:
     """
     Function to calculate the Daily Severity Rating (DSR) per Van Wagner (1987)
     :param fwi: current FWI value (unitless code)
@@ -981,15 +980,15 @@ def dailyDSR(fwi: Union[int, float, np.ndarray]) -> Union[float, np.ndarray]:
 
 
 def startupDC(
-        dc_stop: Union[int, float, np.ndarray],
-        moist_stop: Union[int, float, np.ndarray],
-        moist_start: Union[int, float, np.ndarray],
-        precip_ow: Union[int, float, np.ndarray],
-        temp: Union[int, float, np.ndarray],
-        month: Union[int, str],
-        lat: Union[int, float, np.ndarray] = 49.0,
+        dc_stop: int | float | np.ndarray,
+        moist_stop: int | float | np.ndarray,
+        moist_start: int | float | np.ndarray,
+        precip_ow: int | float | np.ndarray,
+        temp: int | float | np.ndarray,
+        month: int | str,
+        lat: int | float | np.ndarray = 49.0,
         lat_adjust: bool = False
-) -> Union[float, np.ndarray]:
+) -> float | np.ndarray:
     """
     Function to calculate the DC startup values after overwintering.\n
     This function implements new procedures outlined in Hanes and Wotton (2024).
