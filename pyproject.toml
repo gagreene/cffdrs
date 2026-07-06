@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -43,8 +43,14 @@ dev = ["ruff>=0.5", "mypy>=1.8"]
 Homepage = "https://github.com/gagreene/cffdrs"
 Repository = "https://github.com/gagreene/cffdrs"
 
+# Version comes from git tags via hatch-vcs (setuptools-scm rules): a `v0.1.0`
+# tag builds 0.1.0; untagged commits build 0.1.devN+g<sha>. The build hook writes
+# the resolved version into src/cffdrs/_version.py (gitignored).
 [tool.hatch.version]
-path = "src/cffdrs/__init__.py"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/cffdrs/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cffdrs"]

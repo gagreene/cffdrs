@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # hatch-vcs derives the version from git tags; a shallow, tagless
+          # checkout would misversion the build.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v4
       - name: Run test suite
         run: |
