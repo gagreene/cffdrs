@@ -1,0 +1,15 @@
+[package]
+name = "cffdrs-py"
+version = "0.1.0"
+edition = "2021"
+description = "Python bindings (wheel: cffdrs-rs) over cffdrs-core."
+license = "GPL-3.0-or-later"
+
+[lib]
+name = "cffdrs_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+cffdrs-core = { path = "../cffdrs-core" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+numpy = "0.22"

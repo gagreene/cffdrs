@@ -1,0 +1,12 @@
+[package]
+name = "cffdrs-core"
+version = "0.1.0"
+edition = "2021"
+description = "Pure-Rust implementation of the CFFDRS FBP equations (scalar core + grid pass), mirroring the cffdrs Python package in this repository."
+license = "GPL-3.0-or-later"
+
+[dependencies]
+# deliberately none: the core is dependency-free Rust
+
+[dev-dependencies]
+serde_json = "1"
