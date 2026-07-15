@@ -47,6 +47,18 @@ pub struct FbpInput {
     /// Optional caller-supplied Julian date (`initialize(dj=...)`); derived
     /// from `wx_date` when None.
     pub dj_override: Option<f64>,
+    /// Injected foliar moisture (`setParams({'fmc': ...})` in place of
+    /// calcFMC). When Some, calcFMC is skipped entirely: latn/d0/dj/nd keep
+    /// their zero template values and — critically — so does fme, which
+    /// zeroes the C-6 crown ROS. This mirrors the recompute sequence
+    /// fire-growth engines run to regenerate output quantities from stamped
+    /// per-cell weather.
+    pub fmc_override: Option<f64>,
+    /// Injected head ROS (`setParams({'hros': ...})` after calcROS): replaces
+    /// hros before calcCSFI onward; bros and sros keep their computed values,
+    /// so C-6 cfb (which reads sros) is unaffected and the C-6 blend can
+    /// overwrite the injected value.
+    pub hros_override: Option<f64>,
 }
 
 /// Everything the scalar pass computes: the snapshot's 54 quantities.
@@ -117,6 +129,71 @@ pub struct FbpResult {
     pub fi_class: f64,
     pub accel: f64,
     pub fuel_type: f64,
+}
+
+
+impl FbpResult {
+    /// Value by its Python-package output name (the names `getParams`
+    /// accepts, e.g. "hros", "fF", "fire_type"). None for unknown names.
+    pub fn get(&self, name: &str) -> Option<f64> {
+        Some(match name {
+            "ws" => self.ws,
+            "wd" => self.wd,
+            "wse" => self.wse,
+            "wse1" => self.wse1,
+            "wse2" => self.wse2,
+            "wsx" => self.wsx,
+            "wsy" => self.wsy,
+            "wsv" => self.wsv,
+            "raz" => self.raz,
+            "m" => self.m,
+            "fF" => self.f_f,
+            "fW" => self.f_w,
+            "ffmc" => self.ffmc,
+            "isi" => self.isi,
+            "bui" => self.bui,
+            "a" => self.a,
+            "b" => self.b,
+            "c" => self.c,
+            "q" => self.q,
+            "bui0" => self.bui0,
+            "be" => self.be,
+            "be_max" => self.be_max,
+            "sf" => self.sf,
+            "rsz" => self.rsz,
+            "rsf" => self.rsf,
+            "isf" => self.isf,
+            "rsi" => self.rsi,
+            "latn" => self.latn,
+            "dj" => self.dj,
+            "d0" => self.d0,
+            "nd" => self.nd,
+            "fmc" => self.fmc,
+            "fme" => self.fme,
+            "ffc" => self.ffc,
+            "wfc" => self.wfc,
+            "sfc" => self.sfc,
+            "cfl" => self.cfl,
+            "cfc" => self.cfc,
+            "tfc" => self.tfc,
+            "cbh" => self.cbh,
+            "csfi" => self.csfi,
+            "rso" => self.rso,
+            "cfb" => self.cfb,
+            "fire_type" => self.fire_type,
+            "hros" => self.hros,
+            "sros" => self.sros,
+            "cros" => self.cros,
+            "bfw" => self.bfw,
+            "bisi" => self.bisi,
+            "bros" => self.bros,
+            "hfi" => self.hfi,
+            "fi_class" => self.fi_class,
+            "accel" => self.accel,
+            "fuel_type" => self.fuel_type,
+            _ => return None,
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -370,8 +447,13 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let f_f = (91.9 * (-0.1386 * m).exp()) * (1.0 + m.powf(5.31) / (4.93 * 1.0e7));
     let isz = 0.208 * f_f;
 
-    // --- calc_fmc
-    let fmc = calc_fmc(lat, abs_long, elevation, input.wx_date, input.d0_override, input.dj_override);
+    // --- calc_fmc (or the setParams({'fmc': ...}) injection in its place:
+    // calcFMC never runs, so latn/d0/dj/nd/fme keep their zero templates —
+    // the zero fme is load-bearing for C-6, see FbpInput::fmc_override)
+    let fmc = match input.fmc_override {
+        Some(v) => Fmc { latn: 0.0, d0: 0.0, dj: 0.0, nd: 0.0, fmc: v, fme: 0.0 },
+        None => calc_fmc(lat, abs_long, elevation, input.wx_date, input.d0_override, input.dj_override),
+    };
 
     // --- calc_isi_rsi_be
     let (a, b, c, q, bui0, be_max) = ros_params(ft);
@@ -469,6 +551,12 @@ pub fn run(input: &FbpInput) -> FbpResult {
             hros *= 0.2;
             bros *= 0.2;
         }
+    }
+    // setParams({'hros': ...}) injection point: replaces hros after calcROS,
+    // before calcCSFI onward. bros/sros keep their computed values (C-6 cfb
+    // reads sros, and the C-6 blend below may overwrite the injected hros).
+    if let Some(v) = input.hros_override {
+        hros = v;
     }
 
     // --- calc_sfc
@@ -743,6 +831,8 @@ pub fn run_grid(
             percentile_growth,
             d0_override: None,
             dj_override: None,
+            fmc_override: None,
+            hros_override: None,
         });
         out.hros[i] = r.hros;
         out.bros[i] = r.bros;
