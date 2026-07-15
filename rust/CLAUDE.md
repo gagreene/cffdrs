@@ -46,4 +46,7 @@ cargo test                       # core + goldens
 #   set PYO3_PYTHON to the target venv's interpreter first — building
 #   against whatever python3 is on PATH links symbols the runtime may lack
 uv run maturin build --release -m crates/cffdrs-py/Cargo.toml
+# pure-Rust artifact for downstream engines (attach to releases alongside
+# the wheel; consumers unpack it into their lib/ dir as a pinned dep):
+cargo package -p cffdrs-core     # -> target/package/cffdrs-core-X.Y.Z.crate
 ```
