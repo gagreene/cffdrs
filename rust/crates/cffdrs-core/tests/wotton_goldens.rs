@@ -25,6 +25,7 @@ fn parse_inputs() -> HashMap<i64, FbpInput> {
         col("aspect"), col("slope"), col("ws"), col("wd"), col("ffmc"), col("bui"),
         col("pc"), col("pdf"), col("gfl"), col("gcf"), col("id"),
     );
+    let (c_d0, c_dj) = (col("d0"), col("dj"));
     let num = |fields: &[&str], i: usize, default: f64| -> f64 {
         let v = fields[i].trim();
         if v.is_empty() { default } else { v.parse().unwrap_or_else(|_| panic!("bad number {v:?}")) }
@@ -55,6 +56,14 @@ fn parse_inputs() -> HashMap<i64, FbpInput> {
             gfl: num(&f, c_gfl, 0.35),
             gcf: num(&f, c_gcf, 80.0),
             percentile_growth: 50.0,
+            d0_override: {
+                let v = f[c_d0].trim();
+                if v.is_empty() { None } else { Some(v.parse().expect("d0")) }
+            },
+            dj_override: {
+                let v = f[c_dj].trim();
+                if v.is_empty() { None } else { Some(v.parse().expect("dj")) }
+            },
         });
     }
     out
@@ -143,13 +152,13 @@ fn scalar_core_matches_wotton_snapshot() {
         let result = run(input);
 
         for (name, expected) in case["outputs"].as_object().expect("outputs") {
-            let expected = expected.as_f64().expect("numeric golden");
             let actual = field(&result, name)
                 .unwrap_or_else(|| panic!("FbpResult has no accessor for golden field {name:?}"));
-            let ok = if expected.is_nan() {
-                actual.is_nan()
-            } else {
-                (actual - expected).abs() <= expected.abs().max(1e-12) * 1e-9
+            // null golden = unmasked NaN in the Python export (scalarize maps
+            // NaN -> None); masked values export as 0.0 and appear numeric.
+            let ok = match expected.as_f64() {
+                None => actual.is_nan(),
+                Some(e) => (actual - e).abs() <= e.abs().max(1e-12) * 1e-9,
             };
             assert!(
                 ok,
