@@ -64,72 +64,11 @@ fn parse_inputs() -> HashMap<i64, FbpInput> {
                 let v = f[c_dj].trim();
                 if v.is_empty() { None } else { Some(v.parse().expect("dj")) }
             },
+            fmc_override: None,
+            hros_override: None,
         });
     }
     out
-}
-
-/// snapshot field name -> accessor on FbpResult
-fn field(result: &cffdrs_core::fbp::FbpResult, name: &str) -> Option<f64> {
-    use cffdrs_core::fbp::FbpResult as R;
-    let get: fn(&R) -> f64 = match name {
-        "ws" => |r| r.ws,
-        "wd" => |r| r.wd,
-        "wse" => |r| r.wse,
-        "wse1" => |r| r.wse1,
-        "wse2" => |r| r.wse2,
-        "wsx" => |r| r.wsx,
-        "wsy" => |r| r.wsy,
-        "wsv" => |r| r.wsv,
-        "raz" => |r| r.raz,
-        "m" => |r| r.m,
-        "fF" => |r| r.f_f,
-        "fW" => |r| r.f_w,
-        "ffmc" => |r| r.ffmc,
-        "isi" => |r| r.isi,
-        "bui" => |r| r.bui,
-        "a" => |r| r.a,
-        "b" => |r| r.b,
-        "c" => |r| r.c,
-        "q" => |r| r.q,
-        "bui0" => |r| r.bui0,
-        "be" => |r| r.be,
-        "be_max" => |r| r.be_max,
-        "sf" => |r| r.sf,
-        "rsz" => |r| r.rsz,
-        "rsf" => |r| r.rsf,
-        "isf" => |r| r.isf,
-        "rsi" => |r| r.rsi,
-        "latn" => |r| r.latn,
-        "dj" => |r| r.dj,
-        "d0" => |r| r.d0,
-        "nd" => |r| r.nd,
-        "fmc" => |r| r.fmc,
-        "fme" => |r| r.fme,
-        "ffc" => |r| r.ffc,
-        "wfc" => |r| r.wfc,
-        "sfc" => |r| r.sfc,
-        "cfl" => |r| r.cfl,
-        "cfc" => |r| r.cfc,
-        "tfc" => |r| r.tfc,
-        "cbh" => |r| r.cbh,
-        "csfi" => |r| r.csfi,
-        "rso" => |r| r.rso,
-        "cfb" => |r| r.cfb,
-        "fire_type" => |r| r.fire_type,
-        "hros" => |r| r.hros,
-        "sros" => |r| r.sros,
-        "cros" => |r| r.cros,
-        "bfw" => |r| r.bfw,
-        "bisi" => |r| r.bisi,
-        "bros" => |r| r.bros,
-        "hfi" => |r| r.hfi,
-        "fi_class" => |r| r.fi_class,
-        "accel" => |r| r.accel,
-        "fuel_type" => |r| r.fuel_type,
-        _ => return None,
-    };
-    Some(get(result))
 }
 
 #[test]
@@ -152,7 +91,8 @@ fn scalar_core_matches_wotton_snapshot() {
         let result = run(input);
 
         for (name, expected) in case["outputs"].as_object().expect("outputs") {
-            let actual = field(&result, name)
+            let actual = result
+                .get(name)
                 .unwrap_or_else(|| panic!("FbpResult has no accessor for golden field {name:?}"));
             // null golden = unmasked NaN in the Python export (scalarize maps
             // NaN -> None); masked values export as 0.0 and appear numeric.
