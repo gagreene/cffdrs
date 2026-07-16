@@ -50,6 +50,13 @@ def grids():
     g['ws'][2, :4] = 0.0        # calm-wind cells (zero-WSV path)
     g['slope'][2, :4] = 0.0
     g['gcf'][3, 0] = 0.0        # gcf==0 -> 0.1 clamp
+    # nodata cells: NaN inputs arrive masked in the Python package and must
+    # surface as NaN behaviour, never be laundered into calm/flat/default
+    g['ws'][4, 0] = np.nan
+    g['slope'][4, 1] = np.nan
+    g['aspect'][4, 2] = np.nan
+    g['pc'][4, 3] = np.nan
+    g['gcf'][4, 4] = np.nan
     return g
 
 
