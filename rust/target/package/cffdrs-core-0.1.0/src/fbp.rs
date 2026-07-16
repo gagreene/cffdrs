@@ -349,7 +349,10 @@ struct SlopeWindIsi {
 /// `slope_wind.calc_slope_wind_isi`
 fn calc_slope_wind_isi(isf: f64, f_f: f64, wd: f64, aspect: f64, ws: f64) -> SlopeWindIsi {
     let wse1 = (1.0 / 0.05039) * (isf / (0.208 * f_f)).ln();
-    let wse2 = if isf < 0.999 * 2.496 * f_f {
+    let wse2 = if isf.is_nan() {
+        // masked isf keeps its mask through the where() — never the cap
+        f64::NAN
+    } else if isf < 0.999 * 2.496 * f_f {
         28.0 - (1.0 / 0.0818) * (1.0 - isf / (2.496 * f_f)).ln()
     } else {
         112.45 // cap maximum WSE
@@ -366,8 +369,10 @@ fn calc_slope_wind_isi(isf: f64, f_f: f64, wd: f64, aspect: f64, ws: f64) -> Slo
     let angle_deg = acos_val.acos().to_degrees();
     let mut raz = if wsx < 0.0 { 360.0 - angle_deg } else { angle_deg };
     // wsv == 0: azimuth undefined, spread circular — substitute 0 to keep raz
-    // finite for downstream consumers (matches the Python fix).
-    if !(wsv > 0.0) {
+    // finite for downstream consumers (matches the Python fix). NaN wsv is a
+    // masked cell in Python (`where(wsv > 0, raz, 0)` keeps the mask), so
+    // NaN must pass through, not become 0.
+    if !wsv.is_nan() && !(wsv > 0.0) {
         raz = 0.0;
     }
 
@@ -398,8 +403,14 @@ fn ros_curve(a: f64, b: f64, c: f64, x: f64) -> f64 {
 }
 
 /// The `isf >= 0.01` numerator guard shared by every ISF branch.
+/// NaN must PROPAGATE: in the Python package the numerator arrives masked
+/// (NaN inputs are masked by `_coerce`), and `mask.where` keeps the mask no
+/// matter which branch is selected — the observable ISF is NaN. A plain
+/// `if` would silently take the finite fallback branch here.
 fn isf_core(numer: f64, b: f64) -> f64 {
-    if numer >= 0.01 {
+    if numer.is_nan() {
+        f64::NAN
+    } else if numer >= 0.01 {
         numer.ln() / -b
     } else {
         0.01_f64.ln() / -b
@@ -418,19 +429,29 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let lat = input.lat;
     let abs_long = input.long.abs();
     let elevation = input.elevation;
-    let slope = input.slope_pct.max(0.0);
+    // `where(x < 0, 0, x)` / `clip(x, 0, None)` semantics: negatives clamp
+    // to 0 but NaN PASSES THROUGH (NaN < 0 is false) — nodata weather must
+    // surface as NaN behaviour, not as calm wind. f64::max would launder
+    // NaN to 0.0 here.
+    let clamp0 = |x: f64| if x < 0.0 { 0.0 } else { x };
+    let slope = clamp0(input.slope_pct);
     let mut aspect = input.aspect_deg;
     if aspect < 0.0 {
         aspect = 270.0; // negative aspect treated as flat terrain
     }
-    let ws = input.ws.max(0.0);
+    let ws = clamp0(input.ws);
     let mut wd = input.wd;
-    let ffmc = input.ffmc.max(0.0);
-    let bui = input.bui.max(0.0);
-    let pc = if input.pc.is_nan() { 50.0 } else { input.pc.max(0.0) };
-    let pdf = if input.pdf.is_nan() { 35.0 } else { input.pdf.max(0.0) };
-    let gfl = if input.gfl.is_nan() { 0.35 } else { input.gfl.max(0.0) };
-    let mut gcf = if input.gcf.is_nan() { 80.0 } else { input.gcf };
+    let ffmc = clamp0(input.ffmc);
+    let bui = clamp0(input.bui);
+    // pc/pdf/gfl/gcf: the Python _coerce defaults (50/35/0.35/80) apply ONLY
+    // to NaN SCALARS (a wholly-missing input); per-cell NaN in the grid pass
+    // stays masked and surfaces as NaN behaviour. This core is the grid
+    // pass, so NaN propagates; callers with scalar inputs apply the scalar
+    // defaults before broadcasting.
+    let pc = clamp0(input.pc);
+    let pdf = clamp0(input.pdf);
+    let gfl = clamp0(input.gfl);
+    let mut gcf = input.gcf;
     if gcf == 0.0 {
         gcf = 0.1;
     }
@@ -440,7 +461,15 @@ pub fn run(input: &FbpInput) -> FbpResult {
     aspect = if aspect > 180.0 { aspect - 180.0 } else { aspect + 180.0 };
 
     // --- calc_sf
-    let sf = if slope < 70.0 { (3.533 * (slope / 100.0).powf(1.2)).exp() } else { 10.0 };
+    // where(slope < 70, exp(...), 10): NaN slope stays masked in Python —
+    // propagate it rather than taking the finite cap branch.
+    let sf = if slope.is_nan() {
+        f64::NAN
+    } else if slope < 70.0 {
+        (3.533 * (slope / 100.0).powf(1.2)).exp()
+    } else {
+        10.0
+    };
 
     // --- calc_isz
     let m = (250.0 * (59.5 / 101.0) * (101.0 - ffmc)) / (59.5 + ffmc);
@@ -463,7 +492,9 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let m34 = ft == 12 || ft == 13;
     let o1 = ft == 14 || ft == 15;
 
-    let cf = if gcf < 58.8 {
+    let cf = if gcf.is_nan() {
+        f64::NAN
+    } else if gcf < 58.8 {
         0.005 * ((0.061 * gcf).exp() - 1.0)
     } else {
         0.176 + 0.02 * (gcf - 58.8)
@@ -525,7 +556,14 @@ pub fn run(input: &FbpInput) -> FbpResult {
     };
 
     let be = {
-        let raw = if bui == 0.0 || !bui.is_finite() {
+        // Python: where((bui==0)|~isfinite(bui), 0, ...) — but a NaN bui
+        // arrives MASKED there (inputs._coerce masks NaN), so the isfinite
+        // branch only ever catches literal infinities; the masked NaN rides
+        // through and the observable spread outputs (hros/hfi) are NaN.
+        // Mirror the observables: NaN bui => NaN be; infinite bui => 0.
+        let raw = if bui.is_nan() {
+            f64::NAN
+        } else if bui == 0.0 || bui.is_infinite() {
             0.0
         } else if bui0 == 0.0 || !bui0.is_finite() {
             1.0
@@ -620,7 +658,9 @@ pub fn run(input: &FbpInput) -> FbpResult {
         let delta = hros - rso;
         cfb = if delta < -3086.0 { 0.0 } else { 1.0 - (-0.23 * delta).exp() };
     }
-    if !cfb.is_finite() {
+    if !cfb.is_finite() && !cfb.is_nan() {
+        // infinities zero out; NaN is a masked cell in Python and must
+        // stay NaN (grid-truth: cfb/accel are NaN at NaN-input cells)
         cfb = 0.0;
     }
     cfb = cfb.clamp(0.0, 1.0);
@@ -643,7 +683,9 @@ pub fn run(input: &FbpInput) -> FbpResult {
 
     // --- calc_fire_type
     let fire_type = if ft < 19 {
-        if cfb <= 0.1 {
+        if cfb.is_nan() {
+            0.0 // masked cell: grid-truth observable is 0, not a class
+        } else if cfb <= 0.1 {
             1.0
         } else if cfb < 0.9 {
             2.0
