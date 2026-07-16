@@ -76,3 +76,6 @@ Desktop.ini
 
 # Development scratch directory
 /development/
+
+# build output (cargo package artifacts are attached to releases, not tracked)
+rust/target/
