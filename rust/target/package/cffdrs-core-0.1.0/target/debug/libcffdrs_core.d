@@ -1,0 +1,1 @@
+/home/daniel/Sources/CoreFire/cffdrs/rust/target/package/cffdrs-core-0.1.0/target/debug/libcffdrs_core.rlib: /home/daniel/Sources/CoreFire/cffdrs/rust/target/package/cffdrs-core-0.1.0/src/fbp.rs /home/daniel/Sources/CoreFire/cffdrs/rust/target/package/cffdrs-core-0.1.0/src/lib.rs
