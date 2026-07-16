@@ -28,6 +28,10 @@ name = "cffdrs_core"
 path = "src/lib.rs"
 
 [[test]]
+name = "nan_input_goldens"
+path = "tests/nan_input_goldens.rs"
+
+[[test]]
 name = "override_goldens"
 path = "tests/override_goldens.rs"
 

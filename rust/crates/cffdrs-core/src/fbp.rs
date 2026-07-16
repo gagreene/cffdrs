@@ -714,11 +714,11 @@ pub fn run(input: &FbpInput) -> FbpResult {
         hros = sros + cfb * (cros - sros);
     }
 
-    // getParams export convention: quantities the Python package MASKS
-    // (ffc/wfc via the isnan re-mask in calc_sfc) surface as 0.0 through
-    // `masked.item()`; unmasked NaNs (e.g. M-1 a/b/c) stay NaN. Mirror it.
-    let ffc = if ffc.is_nan() { 0.0 } else { ffc };
-    let wfc = if wfc.is_nan() { 0.0 } else { wfc };
+    // ffc/wfc stay NaN where the Python package masks them (fuels without
+    // a fine/woody split): the GRID path surfaces masked cells as NaN.
+    // The scalar getParams export maps masked -> 0.0 via `.item()`; that
+    // convention belongs to the export layer and is applied by the Wotton
+    // golden harness, not here.
 
     // --- calc_tfc / calc_hfi
     let tfc = sfc + cfc;

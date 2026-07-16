@@ -96,6 +96,14 @@ fn scalar_core_matches_wotton_snapshot() {
                 .unwrap_or_else(|| panic!("FbpResult has no accessor for golden field {name:?}"));
             // null golden = unmasked NaN in the Python export (scalarize maps
             // NaN -> None); masked values export as 0.0 and appear numeric.
+            // ffc/wfc: the scalar export maps MASKED -> 0.0 via `.item()`,
+            // while the core (the grid pass) reports NaN there — apply the
+            // export convention harness-side.
+            let actual = if matches!(name.as_str(), "ffc" | "wfc") && actual.is_nan() {
+                0.0
+            } else {
+                actual
+            };
             let ok = match expected.as_f64() {
                 None => actual.is_nan(),
                 Some(e) => (actual - e).abs() <= e.abs().max(1e-12) * 1e-9,
