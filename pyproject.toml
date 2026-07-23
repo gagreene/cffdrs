@@ -34,6 +34,10 @@ dependencies = [
 [project.optional-dependencies]
 # Raster / tabular I/O used by the multiprocessing driver's callers and tooling.
 io = ["rasterio>=1.3", "pandas>=2.0"]
+# Experimental CuPy (GPU) backend (cffdrs.cffbps.cupy_backend). CuPy ships
+# CUDA-version-specific wheels (cupy-cuda12x / cupy-cuda11x); the plain `cupy`
+# sdist builds from source. Users on CUDA should prefer the matching wheel.
+gpu = ["cupy"]
 # Everything needed to run the test suite.
 test = ["pytest>=7", "pandas>=2.0", "openpyxl>=3.1", "rasterio>=1.3"]
 # Linting and type checking.
@@ -61,6 +65,9 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 120
 src = ["src", "tests", "tools"]
+# Experimental GPU backend, frozen at the pre-refactor monolith shape and not
+# held to the reference's lint/typing standards — excluded deliberately.
+extend-exclude = ["src/cffdrs/cffbps/cupy_backend.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]

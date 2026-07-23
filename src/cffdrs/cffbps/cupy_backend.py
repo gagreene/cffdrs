@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
-"""
-cffpbs.py modified to use CuPy for GPU acceleration.
+"""Experimental CuPy (GPU) backend for CFFBPS.
+
+This is a near-duplicate of the CFFBPS ``FBP`` model rewritten against CuPy for
+GPU acceleration. It is **experimental and unmaintained-for-parity**: it is
+frozen at the pre-refactor monolith shape, predates the reference package's
+masked-array NaN-propagation fixes, and defaults to ``float32``. It therefore
+does **not** reproduce the reference golden snapshots, and there is no parity
+test guarding it. The reference implementation is :mod:`cffdrs.cffbps` (the
+``FBP`` facade over the pure ``equations`` modules); use this only for
+deliberate GPU experimentation.
+
+Requires the optional ``gpu`` extra (CuPy + a CUDA-capable environment):
+``pip install cffdrs[gpu]`` (or install the CUDA-matched wheel yourself, e.g.
+``cupy-cuda12x``). Importing this module without CuPy raises a clear
+:class:`ImportError`.
+
 Created on Thur Dec 26 20:45:00 2024
 
 @author: Gregory A. Greene
@@ -11,10 +25,19 @@ import os
 from typing import Union, Optional, Literal
 from operator import itemgetter
 import numpy as np
-import cupy as cp
 import rasterio as rio
 from scipy.stats import t
 from datetime import datetime as dt
+
+try:
+    import cupy as cp
+except ImportError as exc:  # pragma: no cover - depends on optional GPU stack
+    raise ImportError(
+        "The CuPy GPU backend requires the optional 'gpu' extra and a CUDA-capable "
+        "environment. Install with: pip install cffdrs[gpu] (or install the "
+        "CUDA-matched wheel directly, e.g. cupy-cuda12x). The reference CPU "
+        "implementation is available as `from cffdrs.cffbps import FBP`."
+    ) from exc
 
 # Define lookup tables as in the original code
 fbpFTCode_NumToAlpha_LUT = {
