@@ -87,6 +87,28 @@ into blocks and runs them across a worker pool with the same semantics.
 final outputs (`hros`, `hfi`, `fire_type`, `cfb`, `tfc`, `fi_class`, …) and
 intermediates (`isi`, `wsv`, `raz`, `sfc`, `fmc`, `csfi`, `rso`, `be`, …).
 
+### Experimental GPU backend
+
+An experimental CuPy (GPU) variant of the FBP model lives at
+`cffdrs.cffbps.cupy_backend`. Install the optional `gpu` extra (needs a
+CUDA-capable environment):
+
+```bash
+pip install "cffdrs[gpu]"
+# On CUDA, prefer the version-matched wheel instead, e.g.:
+#   pip install cupy-cuda12x
+```
+
+```python
+from cffdrs.cffbps.cupy_backend import FBP   # requires cupy + CUDA
+```
+
+> **Experimental — not held to reference parity.** This backend is frozen at the
+> pre-refactor monolith, defaults to `float32`, and predates the reference
+> package's masked-array NaN-propagation fixes. It does **not** reproduce the
+> golden snapshots and has no parity test. Use `from cffdrs.cffbps import FBP`
+> (the CPU reference) for validated results.
+
 ## Fire Weather Index System (`cffdrs.cffwis`)
 
 Functions for the daily and hourly FWI codes; scalar or array inputs.
