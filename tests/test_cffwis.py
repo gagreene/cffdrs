@@ -1,18 +1,19 @@
 import os
-import sys
 import subprocess
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
-from pandas.testing import assert_frame_equal
 from numpy.testing import assert_allclose
+from pandas.testing import assert_frame_equal
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from cffwis import diurnalFFMC_lawson
-from diurnal_ffmc_lawson import hourly_ffmc_lawson_vectorized
+from cffdrs.cffwis import diurnalFFMC_lawson
+from cffdrs.diurnal_ffmc_lawson import hourly_ffmc_lawson_vectorized
 
 
 def load_output_and_golden(output_path, golden_path, index_col=None, sort_by=None):
@@ -31,16 +32,24 @@ data_dir = os.path.join(os.path.dirname(__file__), 'cffwis', 'data')
 golden_output_dir = os.path.join(data_dir, 'golden_outputs')
 outputs_dir = os.path.join(data_dir, 'outputs')
 
-# Ensure outputs are generated before running tests
+# Ensure outputs are regenerated from the CURRENT source before running tests.
+# Always regenerate: reusing cached outputs would compare stale results against the
+# golden and silently pass after a source change.
 @pytest.fixture(scope='module', autouse=True)
 def generate_outputs():
-    # Check if both output files exist
     daily_output = os.path.join(outputs_dir, 'HaigCamp_daily_weather_results.csv')
     hourly_output = os.path.join(outputs_dir, 'HaigCamp_hourly_weather_results.csv')
-    if not (os.path.exists(daily_output) and os.path.exists(hourly_output)):
-        script_path = os.path.join(os.path.dirname(__file__), 'cffwis', 'cffwis_haig_camp_stn.py')
-        result = subprocess.run([sys.executable, script_path], capture_output=True, text=True)
-        assert result.returncode == 0, f'Script failed: {result.stderr}'
+    for stale in (daily_output, hourly_output):
+        if os.path.exists(stale):
+            os.remove(stale)
+    script_path = os.path.join(os.path.dirname(__file__), 'cffwis', 'cffwis_haig_camp_stn.py')
+    # Propagate src/ to the subprocess so its `cffdrs` import resolves without
+    # requiring an editable install.
+    env = dict(os.environ)
+    src_dir = os.path.join(PROJECT_ROOT, 'src')
+    env['PYTHONPATH'] = src_dir + os.pathsep + env.get('PYTHONPATH', '')
+    result = subprocess.run([sys.executable, script_path], capture_output=True, text=True, env=env)
+    assert result.returncode == 0, f'Script failed: {result.stderr}'
 
 
 test_cases = [
@@ -74,7 +83,7 @@ def test_outputs_match_golden(output_path, golden_path, index_col):
             rtol=1e-8,
             atol=1e-10
         )
-    except AssertionError as e:
+    except AssertionError:
         print('Column dtypes:')
         print(df_out[common_cols].dtypes)
         print(df_golden[common_cols].dtypes)

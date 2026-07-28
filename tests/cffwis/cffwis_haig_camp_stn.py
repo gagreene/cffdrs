@@ -1,6 +1,8 @@
 import os
+
 import pandas as pd
-import cffwis as fwi
+
+from cffdrs import cffwis as fwi
 
 
 def calc_ffmc(df: pd.DataFrame) -> pd.DataFrame:

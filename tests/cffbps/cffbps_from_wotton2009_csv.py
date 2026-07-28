@@ -1,7 +1,9 @@
-from cffbps import FBP
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
+from cffdrs.cffbps import FBP
 
 # Fuel types
 fuel_type_lookup = {

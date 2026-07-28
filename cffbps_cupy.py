@@ -1658,7 +1658,13 @@ def _testFBP(test_functions: list,
     :param out_folder: Location to save test rasters (Default: <location of script>/Test_Data/Outputs)
     :return: None
     """
+    import sys
+
     import ProcessRasters as pr
+
+    # generate_test_fbp_rasters moved from the repo root to tools/ (unpackaged);
+    # make it importable when this script runs from the repo root.
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools'))
     import generate_test_fbp_rasters as genras
 
     fbp = FBP()

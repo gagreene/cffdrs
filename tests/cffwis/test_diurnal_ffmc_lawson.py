@@ -1,14 +1,15 @@
-import numpy as np
-from numpy.testing import assert_allclose
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+import numpy as np
+from numpy.testing import assert_allclose
 
-from cffwis import diurnalFFMC_lawson
-from diurnal_ffmc_lawson import hourly_ffmc_lawson_vectorized
+SRC = Path(__file__).resolve().parents[2] / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from cffdrs.cffwis import diurnalFFMC_lawson
+from cffdrs.diurnal_ffmc_lawson import hourly_ffmc_lawson_vectorized
 
 
 def test_hourly_ffmc_lawson_vectorized_supports_broadcasting():
