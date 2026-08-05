@@ -344,3 +344,25 @@ def test_valid_out_request_still_works():
     fbp.initialize(fuel_type=2, out_request=['hros', 'hfi', 'fire_type'], **BASE_KWARGS)
     result = fbp.runFBP()
     assert len(result) == 3
+
+
+# ── pc/pdf/gfl/gcf NaN-to-default coercion (inputs.py:_coerce) ─────────────────
+def test_nan_optional_fields_use_documented_defaults():
+    """NaN for pc/pdf/gfl/gcf must be coerced to their documented defaults
+    (50, 35, 0.35, 80) by inputs._coerce, not propagate as masked/missing — this is
+    called out as deliberate, golden-locked behavior in inputs.py's _coerce
+    docstring, but was not actually exercised by any existing test. Asserting the
+    coerced fbp.pc/pdf/gfl/gcf attributes directly (rather than hros/hfi outputs
+    that don't depend on them for a pure-conifer fuel type) is what actually
+    exercises the coercion path."""
+    nan = float('nan')
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, pc=nan, pdf=nan, gfl=nan, gcf=nan, **BASE_KWARGS)
+    assert float(np.asarray(fbp.pc).ravel()[0]) == 50
+    assert float(np.asarray(fbp.pdf).ravel()[0]) == 35
+    assert float(np.asarray(fbp.gfl).ravel()[0]) == 0.35
+    assert float(np.asarray(fbp.gcf).ravel()[0]) == 80
+    assert not np.ma.is_masked(fbp.pc)
+    assert not np.ma.is_masked(fbp.pdf)
+    assert not np.ma.is_masked(fbp.gfl)
+    assert not np.ma.is_masked(fbp.gcf)
