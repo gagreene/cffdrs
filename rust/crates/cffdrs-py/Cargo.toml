@@ -3,7 +3,7 @@ name = "cffdrs-py"
 version = "0.1.0"
 edition = "2021"
 description = "Python bindings (wheel: cffdrs-rs) over cffdrs-core."
-license = "GPL-3.0-or-later"
+license = "MIT"
 
 [lib]
 name = "cffdrs_rs"
