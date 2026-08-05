@@ -266,3 +266,40 @@ def test_equations_do_not_mutate_input_arrays():
         aspect=180.0 * ones, ws=20.0 * ones, ref_array=ref_array_in,
     )
     _assert_untouched(ref_array_in, ref_in_data, ref_in_mask)
+
+
+# ── NamedTuple contracts (each consumed differently — see plan Task 2) ─────────
+def test_setattr_namedtuples_match_facade_attributes():
+    """VerifiedInputs/ISIRSIBEResult field names are used as
+    setattr(self, field, value) targets in facade.py (facade.py:236-237, :566-568).
+    If a field is ever renamed without a matching facade attribute rename, setattr
+    would silently create a new, never-read attribute instead of updating the
+    intended one. This test catches that class of drift immediately."""
+    from cffdrs.cffbps.equations.slope_wind import ISIRSIBEResult
+    from cffdrs.cffbps.inputs import VerifiedInputs
+
+    fbp = FBP()
+    for named_tuple_cls in (VerifiedInputs, ISIRSIBEResult):
+        missing = [f for f in named_tuple_cls._fields if not hasattr(fbp, f)]
+        assert not missing, f'{named_tuple_cls.__name__} fields not found on FBP: {missing}'
+
+
+def test_fmc_result_field_order_matches_positional_unpack():
+    """FMCResult is unpacked positionally, not via setattr (facade.py:547):
+        self.latn, self.d0, self.dj, self.nd, self.fmc, self.fme = fmc_eq.calc_fmc(...)
+    A field reorder in FMCResult's class body would silently scramble which value
+    lands on which attribute — hasattr can't catch that, only order can."""
+    from cffdrs.cffbps.equations.fmc import FMCResult
+
+    assert FMCResult._fields == ('latn', 'd0', 'dj', 'nd', 'fmc', 'fme')
+
+
+def test_slope_wind_isi_fields_are_wired_into_isi_rsi_be_result():
+    """SlopeWindISI is internal to calc_isi_rsi_be (never touches the facade
+    directly); its fields are folded into ISIRSIBEResult one by one
+    (slope_wind.py:322-323). If SlopeWindISI grows a field, this catches it not
+    also being wired through to the result the facade actually consumes."""
+    from cffdrs.cffbps.equations.slope_wind import ISIRSIBEResult, SlopeWindISI
+
+    missing = set(SlopeWindISI._fields) - set(ISIRSIBEResult._fields)
+    assert not missing, f'SlopeWindISI fields not present on ISIRSIBEResult: {missing}'
