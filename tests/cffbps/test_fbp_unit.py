@@ -200,3 +200,69 @@ def test_cbh_cfl_unknown_ftype_raises_keyerror():
     fbp.initialize(fuel_type=2, out_request=['csfi'], **BASE_KWARGS)
     with pytest.raises(KeyError):
         fbp.getCBH_CFL(ftype=25)
+
+
+# ── Own-and-return convention (facade.py shared-template optimization) ────────
+def _assert_untouched(arr, data_snapshot, mask_snapshot):
+    np.testing.assert_array_equal(arr.data, data_snapshot)
+    np.testing.assert_array_equal(np.ma.getmaskarray(arr), mask_snapshot)
+
+
+def test_equations_do_not_mutate_input_arrays():
+    """calc_cbh_cfl/calc_ros/calc_accel_param/calc_isi_rsi_be must never write into
+    their inputs — the facade's shared zero-filled output template (initialize(),
+    facade.py:406-413) depends on every calcX reassigning whole attributes rather
+    than mutating them. Checks both .data and the mask: a function that leaves data
+    alone but corrupts the mask is still an own-and-return violation."""
+    from cffdrs.cffbps.equations.crown import calc_cbh_cfl
+    from cffdrs.cffbps.equations.growth import calc_accel_param
+    from cffdrs.cffbps.equations.ros import calc_ros
+    from cffdrs.cffbps.equations.slope_wind import calc_isi_rsi_be
+
+    fuel_type = np.ma.array([2, 6, 9], dtype=np.int8, mask=False)
+
+    # calc_cbh_cfl: cbh/cfl passed in as templates
+    cbh_in = np.ma.array([0.0, 0.0, 0.0], mask=False)
+    cfl_in = np.ma.array([0.0, 0.0, 0.0], mask=False)
+    cbh_in_data, cbh_in_mask = cbh_in.data.copy(), np.ma.getmaskarray(cbh_in).copy()
+    cfl_in_data, cfl_in_mask = cfl_in.data.copy(), np.ma.getmaskarray(cfl_in).copy()
+    cbh_out, _cfl_out = calc_cbh_cfl(
+        fuel_type=fuel_type, cbh=cbh_in, cfl=cfl_in,
+        cbh_cfl_ht_lut=constants.fbpCBH_CFL_HT_LUT,
+    )
+    _assert_untouched(cbh_in, cbh_in_data, cbh_in_mask)
+    _assert_untouched(cfl_in, cfl_in_data, cfl_in_mask)
+    assert not np.array_equal(cbh_out.data, cbh_in_data)  # sanity: it did compute something
+
+    # calc_ros: sros passed in as template, only C6 cells written
+    sros_in = np.ma.array([0.0, 0.0, 0.0], mask=False)
+    sros_in_data, sros_in_mask = sros_in.data.copy(), np.ma.getmaskarray(sros_in).copy()
+    rsi = np.ma.array([5.0, 5.0, 5.0], mask=False)
+    brsi = np.ma.array([2.0, 2.0, 2.0], mask=False)
+    be = np.ma.array([1.0, 1.0, 1.0], mask=False)
+    bui = np.ma.array([80.0, 80.0, 80.0], mask=False)
+    calc_ros(rsi=rsi, brsi=brsi, be=be, fuel_type=fuel_type, bui=bui, sros=sros_in)
+    _assert_untouched(sros_in, sros_in_data, sros_in_mask)
+
+    # calc_accel_param: accel_param passed in as template
+    accel_in = np.ma.array([0.0, 0.0, 0.0], mask=False)
+    accel_in_data, accel_in_mask = accel_in.data.copy(), np.ma.getmaskarray(accel_in).copy()
+    cfb = np.ma.array([0.3, 0.3, 0.3], mask=False)
+    calc_accel_param(
+        fuel_type=fuel_type, ftypes=[2, 6, 9],
+        open_fuel_types=constants.open_fuel_types, cfb=cfb, accel_param=accel_in,
+    )
+    _assert_untouched(accel_in, accel_in_data, accel_in_mask)
+
+    # calc_isi_rsi_be: ref_array passed in as the shared template a/b/c/q/bui0/be_max
+    # are copied from (slope_wind.py:189-194) — missed in the first draft of this plan.
+    ref_array_in = np.ma.array([0.0, 0.0, 0.0], mask=False)
+    ref_in_data, ref_in_mask = ref_array_in.data.copy(), np.ma.getmaskarray(ref_array_in).copy()
+    ones = np.ma.array([1.0, 1.0, 1.0], mask=False)
+    calc_isi_rsi_be(
+        fuel_type=fuel_type, ros_params=dict(constants.rosParams),
+        gcf=80.0 * ones, isz=10.0 * ones, sf=ones, pc=50.0 * ones, pdf=35.0 * ones,
+        bui=80.0 * ones, fF=0.5 * ones, wd=np.ma.array([0.0, 0.0, 0.0], mask=False),
+        aspect=180.0 * ones, ws=20.0 * ones, ref_array=ref_array_in,
+    )
+    _assert_untouched(ref_array_in, ref_in_data, ref_in_mask)
