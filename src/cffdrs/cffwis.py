@@ -78,6 +78,10 @@ def diurnalFFMC_lawson(
 
     This function wraps the `hourly_ffmc_lawson_vectorized` function from `diurnal_ffmc_lawson.py'.
 
+    Note: this is independent of `hourlyFFMC` (Van Wagner 1977 / Alexander et al. 1984 recursive
+    model). The two are not interchangeable — this method interpolates from a daily 1200 FFMC,
+    while `hourlyFFMC` recomputes FFMC recursively hour by hour from weather observations.
+
     :param ffmc_1200: Current standard (LST) daily FFMC value (unitless code).
         "Daily FFMC is calculated from noon weather observations, but represents fine fuel moisture at 1600 LST,
         when the fine fuel moisture content is at or near the daily minimum." (Taylor et al. 1997)
@@ -141,6 +145,10 @@ def hourlyFFMC(
 ) -> float | np.ndarray:
     """
     Function to calculate hourly FFMC values per Van Wagner (1977) and Alexander et al. (1984).
+
+    Note: this is independent of `diurnalFFMC_lawson` (Lawson interpolation from a daily
+    1200 FFMC). The two are not interchangeable — see that function's docstring for when
+    to use it instead.
 
     :param ffmc0: previous hour's FFMC value (unitless code)
     :param temp: temperature value (C)
