@@ -303,3 +303,21 @@ def test_slope_wind_isi_fields_are_wired_into_isi_rsi_be_result():
 
     missing = set(SlopeWindISI._fields) - set(ISIRSIBEResult._fields)
     assert not missing, f'SlopeWindISI fields not present on ISIRSIBEResult: {missing}'
+
+
+# ── out_request validation ──────────────────────────────────────────────────────
+def test_unknown_out_request_raises():
+    """A typo'd or unsupported out_request name must raise, not silently return NaN
+    (previously indistinguishable from a real missing-data NaN)."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, out_request=['hors'], **BASE_KWARGS)  # typo: 'hors' not 'hros'
+    with pytest.raises(ValueError, match='hors'):
+        fbp.runFBP()
+
+
+def test_valid_out_request_still_works():
+    """Sanity check: valid names must still run cleanly after the validation is added."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, out_request=['hros', 'hfi', 'fire_type'], **BASE_KWARGS)
+    result = fbp.runFBP()
+    assert len(result) == 3

@@ -867,6 +867,7 @@ class FBP:
         :param block: The array of partial data (block) to run FBP with.
         :returns:
             Tuple of values requested through out_request parameter. Default values are fire_type, hros, and hfi.
+        :raises ValueError: if out_request contains any name not in cffbps.constants.valid_outputs.
         """
         if not self.initialized:
             raise ValueError('FBP class must be initialized before running calculations. Call "initialize" first.')
@@ -878,6 +879,13 @@ class FBP:
         if self.out_request is None:
             # Set default output requests if none provided
             self.out_request = ['hros', 'hfi', 'fire_type']
+        else:
+            unknown = [var for var in self.out_request if var not in constants.valid_outputs]
+            if unknown:
+                raise ValueError(
+                    f'Unknown out_request value(s): {unknown}. '
+                    f'Valid values are: {sorted(constants.valid_outputs)}'
+                )
 
         # ### Model fire behavior with CFFBPS
         # Invert wind direction and aspect
