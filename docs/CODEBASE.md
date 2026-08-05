@@ -33,13 +33,15 @@ The codebase is a genuine two-tier system, not just old-vs-new file age:
 
 ## Key files and responsibilities
 
-### `cffbps/facade.py` (~920 lines) — the `FBP` class
+### `cffbps/facade.py` (~930 lines) — the `FBP` class
 - `initialize(...)` — accepts fuel/terrain/weather inputs (scalar or ndarray), calls
   `inputs.check_array()` then `inputs.verify_inputs()`, pre-binds ~40 output attributes
   to one shared zero-filled `self.ref_array` template, raises `ValueError` if any of
   the 11 required params is missing.
 - `runFBP()` — guards on `self.initialized`, runs 18 `calcX()` steps in a fixed
-  hardcoded order, returns `self.getParams(out_request)`.
+  hardcoded order, returns `self.getParams(out_request)`. Also validates the final
+  `out_request` list against `constants.valid_outputs` and raises `ValueError` naming
+  any unknown entries (documented via a `:raises:` line on the method).
 - `calcX()` methods (one per equation-module function) — thin wrappers: read `self.*`,
   call one `equations.*` function, write result(s) back to `self.*`. Contract: return
   value field names must match facade attribute names (enforced by comment convention,
@@ -61,7 +63,9 @@ attributes by contract.
 (`psutil`) and processor count, splits array inputs into non-overlapping blocks,
 runs a fresh `FBP()` per block via `multiprocessing.Pool.starmap` (return-value
 based, no shared memory/queues), stitches block results back into full output
-arrays by position.
+arrays by position. `num_processors < 2` is bumped to 2 with a `warnings.warn(...)`
+(not a `print()`); an invalid `out_request` raises inside the worker's `runFBP()`
+call and propagates cleanly back out through `pool.starmap`, not swallowed.
 
 ### `cffbps/constants.py` — static lookup tables
 Fuel-type code tables (numeric ↔ alpha), `valid_outputs`, per-fuel-type CBH/CFL/height
@@ -115,6 +119,17 @@ importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
   al. (2009) published cases and golden snapshots (`data/golden/`); raster fixtures
   under `data/inputs/` including a `multiprocessing/` subset and `cupy`/GPU output
   variants.
+  - `test_fbp_unit.py` includes guardrail regression tests for: the own-and-return
+    convention on `calc_cbh_cfl`/`calc_ros`/`calc_accel_param`/`calc_isi_rsi_be`; the
+    `VerifiedInputs`/`ISIRSIBEResult` setattr-target contract, `FMCResult`'s
+    positional-unpack field order, and `SlopeWindISI`'s fields being a subset of
+    `ISIRSIBEResult`'s; unknown `out_request` names raising; `num_processors<2`
+    warning (not printing); and NaN-to-default coercion for `pc`/`pdf`/`gfl`/`gcf`.
+  - `test_fbp_regression.py`'s snapshot tests (layers 2/3) compare at **float32**
+    precision, not exact float64 equality — absorbs 1-ULP platform libm/BLAS drift
+    in trig-derived fields (`raz`, `wse`/`wse1`, `wsx`, `wsy`, `bros`) without masking
+    real regressions (confirmed no real drift: casting the observed float64
+    mismatches to float32 made them equal on both sides).
 - `tests/cffwis/` + `tests/test_cffwis.py` — includes a real BC weather-station
   dataset (Haig Camp) for validation, plus diurnal-FFMC-specific tests.
 
@@ -212,12 +227,22 @@ flowchart TD
   because every `calcX()` *reassigns* the whole attribute rather than mutating it in
   place ("own-and-return" convention). Any new equation code that mutates a masked
   array in place instead of returning a new one would silently corrupt other
-  attributes sharing the same template.
-- **NamedTuple field names are an unenforced contract.** `FMCResult`, `SlopeWindISI`,
-  `ISIRSIBEResult`, `VerifiedInputs` field names must exactly match the `FBP`
-  attribute names they get `setattr`'d onto (via `._asdict()`). Nothing type-checks
-  this — a renamed field silently fails to update the intended attribute rather than
-  raising.
+  attributes sharing the same template. Guarded by a regression test
+  (`test_equations_do_not_mutate_input_arrays`) covering `calc_cbh_cfl`, `calc_ros`,
+  `calc_accel_param`, and `calc_isi_rsi_be` — extend it if new equation code takes a
+  template argument.
+- **NamedTuple field names are an unenforced contract, and not all consumed the same
+  way.** `VerifiedInputs`/`ISIRSIBEResult` field names must exactly match the `FBP`
+  attribute names they get `setattr`'d onto (via `._asdict()`) — nothing type-checks
+  this, a renamed field silently creates a dead attribute instead of raising.
+  `FMCResult` is consumed differently: it's unpacked *positionally*
+  (`self.latn, self.d0, ... = fmc_eq.calc_fmc(...)`), so a field reorder (not a
+  rename) is the failure mode there. `SlopeWindISI` is internal to
+  `calc_isi_rsi_be` only — its fields are folded one-by-one into `ISIRSIBEResult`,
+  never touching the facade directly. Each pattern has its own guardrail test in
+  `test_fbp_unit.py` (`test_setattr_namedtuples_match_facade_attributes`,
+  `test_fmc_result_field_order_matches_positional_unpack`,
+  `test_slope_wind_isi_fields_are_wired_into_isi_rsi_be_result`).
 - **`runFBP()`'s 18-step order is hardcoded and order-dependent.** Each step reads
   `self.*` attributes written by earlier steps (e.g. `calcCFB` depends on `calcRSO`
   depends on `calcCSFI` depends on `calcFMC`). Reordering or skipping a step will
@@ -232,7 +257,9 @@ flowchart TD
   for `pc`/`pdf`/`gfl`/`gcf` is silently replaced with a field-specific default; a NaN
   scalar for any other field becomes *masked* instead. This split is explicitly
   described as deliberate and golden-snapshot-locked — don't "fix" one path to match
-  the other without regenerating goldens.
+  the other without regenerating goldens. Now actually exercised by
+  `test_nan_optional_fields_use_documented_defaults` (previously only documented in
+  a docstring, never tested).
 - **Two independent hourly-FFMC algorithms coexist** (`cffwis.hourlyFFMC` — Van
   Wagner/Alexander recursive; `diurnal_ffmc_lawson` via `cffwis.diurnalFFMC_lawson` —
   table interpolation from a daily 1200 FFMC). They are not interchangeable and not
@@ -257,7 +284,11 @@ flowchart TD
   `tools/gen_fbp_goldens.py` explicitly warns previously-committed goldens were once
   stale (predating real behavior fixes) — regenerating them from a bad state would
   bake the bug in as the new "expected" behavior. Always confirm a known-good state
-  first.
+  first. The snapshot comparison itself is at **float32 precision** (not exact
+  float64 equality) — different numpy/BLAS/libm builds can disagree in the last 1-2
+  digits of a float64's ~16 significant digits for trig-derived fields
+  (`raz`/`wse`/`wsx`/`wsy`/`bros`), which is platform noise, not drift; float32 still
+  carries ~7 significant digits, so a real regression still fails the test.
 - **`equations/__init__.py` re-exports nothing** — every equation function must be
   imported from its specific submodule (`from cffdrs.cffbps.equations.crown import
   calc_cfb`), not from the `equations` package itself.
