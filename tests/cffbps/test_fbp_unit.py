@@ -192,6 +192,29 @@ def test_block_size_estimator_never_returns_zero():
     assert _estimate_optimal_block_size((1, 6, 6), 2) >= 1
 
 
+# ── Multiprocessing num_processors warning ─────────────────────────────────────
+def test_low_num_processors_warns_not_prints(capsys):
+    """num_processors < 2 must emit a UserWarning (visible to pytest.warns / logging
+    capture), and the old print() fallback message must be gone from stdout — not
+    just "a warning was added alongside the print that's still there" (the first
+    draft's pytest.warns-only assertion would have passed even if the print stayed)."""
+    ft = np.array([[[2, 3], [7, 8]]], dtype=np.int8)
+    shape = ft.shape
+
+    def full(v):
+        return np.full(shape, v, dtype=np.float64)
+
+    with pytest.warns(UserWarning, match='at least two cores'):
+        fbpMultiprocessArray(
+            fuel_type=ft, wx_date=20230701,
+            lat=full(55.0), long=full(-110.0), elevation=full(500), slope=full(10),
+            aspect=full(180), ws=full(20), wd=full(0), ffmc=full(90), bui=full(80),
+            num_processors=1, block_size=1,
+        )
+    captured = capsys.readouterr()
+    assert 'Defaulting num_processors to 2' not in captured.out
+
+
 # ── Unknown fuel-type code on the explicit-ftype path ──────────────────────────
 def test_cbh_cfl_unknown_ftype_raises_keyerror():
     """An ftype absent from the LUT must fail with a KeyError naming the code,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from multiprocessing import Pool, current_process
 from operator import itemgetter
+import warnings
 
 import numpy as np
 import psutil
@@ -229,8 +230,11 @@ def fbpMultiprocessArray(fuel_type: int | str | np.ndarray,
     # Verify num_processors is greater than 1
     if num_processors < 2:
         num_processors = 2
-        print('Multiprocessing requires at least two cores.\n'
-              'Defaulting num_processors to 2 for this run')
+        warnings.warn(
+            'Multiprocessing requires at least two cores. '
+            'Defaulting num_processors to 2 for this run.',
+            stacklevel=2,
+        )
 
     # Verify block size
     if block_size is None:
