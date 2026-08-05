@@ -6,9 +6,9 @@ owns process orchestration (not referentially transparent).
 """
 from __future__ import annotations
 
+import warnings
 from multiprocessing import Pool, current_process
 from operator import itemgetter
-import warnings
 
 import numpy as np
 import psutil

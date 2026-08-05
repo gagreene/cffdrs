@@ -1,0 +1,267 @@
+# cffdrs — Codebase Reference
+
+Python implementation of the Canadian Forest Fire Danger Rating System: the Fire
+Behaviour Prediction (FBP) System and the Fire Weather Index (FWI) System. Library
+only — no server, no CLI, no event handlers. Scalar and NumPy-array inputs share
+one API; missing/NoData values propagate via masked arrays. `uv`-managed, PyPI-bound,
+version derived from git tags (hatch-vcs).
+
+## Architecture overview
+
+Two independent systems live side by side in one package:
+
+- **`cffdrs.cffbps`** (FBP) — a facade class (`FBP`) that orchestrates pure,
+  single-purpose equation functions in a fixed sequence. Facade holds no fire-behavior
+  math itself; equation submodules never call across files — all wiring between
+  quantities (e.g. crown fraction burned feeding into fuel consumption) happens in
+  the facade's hardcoded call order.
+- **`cffdrs.cffwis`** (FWI) — flat, independent module functions (no shared class).
+  Legacy/untyped style, predates the `cffbps` typing conventions. Not called by
+  `cffbps` internally — FBP takes FFMC/BUI as caller-supplied inputs.
+- **`cffdrs.diurnal_ffmc_lawson`** — a separate hourly-FFMC algorithm (table
+  interpolation from a daily 1200 FFMC), wrapped by `cffwis.diurnalFFMC_lawson()`.
+  Unrelated to `cffwis.hourlyFFMC()` (Van Wagner/Alexander recursive model) — two
+  independent hourly-FFMC methods coexist.
+
+The codebase is a genuine two-tier system, not just old-vs-new file age:
+
+| Tier | Files | Typing | Error handling |
+|---|---|---|---|
+| Modern, strict-mypy-gated | `cffbps/equations/*`, `cffbps/constants.py`, `_typing.py` | Fully typed, `from __future__ import annotations`, reST docstrings | `TypeError`/`ValueError` only for structural problems; domain issues handled via masking/clipping/`np.errstate` |
+| Modern, typed but ungated | `cffbps/facade.py`, `cffbps/inputs.py`, `cffbps/parallel.py` | Typed, excluded from strict mypy (dynamic dict access, masked-array narrowing fights numpy stubs) | Same masking-first philosophy as equations |
+| Legacy/untyped | `cffwis.py`, `diurnal_ffmc_lawson.py` | Bypasses `_typing.py` entirely | Manual `isinstance` checks repeated per parameter, per function |
+
+## Key files and responsibilities
+
+### `cffbps/facade.py` (~920 lines) — the `FBP` class
+- `initialize(...)` — accepts fuel/terrain/weather inputs (scalar or ndarray), calls
+  `inputs.check_array()` then `inputs.verify_inputs()`, pre-binds ~40 output attributes
+  to one shared zero-filled `self.ref_array` template, raises `ValueError` if any of
+  the 11 required params is missing.
+- `runFBP()` — guards on `self.initialized`, runs 18 `calcX()` steps in a fixed
+  hardcoded order, returns `self.getParams(out_request)`.
+- `calcX()` methods (one per equation-module function) — thin wrappers: read `self.*`,
+  call one `equations.*` function, write result(s) back to `self.*`. Contract: return
+  value field names must match facade attribute names (enforced by comment convention,
+  not by code).
+- `getParams(out_request)` — builds a ~50-key dict of every possible output, returns
+  the requested subset; branches once on scalar-vs-array mode to unwrap results.
+- `getSeasonGrassCuring(...)` — standalone lookup helper, not tied to an instance.
+
+### `cffbps/inputs.py` — validation/coercion
+Pure functions, no mutation of shared state. `check_array()` detects scalar-vs-array
+mode and validates all array inputs share one shape. `_coerce()` wraps a single
+value as a masked array (NaN → default for pc/pdf/gfl/gcf, NaN → masked for
+everything else — deliberate, golden-snapshot-locked behavior). `verify_inputs()` is
+the main entry, returns a `VerifiedInputs` NamedTuple whose field names match `FBP`
+attributes by contract.
+
+### `cffbps/parallel.py` — multiprocessing driver
+`fbpMultiprocessArray(...)`: estimates block size from available memory
+(`psutil`) and processor count, splits array inputs into non-overlapping blocks,
+runs a fresh `FBP()` per block via `multiprocessing.Pool.starmap` (return-value
+based, no shared memory/queues), stitches block results back into full output
+arrays by position.
+
+### `cffbps/constants.py` — static lookup tables
+Fuel-type code tables (numeric ↔ alpha), `valid_outputs`, per-fuel-type CBH/CFL/height
+table, per-fuel-type ROS coefficients (`rosParams`), open/non-crowning fuel-type sets.
+Wrapped immutable (`MappingProxyType`/`tuple`/`Final`). `facade.__init__` copies these
+into per-instance mutable attributes so one instance can be calibrated without
+affecting others or the shared module table.
+
+### `cffbps/equations/*` — pure calculation functions
+One file per concern, all operating on `numpy.ma.MaskedArray` only (no separate
+scalar path — scalars are coerced upstream):
+- `slope_wind.py` — wind/slope geometry, zero-wind ISI, wind/slope-adjusted ISI, RSI, BUI effect
+- `ros.py` — head/backing rate of spread, C6/D2 special cases
+- `surface.py` — surface fuel consumption (one formula per fuel type/group)
+- `crown.py` — CBH/CFL, CSFI, RSO, CFB, fire type, CFC, C6-specific ROS
+- `consumption.py` — total fuel consumption, HFI, fire intensity class
+- `fmc.py` — foliar moisture content and effect
+- `growth.py` — percentile-based ROS growth adjustment, point-ignition acceleration
+
+Multi-value returns use `NamedTuple`s (`FMCResult`, `SlopeWindISI`, `ISIRSIBEResult`)
+whose field names double as the facade attribute contract.
+
+### `cffwis.py` (~1150 lines) — FWI System
+Flat functions: `dailyFFMC`, `hourlyFFMC`, `dailyDMC`, `dailyDC`, `dailyISI`,
+`dailyBUI`, `dailyFWI`, `dailyDSR`, `startupDC`, `diurnalFFMC_lawson`. Only FFMC has
+a distinct hourly variant — ISI/FWI reuse one equation for both cadences depending
+on which inputs the caller passes. No shared typed helpers between functions; each
+repeats its own `isinstance` checks and NaN-mask rebuilding.
+
+### `diurnal_ffmc_lawson.py` — Lawson diurnal FFMC
+Static RH-class lookup tables (`L`, `M`, `H`, `MAIN`, `RHCLASS`), translated from a
+C++ source (`WISE_FWI_Module.cpp`). Main entry: `hourly_ffmc_lawson_vectorized(...)`.
+A commented-out scalar reference implementation is kept in place above it as
+translation reference.
+
+### `_typing.py`
+Shared aliases (`Scalar`, `ArrayLike`, `MaskedArray`, `FloatArray`) — explicitly the
+newer convention; equation files still alias `MaskedArray` locally instead of
+importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
+
+### `tools/`
+- `gen_fbp_goldens.py` — regenerates golden regression fixtures; run only from a
+  known-good state.
+- `generate_test_fbp_rasters.py` — builds `.tif` test fixtures (depends on an
+  external `ProcessRasters` module not in this repo).
+- `manual_fbp_test.py` — explicitly not part of the package or pytest suite; manual
+  smoke test only.
+
+### `tests/`
+- `tests/cffbps/` — `test_fbp_unit.py`, `test_fbp_regression.py` against Wotton et
+  al. (2009) published cases and golden snapshots (`data/golden/`); raster fixtures
+  under `data/inputs/` including a `multiprocessing/` subset and `cupy`/GPU output
+  variants.
+- `tests/cffwis/` + `tests/test_cffwis.py` — includes a real BC weather-station
+  dataset (Haig Camp) for validation, plus diurnal-FFMC-specific tests.
+
+## Data flow
+
+```mermaid
+flowchart TD
+    subgraph Caller["Caller code"]
+        A["Weather obs + prior codes"]
+    end
+
+    subgraph FWI["cffdrs.cffwis (independent)"]
+        B["dailyFFMC / dailyDMC / dailyDC"]
+        C["dailyISI / dailyBUI / dailyFWI / dailyDSR"]
+        L["diurnal_ffmc_lawson.hourly_ffmc_lawson_vectorized"]
+        B --> C
+        C -.->|"diurnalFFMC_lawson() wraps"| L
+    end
+
+    subgraph FBPInit["FBP.initialize()"]
+        D["inputs.check_array()\n(scalar vs array mode)"]
+        E["inputs.verify_inputs()\n(coerce, clamp, mask invalid)"]
+        F["VerifiedInputs NamedTuple\n-> setattr onto self.*"]
+        G["Pre-bind ~40 output attrs\nto shared self.ref_array template"]
+        D --> E --> F --> G
+    end
+
+    subgraph FBPRun["FBP.runFBP() - fixed 18-step sequence"]
+        direction TB
+        S1["invertWindAspect"] --> S2["calcSF"] --> S3["calcISZ"] --> S4["calcFMC"]
+        S4 --> S5["calcISI_RSI_BE"] --> S6["calcROS"] --> S7["calcSFC"]
+        S7 --> S8["getCBH_CFL"] --> S9["calcCSFI"] --> S10["calcRSO"]
+        S10 --> S11["calcCFB"] --> S12["calcRosPercentileGrowth"]
+        S12 --> S13["calcAccelParam"] --> S14["calcFireType"] --> S15["calcCFC"]
+        S15 --> S16["calcC6hros"] --> S17["calcTFC"] --> S18["calcFireIntensityClass"]
+    end
+
+    subgraph Eq["cffbps.equations.* (pure functions, MaskedArray in/out)"]
+        EQ1["slope_wind"]
+        EQ2["ros"]
+        EQ3["surface"]
+        EQ4["crown"]
+        EQ5["fmc"]
+        EQ6["growth"]
+        EQ7["consumption"]
+    end
+
+    subgraph Const["cffbps.constants"]
+        K["rosParams, CBH/CFL LUT,\nfuel-type code tables"]
+    end
+
+    A --> B
+    C -->|"FFMC, BUI"| D
+    A -->|"fuel_type, terrain, wind"| D
+
+    S3 -.-> EQ1
+    S4 -.-> EQ5
+    S5 -.-> EQ1
+    S6 -.-> EQ2
+    S7 -.-> EQ3
+    S8 -.-> EQ4
+    S9 -.-> EQ4
+    S10 -.-> EQ4
+    S11 -.-> EQ4
+    S12 -.-> EQ6
+    S13 -.-> EQ6
+    S14 -.-> EQ4
+    S15 -.-> EQ4
+    S16 -.-> EQ4
+    S17 -.-> EQ7
+    S18 -.-> EQ7
+
+    Eq -.->|"reads"| Const
+    FBPInit --> FBPRun
+
+    S18 --> H["getParams(out_request)\nfill masked -> NaN (array mode)\nor .item() (scalar mode)"]
+    H --> I["Output: hros, hfi, fire_type,\ncfb, tfc, fi_class, ... (up to 54 vars)"]
+
+    subgraph Parallel["cffbps.parallel.fbpMultiprocessArray (large rasters)"]
+        P1["Estimate block size\n(psutil available memory)"]
+        P2["Split array inputs into blocks"]
+        P3["Pool.starmap: fresh FBP() per block\n-> initialize() + runFBP()"]
+        P4["Stitch block results back\nby position into full arrays"]
+        P1 --> P2 --> P3 --> P4
+    end
+
+    A -.->|"large raster path"| P1
+    P3 -.->|"same 18-step sequence"| FBPRun
+```
+
+## Implicit assumptions and gotchas
+
+- **Shared-template output binding is load-bearing.** `initialize()` pre-binds ~40
+  output attributes to one shared zero-filled `self.ref_array`. This only stays safe
+  because every `calcX()` *reassigns* the whole attribute rather than mutating it in
+  place ("own-and-return" convention). Any new equation code that mutates a masked
+  array in place instead of returning a new one would silently corrupt other
+  attributes sharing the same template.
+- **NamedTuple field names are an unenforced contract.** `FMCResult`, `SlopeWindISI`,
+  `ISIRSIBEResult`, `VerifiedInputs` field names must exactly match the `FBP`
+  attribute names they get `setattr`'d onto (via `._asdict()`). Nothing type-checks
+  this — a renamed field silently fails to update the intended attribute rather than
+  raising.
+- **`runFBP()`'s 18-step order is hardcoded and order-dependent.** Each step reads
+  `self.*` attributes written by earlier steps (e.g. `calcCFB` depends on `calcRSO`
+  depends on `calcCSFI` depends on `calcFMC`). Reordering or skipping a step will
+  silently use stale/zero values from the template rather than failing loudly.
+  `out_request` only controls what `getParams()` returns — it does **not** skip
+  unneeded calculation steps; all 18 always run.
+- **Unknown fuel-type keys fail hard, not gracefully.** `crown.calc_cbh_cfl`'s
+  lookup-table indexing (`cbh_cfl_ht_lut[ftype]`) is explicitly documented in-code as
+  intentionally unvalidated — an unrecognized `ftype` raises a bare `KeyError`, not a
+  friendly `ValueError`.
+- **NaN vs. default semantics differ by field.** In `inputs._coerce()`, a NaN scalar
+  for `pc`/`pdf`/`gfl`/`gcf` is silently replaced with a field-specific default; a NaN
+  scalar for any other field becomes *masked* instead. This split is explicitly
+  described as deliberate and golden-snapshot-locked — don't "fix" one path to match
+  the other without regenerating goldens.
+- **Two independent hourly-FFMC algorithms coexist** (`cffwis.hourlyFFMC` — Van
+  Wagner/Alexander recursive; `diurnal_ffmc_lawson` via `cffwis.diurnalFFMC_lawson` —
+  table interpolation from a daily 1200 FFMC). They are not interchangeable and not
+  cross-validated against each other in this codebase.
+- **`out_request` values are the only sanctioned output-selection mechanism**, drawn
+  from `constants.valid_outputs` (~54 names, includes intermediates like `isi`,
+  `wsv`, `raz`, `sfc`, `fmc`, `csfi`, `rso`, `be`). Requesting a name outside this set
+  now raises `ValueError` naming the bad value(s), rather than silently returning
+  `np.nan` for that slot.
+- **Scalar mode round-trips through masked arrays.** Even scalar calls get wrapped as
+  1-element `MaskedArray`s internally and unwrapped via `.item()` at the very end
+  (`getParams`). Any equation code added must stay masked-array-only — it cannot
+  assume/branch on "this is a plain Python float."
+- **`rosParams` has fuel-type-specific gaps.** M-1/M-2 entries use `None` for
+  `a`/`b`/`c` — those coefficients are computed dynamically elsewhere. Code iterating
+  `rosParams` generically must handle that `None` case rather than assuming numeric.
+- **`num_processors < 2` in `fbpMultiprocessArray` is silently bumped to 2**, not
+  raised — now surfaced via `warnings.warn(...)` rather than `print()`, so it's
+  visible to `pytest.warns`/logging capture/`-W error` instead of only showing up in
+  captured stdout.
+- **Golden snapshots are the refactor safety net, not the equations code itself.**
+  `tools/gen_fbp_goldens.py` explicitly warns previously-committed goldens were once
+  stale (predating real behavior fixes) — regenerating them from a bad state would
+  bake the bug in as the new "expected" behavior. Always confirm a known-good state
+  first.
+- **`equations/__init__.py` re-exports nothing** — every equation function must be
+  imported from its specific submodule (`from cffdrs.cffbps.equations.crown import
+  calc_cfb`), not from the `equations` package itself.
+- **Two hourly test-fixture surfaces for the same system**: `cffwis` tests live both
+  under `tests/cffwis/` and as a separate `tests/test_cffwis.py` at the repo root of
+  `tests/` — check both when validating FWI changes, it's easy to update one and miss
+  the other.
