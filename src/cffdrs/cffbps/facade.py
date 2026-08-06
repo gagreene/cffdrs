@@ -651,7 +651,7 @@ class FBP:
         """
         self.hros, self.bros = growth_eq.calc_ros_percentile_growth(
             percentile_growth=self.percentile_growth, fuel_type=self.fuel_type,
-            cfb=self.cfb, hros=self.hros, bros=self.bros,
+            cfb=self.cfb, wsv=self.wsv, hros=self.hros, bros=self.bros,
         )
         return
 

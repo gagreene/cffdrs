@@ -53,16 +53,21 @@ def test_convert_fuel_type_codes_flag_matches_manual_conversion():
     assert _run(9, out_req, convert_fuel_type_codes=True) == _run(10, out_req)
 
 
-# ── Percentile growth branch (WISE) ────────────────────────────────────────────
+# ── Percentile growth branch (Han & Braun 2014, "Dionysus") ────────────────────
 def test_percentile_growth_locks_current_behavior():
     """Lock hros/bros under percentile_growth=90 (branch is a no-op at 50).
 
     Literals captured from the current, snapshot-validated code. If a refactor
     changes this branch, these values must be consciously regenerated.
+
+    bros values were regenerated when the growth-percentile formula was fixed to
+    scale backing-fire noise by the wind-decay factor k(wsv) (Han & Braun 2014);
+    hros is unaffected by that fix (its noise is never wind-scaled), which is why
+    only the bros literals changed from the pre-fix values.
     """
     expected = {
-        2: (27.11959245018106, 8.110300275335513),    # C-2: crown table entry
-        6: (11.284404397222712, 3.631810233270796),   # C-6
+        2: (27.11959245018106, 2.201176966805244),    # C-2: crown table entry
+        6: (11.284404397222712, 0.3243897622184262),  # C-6
         14: (17.667074274782212, 2.0109729485336385),  # O-1a: no crown entry
     }
     for ft, (hros_exp, bros_exp) in expected.items():
@@ -74,6 +79,56 @@ def test_percentile_growth_locks_current_behavior():
 def test_percentile_growth_50_is_noop():
     """percentile_growth=50 (default) must not adjust ROS."""
     assert _run(2, ['hros', 'bros'], percentile_growth=50) == _run(2, ['hros', 'bros'])
+
+
+def test_percentile_growth_surface_regime_uses_fuel_type_sigma():
+    """Surface-regime (cfb < 0.1) percentile growth must scale by the fuel type's
+    fitted sigma (Han & Braun 2014's per-fuel-type noise standard deviation), not
+    a bare exp(tinv). Locks the fix for a bug (inherited from WISE) where the
+    surface sigma was checked for eligibility (>= 0) but its magnitude was never
+    actually multiplied into the adjustment."""
+    from cffdrs.cffbps.equations.growth import _tinv, calc_ros_percentile_growth
+
+    fuel_type = np.ma.array([8], dtype=np.int8, mask=False)  # D1: surface sigma 0.716, no crown entry
+    cfb = np.ma.array([0.0], mask=False)  # surface regime
+    wsv = np.ma.array([0.0], mask=False)
+    hros_in = np.ma.array([1.0], mask=False)
+    bros_in = np.ma.array([1.0], mask=False)
+
+    hros90, _ = calc_ros_percentile_growth(
+        percentile_growth=90, fuel_type=fuel_type, cfb=cfb, wsv=wsv,
+        hros=hros_in.copy(), bros=bros_in.copy(),
+    )
+    expected = np.exp(_tinv(0.9) * np.float32(0.716))
+    assert float(hros90[0]) == pytest.approx(expected, rel=1e-6)
+
+
+def test_percentile_growth_bros_wind_decay():
+    """Backing-fire growth-percentile noise must shrink toward the unadjusted
+    value as wind speed increases (Han & Braun 2014's k(w)); head-fire noise must
+    not depend on wind speed at all."""
+    from cffdrs.cffbps.equations.growth import calc_ros_percentile_growth
+
+    fuel_type = np.ma.array([6], dtype=np.int8, mask=False)  # C6: crown sigma 1.54
+    cfb = np.ma.array([0.9], mask=False)  # crown regime
+    hros_in = np.ma.array([10.0], mask=False)
+    bros_in = np.ma.array([10.0], mask=False)
+
+    hros_low, bros_low = calc_ros_percentile_growth(
+        percentile_growth=90, fuel_type=fuel_type, cfb=cfb, wsv=np.ma.array([0.0], mask=False),
+        hros=hros_in.copy(), bros=bros_in.copy(),
+    )
+    hros_high, bros_high = calc_ros_percentile_growth(
+        percentile_growth=90, fuel_type=fuel_type, cfb=cfb, wsv=np.ma.array([80.0], mask=False),
+        hros=hros_in.copy(), bros=bros_in.copy(),
+    )
+
+    # head-fire adjustment never depends on wind speed
+    assert float(hros_low[0]) == pytest.approx(float(hros_high[0]), rel=1e-12)
+    # backing-fire adjustment shrinks toward the unadjusted value as wind increases
+    assert abs(float(bros_high[0]) - 10.0) < abs(float(bros_low[0]) - 10.0)
+    # at wsv=0, k(w)=1: backing gets the *same* adjustment as head fire (identical inputs)
+    assert float(bros_low[0]) == pytest.approx(float(hros_low[0]), rel=1e-12)
 
 
 # ── Multiprocessing driver ─────────────────────────────────────────────────────
