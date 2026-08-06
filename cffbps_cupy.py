@@ -190,6 +190,7 @@ class FBP:
         self.rso = cp.array([0], dtype=self.cupy_float_type)
         self.rsc = cp.array([0], dtype=self.cupy_float_type)
         self.cfb = cp.array([0], dtype=self.cupy_float_type)
+        self.bros_cfb = cp.array([0], dtype=self.cupy_float_type)
         self.cfl = cp.array([0], dtype=self.cupy_float_type)
         self.cfc = cp.array([0], dtype=self.cupy_float_type)
         self.tfc = cp.array([0], dtype=self.cupy_float_type)
@@ -563,6 +564,7 @@ class FBP:
         self.rso = self._init_array()
         self.rsc = self._init_array()
         self.cfb = self._init_array()
+        self.bros_cfb = self._init_array()
         self.cfl = self._init_array()
         self.cfc = self._init_array()
         self.tfc = self._init_array()
@@ -1102,6 +1104,15 @@ class FBP:
         Function to calculate crown fraction burned using CuPy.
         Equation per Forestry Canada Fire Danger Group (1992).
 
+        Also computes a backing-fire-specific CFB (self.bros_cfb), using bros in
+        place of hfros, for calcRosPercentileGrowth's backing-fire regime decision
+        (matches WISE FBPFuel::BROS computing its own CFB from brss, distinct
+        from FBPFuel::ROS's head-fire CFB from rss). For C6, sfros (the
+        C6-specific surface ROS used in place of hfros for CFB) is head-fire-
+        derived only -- no backing-fire equivalent is computed elsewhere in
+        this pipeline, so the backing CFB for C6 reuses the same sfros as a
+        documented simplification.
+
         :return: None
         """
         # Masks
@@ -1109,24 +1120,23 @@ class FBP:
         non_crowning = cp.isin(self.fuel_type, self.non_crowning_fuels)
         is_other = cp.isin(self.fuel_type, self.ftypes) & ~is_c6 & ~non_crowning
 
-        # Precompute exponent input values
+        # C6 always uses sfros (head-fire-derived; no backing equivalent available)
         delta_sfros_c6 = self.sfros - self.rso
-        delta_hfros_other = self.hfros - self.rso
-
-        # Compute CFB
         cfb_c6 = cp.where(delta_sfros_c6 < -3086, 0.0, 1 - cp.exp(-0.23 * delta_sfros_c6))
-        cfb_other = cp.where(delta_hfros_other < -3086, 0.0, 1 - cp.exp(-0.23 * delta_hfros_other))
 
-        # Initialize output
-        self.cfb = cp.zeros_like(self.fuel_type, dtype=self.cupy_float_type)
-        self.cfb = cp.where(is_c6, cfb_c6, self.cfb)
-        self.cfb = cp.where(is_other, cfb_other, self.cfb)
+        def _cfb_for_other(ros_other: cp.ndarray) -> cp.ndarray:
+            delta_other = ros_other - self.rso
+            cfb_other = cp.where(delta_other < -3086, 0.0, 1 - cp.exp(-0.23 * delta_other))
+            cfb = cp.zeros_like(self.fuel_type, dtype=self.cupy_float_type)
+            cfb = cp.where(is_c6, cfb_c6, cfb)
+            cfb = cp.where(is_other, cfb_other, cfb)
+            return cp.clip(cp.nan_to_num(cfb, nan=0.0), 0, 1)
 
-        # Ensure values range between 0 and 1
-        self.cfb = cp.clip(cp.nan_to_num(self.cfb, nan=0.0), 0, 1)
+        self.cfb = _cfb_for_other(self.hfros)
+        self.bros_cfb = _cfb_for_other(self.bros)
 
         # Clean up memory
-        del is_c6, is_other, delta_sfros_c6, delta_hfros_other, cfb_c6, cfb_other
+        del is_c6, is_other, delta_sfros_c6, cfb_c6
 
         return
 
@@ -1136,16 +1146,34 @@ class FBP:
         This function adjusts the `hfros` and `bros` attributes based on the percentile growth value and
         crown/surface spread parameters.
 
-        This function is pulled from the WISE code base, and was apparently conceived by John Braun,
-        who is currently a faculty member of the Computer Science, Mathematics, Physics and Statistics
-        department at UBC, Okanagan (as of April 16, 2025).
+        Implements the variance-stabilized ROS quantile model of Han, L. & Braun,
+        W.J. (2014), "Dionysus: a stochastic fire growth scenario generator",
+        Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1),
+        ROS residuals are treated as log-normal and scaled by
+        exp(tinv * sigma_surface). At or above it, a closed-form Box-Cox
+        power-law adjustment (delta=0.6, the paper's fitted crown-fire
+        transform) applies unless its radicand would go negative (outside the
+        transform's valid domain), in which case it falls back to the same
+        log-normal-shift form using the crown-fire sigma. Fuel types with no
+        fitted sigma for the applicable regime are left unchanged.
+
+        hfros and bros each use their own direction-specific CFB (self.cfb /
+        self.bros_cfb) to decide the surface-vs-crown regime, and bros's noise
+        term is additionally scaled by a wind-speed decay factor k(wsv) (the
+        paper's Eq. 3): backing-spread variability shrinks as wind speed
+        increases, the same way backing ROS itself does. hfros's noise is not
+        wind-scaled.
 
         :return: None
         """
 
         def _tinv(probability: float, freedom: int = 9999999):
             """
-            Calculates the inverse of the Student's t-distribution (quantile function).
+            Calculates the standard-normal quantile, via a Student's t at very high freedom.
+
+            Han & Braun (2014) specify the standard normal quantile directly; a t
+            distribution at freedom=9999999 is numerically indistinguishable from
+            it and is what this method's fuel-type sigmas were fit against.
 
             :param probability: The cumulative probability for which the quantile is calculated.
             :param freedom: The degrees of freedom for the t-distribution.
@@ -1153,14 +1181,30 @@ class FBP:
             """
             return t.ppf(probability, freedom)
 
+        def _wind_decay(w: cp.ndarray) -> cp.ndarray:
+            """
+            Wind-speed decay factor for backing-fire growth-percentile noise.
+
+            Han & Braun (2014), the k(w) accompanying their Eq. 3: k(0) = 1,
+            decaying as wind speed increases.
+
+            :param w: Wind speed (wsv).
+            :return: The decay factor, same shape as w.
+            """
+            low = cp.exp(-0.10078 * w)
+            high = cp.exp(-0.05039 * w) / (12.0 * (1.0 - cp.exp(-0.0818 * (w - 28.0))))
+            return cp.where(w < 40, low, high)
+
         if self.percentile_growth != 50:
             # Calculate the inverse t-distribution for the given percentile growth
             tinv_value = _tinv(probability=self.percentile_growth / 100, freedom=9999999)
 
-            # Prepare default table with structured dtype
+            # Prepare default table with structured dtype. Both are fitted noise
+            # standard deviations (Han & Braun 2014, Section 3): surface_vals scales
+            # a log-normal shift, crown_vals scales the Box-Cox power-law adjustment.
             keys = cp.array([1, 2, 3, 4, 5, 6, 7, 8, 12], dtype=cp.uint8)
-            surface_vals = cp.array([-1.0, 0.84, 0.62, 0.74, 0.8, 0.66, 1.22, 0.716, 0.551], dtype=cp.float32)
-            crown_vals = cp.array([0.95, 1.82, 1.78, 1.38, -1.0, 1.54, 1.0, -1.0, -1.0], dtype=cp.float32)
+            surface_vals = cp.array([cp.nan, 0.84, 0.62, 0.74, 0.8, 0.66, 1.22, 0.716, 0.551], dtype=cp.float32)
+            crown_vals = cp.array([0.95, 1.82, 1.78, 1.38, cp.nan, 1.54, 1.0, cp.nan, cp.nan], dtype=cp.float32)
 
             # Initialize default arrays for lookup
             surface_s = cp.full_like(self.fuel_type, cp.nan, dtype=cp.float32)
@@ -1172,35 +1216,29 @@ class FBP:
                 surface_s = cp.where(valid_mask, s_val, surface_s)
                 crown_s = cp.where(valid_mask, c_val, crown_s)
 
-            e = tinv_value * crown_s
+            has_surface = ~cp.isnan(surface_s)
+            has_crown = ~cp.isnan(crown_s)
+            wind_decay = _wind_decay(self.wsv)
 
-            # Iterate over head fire and backing fire ROS attributes
-            for ros_attr in ['hfros', 'bros']:
+            # Iterate over head fire and backing fire ROS attributes, each with its
+            # own direction-specific CFB and noise-scaling factor.
+            for ros_attr, regime_cfb, noise_scale in (
+                ('hfros', self.cfb, 1.0),
+                ('bros', self.bros_cfb, wind_decay),
+            ):
                 ros_in = getattr(self, ros_attr)  # Get the current ROS value
-                d = cp.power(ros_in, 0.6)  # Apply a power transformation to the ROS value
 
-                # Calculate the adjusted ROS growth based on crown and surface spread parameters
-                ros_growth = cp.where(~cp.isnan(crown_s),
-                                      cp.where(self.cfb < 0.1,
-                                               cp.where(surface_s < 0,
-                                                        # No adjustment if surface_s is invalid
-                                                        ros_in,
-                                                        # Adjust using surface_s
-                                                        cp.exp(tinv_value) * ros_in),
-                                               cp.where(crown_s < 0,
-                                                        # No adjustment if crown_s is invalid
-                                                        ros_in,
-                                                        cp.where(-e > d,
-                                                                 # Adjust using crown_s
-                                                                 cp.exp(tinv_value) * ros_in,
-                                                                 # Apply growth adjustment
-                                                                 cp.power(d + e, 1 / 0.6)
-                                                                 )
-                                                        )
-                                               ),
-                                      # Default to the original ROS value if no conditions are met
-                                      ros_in)
+                # Surface regime: log-normal shift, scaled by the fuel type's sigma
+                surface_regime = cp.where(has_surface, ros_in * cp.exp(tinv_value * surface_s * noise_scale), ros_in)
 
+                # Crown regime: Box-Cox power-law adjustment, falling back to the
+                # same log-normal-shift form (using crown_s) outside its domain
+                radicand = cp.power(ros_in, 0.6) + tinv_value * crown_s * noise_scale
+                power_law = cp.power(cp.where(radicand >= 0, radicand, 0.0), 1 / 0.6)
+                crown_fallback = ros_in * cp.exp(tinv_value * crown_s * noise_scale)
+                crown_regime = cp.where(has_crown, cp.where(radicand >= 0, power_law, crown_fallback), ros_in)
+
+                ros_growth = cp.where(regime_cfb < 0.1, surface_regime, crown_regime)
                 setattr(self, ros_attr, ros_growth)  # Update the ROS attribute with the adjusted value
 
         return

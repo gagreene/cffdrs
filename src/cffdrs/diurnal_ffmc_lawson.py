@@ -4,7 +4,6 @@ Created on Thur Apr 17 13:00:00 2025
 @author: Gregory A. Greene
 
 The hourlyFFMC_lawson function.
-This code was translated to Python from the C++ code in the WISE_FWI_Module.
 """
 
 import numpy as np
@@ -205,178 +204,6 @@ RHCLASS = [
 ]
 
 
-# THIS IS THE DIRECT PYTHON INTERPRETATION FROM THE C++ CODE IN WISE_FWI_MODULE.CPP
-# # Time helper class to mimic WTimeSpan
-# class TimeSpan:
-#     """
-#     Represents a time interval using hours and minutes.
-#
-#     Provides methods to access hours, minutes, and compute the total number of minutes.
-#     """
-#
-#     def __init__(self, hours: int, minutes: int):
-#         self.hours = hours
-#         self.minutes = minutes
-#
-#     def get_hours(self) -> int:
-#         """Return the hour component."""
-#         return self.hours
-#
-#     def get_minutes(self) -> int:
-#         """Return the minute component."""
-#         return self.minutes
-#
-#     def get_total_minutes(self) -> int:
-#         """Return total minutes represented by this timespan."""
-#         return self.hours * 60 + self.minutes
-#
-#
-# def interpolate(i1: float, i2: float, i3: float, i4: float, fraction: float, ts: TimeSpan) -> float:
-#     """
-#     Perform bilinear interpolation between four points in a grid based on a fractional x/y position.
-#
-#     :param i1: Lower-left value
-#     :param i2: Lower-right value
-#     :param i3: Upper-left value
-#     :param i4: Upper-right value
-#     :param fraction: X interpolation fraction between columns
-#     :param ts: A TimeSpan object providing the current time (used for vertical interpolation)
-#     :return: Interpolated FFMC value
-#     """
-#     i12 = i1 + ((i2 - i1) * fraction)  # Interpolate across first row
-#     i34 = i3 + ((i4 - i3) * fraction)  # Interpolate across second row
-#
-#     # Interpolate between i12 and i34 vertically
-#     divisor = 59.0 if ts.get_hours() == 11 else 60.0
-#     return i12 + ((i34 - i12) / divisor) * ts.get_minutes()
-#
-#
-# def interpolate_table(table: list[list[float]], ffmc: float, tindex: int, ts: TimeSpan) -> float:
-#     """
-#     Interpolate FFMC value from a 2D table (L, M, H, or MAIN) based on current FFMC and time.
-#
-#     :param table: A 2D lookup table for FFMC (e.g., L, M, H)
-#     :param ffmc: Current FFMC value (must be between 17.5 and 101)
-#     :param tindex: Row index based on time-of-day
-#     :param ts: TimeSpan object for interpolation reference
-#     :return: Interpolated FFMC value
-#     """
-#     i = 1
-#     while ffmc >= table[0][i]:
-#         i += 1
-#     i -= 1
-#
-#     fraction = (ffmc - table[0][i]) / (table[0][i + 1] - table[0][i])
-#
-#     return interpolate(table[tindex][i], table[tindex][i + 1],
-#                        table[tindex + 1][i], table[tindex + 1][i + 1],
-#                        fraction, ts)
-#
-#
-# def hourlyFFMC_lawson_calc(ffmc: float, ts: TimeSpan, rh: float) -> float:
-#     """
-#     Calculate the hourly-adjusted FFMC based on the Lawson interpolation method.
-#
-#     :param ffmc: Initial FFMC value (typically from daily FWI system)
-#     :param ts: TimeSpan object representing local solar time (hours, minutes)
-#     :param rh: Relative Humidity (0–100%)
-#     :return: Adjusted hourly FFMC value, or -98.0 if input FFMC is invalid
-#     """
-#     if ffmc < 0.0 or ffmc > 101.0:
-#         return -98.0  # Invalid input
-#
-#     ffmc = max(ffmc, 17.5)
-#     rh = max(0.0, min(100.0, rh))
-#     rh = round(rh)
-#     if rh < 1.0:
-#         rh = 95
-#
-#     hour = ts.get_hours()
-#     minutes = ts.get_minutes()
-#
-#     # Morning transition period (06:00 to 12:00)
-#     if 6 <= hour <= 11:
-#         tindex = 0
-#         for i in range(8):
-#             if 100 * hour < RHCLASS[0][i][0]:
-#                 tindex = i
-#                 break
-#
-#         # Determine RH class: Low (L), Medium (M), High (H)
-#         if minutes <= 30:
-#             if rh > RHCLASS[1][tindex - 1][0]:
-#                 rh_class = 'H'
-#             elif rh < RHCLASS[3][tindex - 1][0]:
-#                 rh_class = 'L'
-#             else:
-#                 rh_class = 'M'
-#         else:
-#             if rh > RHCLASS[1][tindex][0]:
-#                 rh_class = 'H'
-#             elif rh < RHCLASS[3][tindex][0]:
-#                 rh_class = 'L'
-#             else:
-#                 rh_class = 'M'
-#
-#         # Use appropriate table for interpolation
-#         if rh_class == 'L':
-#             return interpolate_table(L, ffmc, tindex, ts)
-#         elif rh_class == 'M':
-#             return interpolate_table(M, ffmc, tindex, ts)
-#         else:
-#             return interpolate_table(H, ffmc, tindex, ts)
-#
-#     # Afternoon/evening period: use MAIN table
-#     hour_val = hour * 100 + minutes
-#     if hour_val < 100:
-#         hour_val += 2400  # Adjust for times past midnight
-#
-#     tindex = 1
-#     while hour_val >= MAIN[tindex][0]:
-#         tindex += 1
-#     tindex -= 1
-#
-#     i = 1
-#     while ffmc >= MAIN[0][i]:
-#         i += 1
-#     i -= 1
-#
-#     fraction = (ffmc - MAIN[0][i]) / (MAIN[0][i + 1] - MAIN[0][i])
-#     return interpolate(MAIN[tindex][i], MAIN[tindex][i + 1],
-#                        MAIN[tindex + 1][i], MAIN[tindex + 1][i + 1],
-#                        fraction, ts)
-#
-
-# def hourlyFFMC_lawson(ffmc: Union[float, np.ndarray],
-#                       rh: Union[float, np.ndarray],
-#                       hour: int,
-#                       minute: int) -> Union[float, np.ndarray]:
-#     """
-#     Vectorized version of hourlyFFMC_lawson that accepts FFMC and RH as arrays or scalars.
-#     Hour and minute must be scalars (applied uniformly to all inputs).
-#
-#     :param ffmc: Initial FFMC values
-#     :param rh: Relative humidity (%) values
-#     :param hour: Hour of day
-#     :param minute: Minute
-#     :return: Predicted hourly FFMC value(s)
-#     """
-#     ffmc = np.atleast_1d(ffmc)
-#     rh = np.atleast_1d(rh)
-#
-#     if ffmc.shape != rh.shape:
-#         raise ValueError('ffmc and rh must have the same shape')
-#
-#     ts = TimeSpan(hour, minute)
-#     result = np.full(ffmc.shape, -98.0, dtype=np.float32)
-#
-#     # Currently processes each element independently due to the table interpolations
-#     for idx in np.ndindex(ffmc.shape):
-#         result[idx] = hourlyFFMC_lawson_calc(float(ffmc[idx]), ts, float(rh[idx]))
-#
-#     return result if result.size > 1 else result[0]
-
-
 def hourly_ffmc_lawson_vectorized(
         ffmc: float | np.ndarray,
         rh: float | np.ndarray,
@@ -385,6 +212,7 @@ def hourly_ffmc_lawson_vectorized(
 ) -> float | np.ndarray:
     """
     Vectorized implementation of the Lawson hourly FFMC interpolation.
+    Lawson hourly FFMC method sourced from: Lawson, Armitage & Hoskins 1996, FRDA Report 245.
 
     :param ffmc: Array of initial FFMC values (float32)
     :param hour: Array of hour values (int)
@@ -454,14 +282,18 @@ def hourly_ffmc_lawson_vectorized(
         rh_morning = rh_data[is_morning]
         hour_morning = hour_data[is_morning]
         minute_morning = minute_data[is_morning]
-        hour_val_morning = hour_morning * 100 + minute_morning
 
-        tindex = np.searchsorted(rh_cutoff, hour_val_morning, side='right')
+        tindex = np.searchsorted(rh_cutoff, hour_morning * 100, side='right')
         tindex = np.clip(tindex, 1, 7)
 
+        # RH-class thresholds are keyed to the half of the hour: the first 30
+        # minutes use the previous column (tindex - 1), the last 30 use
+        # tindex itself.
+        class_tindex = np.where(minute_morning <= 30, tindex - 1, tindex)
+
         rh_class = np.full(rh_morning.shape, 'M', dtype='<U1')
-        rh_class[rh_morning > rh_class_h[tindex]] = 'H'
-        rh_class[rh_morning < rh_class_l[tindex]] = 'L'
+        rh_class[rh_morning > rh_class_h[class_tindex]] = 'H'
+        rh_class[rh_morning < rh_class_l[class_tindex]] = 'L'
 
         table_map = {'L': low_tbl, 'M': med_tbl, 'H': high_tbl}
         out_vals = np.zeros(ffmc_morning.shape, dtype=np.float64)
