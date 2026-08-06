@@ -212,6 +212,7 @@ def hourly_ffmc_lawson_vectorized(
 ) -> float | np.ndarray:
     """
     Vectorized implementation of the Lawson hourly FFMC interpolation.
+    Lawson hourly FFMC method sourced from: Lawson, Armitage & Hoskins 1996, FRDA Report 245.
 
     :param ffmc: Array of initial FFMC values (float32)
     :param hour: Array of hour values (int)
