@@ -56,7 +56,8 @@ def _wind_decay(w: MaskedArray) -> MaskedArray:
 def calc_ros_percentile_growth(*,
                                percentile_growth: float | int | None,
                                fuel_type: MaskedArray,
-                               cfb: MaskedArray,
+                               hros_cfb: MaskedArray,
+                               bros_cfb: MaskedArray,
                                wsv: MaskedArray,
                                hros: MaskedArray,
                                bros: MaskedArray) -> tuple[MaskedArray, MaskedArray]:
@@ -73,6 +74,11 @@ def calc_ros_percentile_growth(*,
     form using the crown-fire sigma. Fuel types with no fitted sigma for the
     applicable regime are left unchanged, as is percentile_growth of None or 50
     (the median, i.e. no adjustment).
+
+    Head and backing ROS are adjusted using their own, direction-specific CFB
+    (hros_cfb/bros_cfb) to decide the surface-vs-crown regime — matching WISE's
+    FBPFuel::ROS/BROS each computing CFB from their own direction's spread rate,
+    rather than sharing one CFB value between both directions.
 
     Backing ROS additionally has its noise term scaled by a wind-speed decay
     factor, k(wsv) (paper Eq. 3's k(w)): backing-spread variability shrinks as
@@ -93,7 +99,7 @@ def calc_ros_percentile_growth(*,
     wind_decay = _wind_decay(wsv)
 
     adjusted = []
-    for rsi, noise_scale in ((hros, 1.0), (bros, wind_decay)):
+    for rsi, noise_scale, regime_cfb in ((hros, 1.0, hros_cfb), (bros, wind_decay, bros_cfb)):
         surface_regime = mask.where(has_surface, rsi * np.exp(tinv_value * surface_sigma * noise_scale), rsi)
 
         radicand = mask.power(rsi, 0.6) + tinv_value * crown_sigma * noise_scale
@@ -101,7 +107,7 @@ def calc_ros_percentile_growth(*,
         crown_fallback = rsi * np.exp(tinv_value * crown_sigma * noise_scale)
         crown_regime = mask.where(has_crown, mask.where(radicand >= 0, power_law, crown_fallback), rsi)
 
-        adjusted.append(mask.where(cfb < 0.1, surface_regime, crown_regime))
+        adjusted.append(mask.where(regime_cfb < 0.1, surface_regime, crown_regime))
 
     return adjusted[0], adjusted[1]
 
