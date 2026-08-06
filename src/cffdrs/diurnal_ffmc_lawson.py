@@ -282,14 +282,18 @@ def hourly_ffmc_lawson_vectorized(
         rh_morning = rh_data[is_morning]
         hour_morning = hour_data[is_morning]
         minute_morning = minute_data[is_morning]
-        hour_val_morning = hour_morning * 100 + minute_morning
 
-        tindex = np.searchsorted(rh_cutoff, hour_val_morning, side='right')
+        tindex = np.searchsorted(rh_cutoff, hour_morning * 100, side='right')
         tindex = np.clip(tindex, 1, 7)
 
+        # RH-class thresholds are keyed to the half of the hour: the first 30
+        # minutes use the previous column (tindex - 1), the last 30 use
+        # tindex itself.
+        class_tindex = np.where(minute_morning <= 30, tindex - 1, tindex)
+
         rh_class = np.full(rh_morning.shape, 'M', dtype='<U1')
-        rh_class[rh_morning > rh_class_h[tindex]] = 'H'
-        rh_class[rh_morning < rh_class_l[tindex]] = 'L'
+        rh_class[rh_morning > rh_class_h[class_tindex]] = 'H'
+        rh_class[rh_morning < rh_class_l[class_tindex]] = 'L'
 
         table_map = {'L': low_tbl, 'M': med_tbl, 'H': high_tbl}
         out_vals = np.zeros(ffmc_morning.shape, dtype=np.float64)
