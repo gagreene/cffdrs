@@ -83,10 +83,35 @@ scalar path — scalars are coerced upstream):
 - `crown.py` — CBH/CFL, CSFI, RSO, CFB, fire type, CFC, C6-specific ROS
 - `consumption.py` — total fuel consumption, HFI, fire intensity class
 - `fmc.py` — foliar moisture content and effect
-- `growth.py` — percentile-based ROS growth adjustment, point-ignition acceleration
+- `growth.py` — growth-percentile ROS adjustment, point-ignition acceleration
 
 Multi-value returns use `NamedTuple`s (`FMCResult`, `SlopeWindISI`, `ISIRSIBEResult`)
 whose field names double as the facade attribute contract.
+
+**`growth.calc_ros_percentile_growth`'s statistical basis.** Adjusts `hros`/`bros`
+for a requested `percentile_growth` (0-100, no-op at 50) using the variance-stabilized
+ROS quantile model of Han, L. & Braun, W.J. (2014), "Dionysus: a stochastic fire
+growth scenario generator", *Environmetrics* 25(6):431-442 — traced from the WISE
+C++ codebase (`Percentile.cpp`'s `ScenarioPercentile::RSI`, `excel_tinv.cpp`) back
+to its published source. Below the crowning threshold (`cfb < 0.1`) ROS
+residuals are treated as log-normal and scaled by
+`exp(tinv * sigma_surface)`; at or above it, a closed-form Box-Cox power-law
+adjustment (`delta=0.6`, the paper's fitted crown-fire transform) applies, falling
+back to the same log-normal form if its radicand goes negative. `sigma_surface`/
+`sigma_crown` are per-fuel-type fitted noise standard deviations (only 9 fuel
+types have them: C1-C7, D1, M3); `tinv` is a standard-normal quantile computed via
+`scipy.stats.t.ppf` at `freedom=9999999` (numerically indistinguishable from
+normal). `hros` and `bros` each use their own direction-specific CFB for the
+surface-vs-crown decision (`facade.py`'s `self.cfb`/`self.bros_cfb`, matching
+WISE's `FBPFuel::ROS`/`BROS` each computing CFB from their own spread rate), and
+`bros`'s noise term is additionally scaled by a wind-speed decay factor `k(wsv)`
+(the paper's Eq. 3) — backing-spread variability shrinks as wind speed increases,
+the same way backing ROS itself does. Two implementation gaps inherited from the
+WISE port were found and fixed here: the surface-regime sigma was previously
+checked for eligibility but never actually multiplied in, and `bros` previously
+shared `hros`'s unscaled noise term and CFB. One known simplification remains:
+C6's backing CFB reuses the head-fire-derived `sros` value, since no backing-fire
+equivalent of that C6-specific surface ROS exists elsewhere in the pipeline.
 
 ### `cffwis.py` (~1150 lines) — FWI System
 Flat functions: `dailyFFMC`, `hourlyFFMC`, `dailyDMC`, `dailyDC`, `dailyISI`,
@@ -296,3 +321,11 @@ flowchart TD
   under `tests/cffwis/` and as a separate `tests/test_cffwis.py` at the repo root of
   `tests/` — check both when validating FWI changes, it's easy to update one and miss
   the other.
+- **C6's backing-fire growth-percentile CFB reuses head-fire data.**
+  `growth.calc_ros_percentile_growth`'s backing-fire regime decision uses
+  `facade.py`'s `self.bros_cfb` (crown fraction burned computed from `bros`), but
+  for C6 specifically that computation still uses the head-fire-derived `sros`
+  value (there's no backing-fire equivalent of C6's surface-only ROS anywhere in
+  the pipeline). A documented simplification, not a bug — see `calcCFB()`'s
+  docstring — but a genuine gap if a future backing-fire-specific `sros` becomes
+  available and this isn't revisited.
