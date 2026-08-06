@@ -121,10 +121,11 @@ on which inputs the caller passes. No shared typed helpers between functions; ea
 repeats its own `isinstance` checks and NaN-mask rebuilding.
 
 ### `diurnal_ffmc_lawson.py` — Lawson diurnal FFMC
-Static RH-class lookup tables (`L`, `M`, `H`, `MAIN`, `RHCLASS`), translated from a
-C++ source (`WISE_FWI_Module.cpp`). Main entry: `hourly_ffmc_lawson_vectorized(...)`.
-A commented-out scalar reference implementation is kept in place above it as
-translation reference.
+Static RH-class lookup tables (`L`, `M`, `H`, `MAIN`, `RHCLASS`), sourced from
+Lawson, Armitage & Hoskins (1996), FRDA Report 245, vectorized over
+`numpy`/masked arrays. Main entry: `hourly_ffmc_lawson_vectorized(...)`.
+Morning-hour (06:00-11:59) RH-class selection uses a half-hour-dependent
+threshold column — see gotchas below.
 
 ### `_typing.py`
 Shared aliases (`Scalar`, `ArrayLike`, `MaskedArray`, `FloatArray`) — explicitly the
@@ -321,6 +322,14 @@ flowchart TD
   under `tests/cffwis/` and as a separate `tests/test_cffwis.py` at the repo root of
   `tests/` — check both when validating FWI changes, it's easy to update one and miss
   the other.
+- **Lawson diurnal FFMC's morning RH-class threshold is keyed to the half-hour,
+  not just the hour.** `diurnal_ffmc_lawson.hourly_ffmc_lawson_vectorized`'s
+  morning branch (06:00-11:59) must pick the RH-class (L/M/H) threshold column at
+  `tindex - 1` when `minute <= 30` and `tindex` when `minute > 30` — one column
+  earlier than the hour-row interpolation index. Using a single `tindex` for both
+  purposes (the bug fixed here) silently misclassifies RH values near a class
+  boundary for the first 30 minutes of every morning hour. Regression-locked by
+  `test_hourly_ffmc_lawson_vectorized_rh_class_uses_half_hour_offset`.
 - **C6's backing-fire growth-percentile CFB reuses head-fire data.**
   `growth.calc_ros_percentile_growth`'s backing-fire regime decision uses
   `facade.py`'s `self.bros_cfb` (crown fraction burned computed from `bros`), but
