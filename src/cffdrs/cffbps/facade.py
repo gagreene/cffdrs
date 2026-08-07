@@ -152,6 +152,7 @@ class FBP:
         self.rso = None
         self.rsc = None
         self.cfb = None
+        self.bros_cfb = None
         self.cfl = None
         self.cfc = None
         self.tfc = None
@@ -460,6 +461,7 @@ class FBP:
         self.csfi = template
         self.rso = template
         self.cfb = template
+        self.bros_cfb = template
         self.cfl = template
         self.cfc = template
         self.tfc = template
@@ -632,7 +634,15 @@ class FBP:
 
     def calcCFB(self) -> None:
         """
-        Function calculates crown fraction burned using equation in Forestry Canada Fire Danger Group (1992)
+        Function calculates crown fraction burned using equation in Forestry Canada Fire Danger Group (1992).
+
+        Also computes a backing-fire-specific CFB (self.bros_cfb), using bros in
+        place of hros, for calcRosPercentileGrowth's backing-fire regime decision
+        (matches WISE FBPFuel::BROS computing its own CFB from brss, distinct
+        from FBPFuel::ROS's head-fire CFB from rss). For C6, sros (the C6-specific
+        surface ROS used in place of hros for CFB) is head-fire-derived only —
+        no backing-fire equivalent is computed elsewhere in this pipeline, so
+        C6's backing CFB reuses the same sros as a documented simplification.
 
         :return: None
         """
@@ -640,6 +650,11 @@ class FBP:
             fuel_type=self.fuel_type, ftypes=self.ftypes,
             non_crowning_fuels=self.non_crowning_fuels,
             sros=self.sros, rso=self.rso, hros=self.hros,
+        )
+        self.bros_cfb = crown_eq.calc_cfb(
+            fuel_type=self.fuel_type, ftypes=self.ftypes,
+            non_crowning_fuels=self.non_crowning_fuels,
+            sros=self.sros, rso=self.rso, hros=self.bros,
         )
         return
 
@@ -651,7 +666,8 @@ class FBP:
         """
         self.hros, self.bros = growth_eq.calc_ros_percentile_growth(
             percentile_growth=self.percentile_growth, fuel_type=self.fuel_type,
-            cfb=self.cfb, hros=self.hros, bros=self.bros,
+            hros_cfb=self.cfb, bros_cfb=self.bros_cfb, wsv=self.wsv,
+            hros=self.hros, bros=self.bros,
         )
         return
 
@@ -867,6 +883,7 @@ class FBP:
         :param block: The array of partial data (block) to run FBP with.
         :returns:
             Tuple of values requested through out_request parameter. Default values are fire_type, hros, and hfi.
+        :raises ValueError: if out_request contains any name not in cffbps.constants.valid_outputs.
         """
         if not self.initialized:
             raise ValueError('FBP class must be initialized before running calculations. Call "initialize" first.')
@@ -878,6 +895,13 @@ class FBP:
         if self.out_request is None:
             # Set default output requests if none provided
             self.out_request = ['hros', 'hfi', 'fire_type']
+        else:
+            unknown = [var for var in self.out_request if var not in constants.valid_outputs]
+            if unknown:
+                raise ValueError(
+                    f'Unknown out_request value(s): {unknown}. '
+                    f'Valid values are: {sorted(constants.valid_outputs)}'
+                )
 
         # ### Model fire behavior with CFFBPS
         # Invert wind direction and aspect
