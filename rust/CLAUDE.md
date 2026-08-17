@@ -6,7 +6,7 @@ Two crates, one version, released together:
   chain and grid pass. Consumable as a cargo dependency by fire-growth
   engines that need the science without a Python runtime in the hot path.
 - `crates/cffdrs-py` — thin PyO3 bindings over cffdrs-core; maturin builds
-  the `cffdrs-rs` wheel for Python consumers.
+  it as `cffdrs._rust` in the main `cffdrs` wheel.
 
 ## The Python package is the spec
 
@@ -40,13 +40,10 @@ follows in the same PR, and the shared goldens prove agreement.
 ## Building
 
 ```bash
-cd rust
-cargo test                       # core + goldens
-# wheel (from crates/cffdrs-py):
-#   set PYO3_PYTHON to the target venv's interpreter first — building
-#   against whatever python3 is on PATH links symbols the runtime may lack
-uv run maturin build --release -m crates/cffdrs-py/Cargo.toml
+cd ..
+cargo test --manifest-path rust/Cargo.toml
+uv build --wheel                 # mixed cffdrs wheel
 # pure-Rust artifact for downstream engines (attach to releases alongside
 # the wheel; consumers unpack it into their lib/ dir as a pinned dep):
-cargo package -p cffdrs-core     # -> target/package/cffdrs-core-X.Y.Z.crate
+cargo package --manifest-path rust/Cargo.toml -p cffdrs-core
 ```

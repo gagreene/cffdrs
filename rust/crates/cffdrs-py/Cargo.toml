@@ -2,11 +2,11 @@
 name = "cffdrs-py"
 version = "0.1.0"
 edition = "2021"
-description = "Python bindings (wheel: cffdrs-rs) over cffdrs-core."
+description = "Python bindings (cffdrs._rust) over cffdrs-core."
 license = "MIT"
 
 [lib]
-name = "cffdrs_rs"
+name = "_rust"
 crate-type = ["cdylib"]
 
 [dependencies]

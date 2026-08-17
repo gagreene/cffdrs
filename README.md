@@ -13,6 +13,9 @@ multiprocessing driver for large rasters.
 pip install cffdrs
 ```
 
+Published wheels include the compiled Rust grid backend. Installing from a
+source distribution requires a Rust toolchain as well as Python 3.10+.
+
 Optional extras:
 
 ```bash
@@ -28,6 +31,21 @@ Requires Python 3.10+. Core dependencies: `numpy`, `scipy`, `psutil`.
 | `cffdrs.cffbps` | FBP System: the `FBP` class (facade) over pure equation modules |
 | `cffdrs.cffwis` | FWI System: FFMC/DMC/DC/ISI/BUI/FWI/DSR functions (hourly + daily) |
 | `cffdrs.diurnal_ffmc_lawson` | Diurnal (hourly) FFMC interpolation per Lawson et al. |
+| `cffdrs._rust` | Compiled, low-level FBP grid pass used as the performance backend |
+
+The repository is a mixed Python/Rust project. Python package sources live under
+`src/cffdrs`; the top-level `rust/` directory is a Cargo workspace containing:
+
+- `cffdrs-core`: dependency-free Rust FBP equations and the grid pass.
+- `cffdrs-py`: thin PyO3 bindings that install as `cffdrs._rust` in the same
+  `cffdrs` wheel as the Python package.
+
+The Python implementation remains the behavioral reference and provides the
+public high-level API. The compiled module currently exposes the lower-level
+`run_fbp_grid(...)` operation for performance-sensitive integrations and is
+parity-tested against the Python implementation. Keeping `rust/` beside `src/`
+is deliberate: `src/` is the Python import tree, while `rust/` is an independent
+Cargo workspace that can also be tested and packaged with Cargo tooling.
 
 ## Fire Behavior Prediction (`cffdrs.cffbps`)
 
@@ -138,14 +156,24 @@ full-precision golden snapshots on both the scalar and array code paths.
 
 ## Development
 
+Development requires Python 3.10+, `uv`, and a stable Rust toolchain. The main
+project uses Maturin, so syncing the environment builds `cffdrs._rust` alongside
+the editable Python package:
+
 ```bash
 git clone https://github.com/gagreene/cffdrs.git
 cd cffdrs
-uv sync --extra test --extra dev   # editable install + tooling
-uv run pytest                      # full suite
+uv sync --extra test --extra dev   # editable mixed Python/Rust install + tooling
+uv run pytest                      # full suite, including Rust/Python parity
 uv run ruff check src/             # lint
 uv run mypy                        # type-check the equation core
+cargo test --manifest-path rust/Cargo.toml
 ```
+
+The Python distribution version comes from `rust/crates/cffdrs-py/Cargo.toml`;
+update that crate version when preparing a release tag. The pure Rust core has
+its own version in `rust/crates/cffdrs-core/Cargo.toml` because it may be consumed
+independently by Rust applications.
 
 Golden regression fixtures are regenerated with `uv run python tools/gen_fbp_goldens.py`
 — only do this deliberately from a known-good state; the snapshots are the

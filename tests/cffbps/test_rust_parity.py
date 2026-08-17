@@ -1,4 +1,4 @@
-"""Differential parity: the cffdrs-rs compiled grid pass vs the Python package.
+"""Differential parity: the compiled grid pass vs the Python implementation.
 
 The Python package is the spec. These tests run both implementations over the
 same synthetic grids (all modeled fuel types, slopes, aspects, calm and windy
@@ -6,9 +6,7 @@ cells, non-fuel cells) and require agreement at rtol 1e-9 on every consumed
 output. Complements the static Wotton goldens (which pin the scalar chain) by
 exercising the array path end to end.
 
-Skipped unless the extension is built:
-    PYO3_PYTHON=$(pwd)/.venv/bin/python \
-      uv run maturin develop -m rust/crates/cffdrs-py/Cargo.toml
+The extension is part of the main package and is built by ``uv sync``.
 """
 
 from __future__ import annotations
@@ -16,9 +14,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-cffdrs_rs = pytest.importorskip('cffdrs_rs')
-
-from cffdrs.cffbps import FBP  # noqa: E402
+from cffdrs import _rust as rust_backend
+from cffdrs.cffbps import FBP
 
 RNG = np.random.default_rng(42)
 SHAPE = (12, 18)  # every modeled fuel type appears more than once
@@ -84,7 +81,7 @@ def python_reference(g):
 
 
 def rust_grid(g):
-    res = cffdrs_rs.run_fbp_grid(
+    res = rust_backend.run_fbp_grid(
         g['fuel_type'],
         g['lat'], g['long'], g['elevation'],
         g['slope'], g['aspect'],
@@ -123,7 +120,7 @@ def test_non_fuel_cells_are_nan(grids):
 
 def test_percentile_growth_not_yet_supported():
     with pytest.raises(ValueError):
-        cffdrs_rs.run_fbp_grid(
+        rust_backend.run_fbp_grid(
             np.full((2, 2), 2, dtype=np.int32),
             np.full((2, 2), 55.0), np.full((2, 2), -110.0), np.zeros((2, 2)),
             np.zeros((2, 2)), np.full((2, 2), 270.0),
