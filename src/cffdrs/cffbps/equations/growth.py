@@ -11,72 +11,105 @@ MaskedArray = mask.MaskedArray
 
 
 def _tinv(probability: float | int, freedom: int = 9999999):
-    """Inverse of the Student's t-distribution (quantile function)."""
+    """Standard-normal quantile, computed via a Student's t at very high freedom.
+
+    Han & Braun (2014) specify the standard normal quantile directly; a t
+    distribution at freedom=9999999 is numerically indistinguishable from it and
+    is what this coefficient table's fuel-type sigmas were fit against.
+    """
     return t.ppf(probability, freedom)
+
+
+_MAX_FTYPE = 20
+# Per-fuel-type growth-percentile coefficients, indexed directly by CFFBPS
+# fuel-type code. Both are fitted noise standard deviations (Han & Braun 2014,
+# Section 3): the surface-fire value scales a log-normal shift, the crown-fire
+# value scales a Box-Cox-transformed (delta=0.6) power-law adjustment. NaN marks
+# a fuel type with no fitted coefficient for that regime (percentile growth is a
+# no-op there).
+_SURFACE_SIGMA = np.full(_MAX_FTYPE + 1, np.nan, dtype=np.float32)
+_CROWN_SIGMA = np.full(_MAX_FTYPE + 1, np.nan, dtype=np.float32)
+for _ftype, _surface, _crown in (
+    (1, None, 0.95), (2, 0.84, 1.82), (3, 0.62, 1.78), (4, 0.74, 1.38),
+    (5, 0.80, None), (6, 0.66, 1.54), (7, 1.22, 1.00), (8, 0.716, None),
+    (12, 0.551, None),
+):
+    if _surface is not None:
+        _SURFACE_SIGMA[_ftype] = _surface
+    if _crown is not None:
+        _CROWN_SIGMA[_ftype] = _crown
+del _ftype, _surface, _crown
+
+
+def _wind_decay(w: MaskedArray) -> MaskedArray:
+    """Wind-speed decay factor for backing-fire growth-percentile noise.
+
+    Han & Braun (2014), the k(w) accompanying their Eq. 3: k(0) = 1, decaying as
+    wind speed increases — backing-spread variability shrinks in strong wind, the
+    same way backing ROS itself does.
+    """
+    low = np.exp(-0.10078 * w)
+    high = np.exp(-0.05039 * w) / (12.0 * (1.0 - np.exp(-0.0818 * (w - 28.0))))
+    return mask.where(w < 40, low, high)
 
 
 def calc_ros_percentile_growth(*,
                                percentile_growth: float | int | None,
                                fuel_type: MaskedArray,
-                               cfb: MaskedArray,
+                               hros_cfb: MaskedArray,
+                               bros_cfb: MaskedArray,
+                               wsv: MaskedArray,
                                hros: MaskedArray,
                                bros: MaskedArray) -> tuple[MaskedArray, MaskedArray]:
-    """Adjust head/backing ROS by a percentile-growth factor (from the WISE code base).
+    """Adjust head/backing ROS by a growth-percentile factor.
 
-    Returns ``(hros, bros)`` unchanged when ``percentile_growth`` is None or 50.
+    Implements the variance-stabilized ROS quantile model of Han, L. & Braun,
+    W.J. (2014), "Dionysus: a stochastic fire growth scenario generator",
+    Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1), ROS
+    residuals are treated as log-normal and the ROS is scaled multiplicatively
+    by exp(tinv * sigma_surface). At or above it, a closed-form Box-Cox
+    power-law adjustment (delta=0.6, the paper's fitted crown-fire transform)
+    applies unless its radicand would go negative (outside the transform's
+    valid domain), in which case it falls back to the same log-normal-shift
+    form using the crown-fire sigma. Fuel types with no fitted sigma for the
+    applicable regime are left unchanged, as is percentile_growth of None or 50
+    (the median, i.e. no adjustment).
+
+    Head and backing ROS are adjusted using their own, direction-specific CFB
+    (hros_cfb/bros_cfb) to decide the surface-vs-crown regime — matching WISE's
+    FBPFuel::ROS/BROS each computing CFB from their own direction's spread rate,
+    rather than sharing one CFB value between both directions.
+
+    Backing ROS additionally has its noise term scaled by a wind-speed decay
+    factor, k(wsv) (paper Eq. 3's k(w)): backing-spread variability shrinks as
+    wind speed increases, the same way backing ROS itself does. Head fire's
+    noise is not wind-scaled.
     """
-    if (percentile_growth is not None) and (percentile_growth != 50):
-        # Calculate the inverse t-distribution for the given percentile growth
-        tinv_value = _tinv(probability=percentile_growth / 100, freedom=9999999)
+    if percentile_growth is None or percentile_growth == 50:
+        return hros, bros
 
-        # Prepare default table with structured dtype
-        keys = np.array([1, 2, 3, 4, 5, 6, 7, 8, 12], dtype=np.uint8)
-        surface_vals = np.array([-1.0, 0.84, 0.62, 0.74, 0.8, 0.66, 1.22, 0.716, 0.551], dtype=np.float32)
-        crown_vals = np.array([0.95, 1.82, 1.78, 1.38, -1.0, 1.54, 1.0, -1.0, -1.0], dtype=np.float32)
+    tinv_value = _tinv(probability=percentile_growth / 100, freedom=9999999)
 
-        # Initialize default arrays for lookup
-        surface_s = np.full_like(fuel_type, np.nan, dtype=np.float32)
-        crown_s = np.full_like(fuel_type, np.nan, dtype=np.float32)
+    ftype_idx = np.ma.filled(fuel_type, 0).astype(np.intp)
+    surface_sigma = _SURFACE_SIGMA[ftype_idx]
+    crown_sigma = _CROWN_SIGMA[ftype_idx]
+    has_surface = ~np.isnan(surface_sigma)
+    has_crown = ~np.isnan(crown_sigma)
 
-        # Create a mask for each valid fuel type and assign values
-        for k, s_val, c_val in zip(keys, surface_vals, crown_vals, strict=False):
-            valid_mask = fuel_type == k
-            surface_s[valid_mask] = s_val
-            crown_s[valid_mask] = c_val
+    wind_decay = _wind_decay(wsv)
 
-        e = tinv_value * crown_s
+    adjusted = []
+    for rsi, noise_scale, regime_cfb in ((hros, 1.0, hros_cfb), (bros, wind_decay, bros_cfb)):
+        surface_regime = mask.where(has_surface, rsi * np.exp(tinv_value * surface_sigma * noise_scale), rsi)
 
-        # Iterate over head fire and backing fire ROS values
-        out = {}
-        for name, ros_in in (('hros', hros), ('bros', bros)):
-            d = mask.power(ros_in, 0.6)  # Apply a power transformation to the ROS value
+        radicand = mask.power(rsi, 0.6) + tinv_value * crown_sigma * noise_scale
+        power_law = mask.power(mask.where(radicand >= 0, radicand, 0.0), 1.0 / 0.6)
+        crown_fallback = rsi * np.exp(tinv_value * crown_sigma * noise_scale)
+        crown_regime = mask.where(has_crown, mask.where(radicand >= 0, power_law, crown_fallback), rsi)
 
-            # Calculate the adjusted ROS growth based on crown and surface spread parameters
-            ros_growth = mask.where(~np.isnan(crown_s),
-                                    mask.where(cfb < 0.1,
-                                               mask.where(surface_s < 0,
-                                                          # No adjustment if surface_s is invalid
-                                                          ros_in,
-                                                          # Adjust using surface_s
-                                                          np.exp(tinv_value) * ros_in),
-                                               mask.where(crown_s < 0,
-                                                          # No adjustment if crown_s is invalid
-                                                          ros_in,
-                                                          mask.where(-e > d,
-                                                                     # Adjust using crown_s
-                                                                     mask.exp(tinv_value) * ros_in,
-                                                                     # Apply growth adjustment
-                                                                     mask.power(d + e, 1 / 0.6)
-                                                                     )
-                                                          )
-                                               ),
-                                    # Default to the original ROS value if no conditions are met
-                                    ros_in)
-            out[name] = ros_growth
+        adjusted.append(mask.where(regime_cfb < 0.1, surface_regime, crown_regime))
 
-        hros, bros = out['hros'], out['bros']
-
-    return hros, bros
+    return adjusted[0], adjusted[1]
 
 
 def calc_accel_param(*,

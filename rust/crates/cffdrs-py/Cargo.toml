@@ -1,0 +1,15 @@
+[package]
+name = "cffdrs-py"
+version = "0.1.0"
+edition = "2021"
+description = "Python bindings (cffdrs._rust) over cffdrs-core."
+license = "MIT"
+
+[lib]
+name = "_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+cffdrs-core = { path = "../cffdrs-core" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+numpy = "0.22"
