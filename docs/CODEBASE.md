@@ -3,8 +3,9 @@
 Python implementation of the Canadian Forest Fire Danger Rating System: the Fire
 Behaviour Prediction (FBP) System and the Fire Weather Index (FWI) System. Library
 only — no server, no CLI, no event handlers. Scalar and NumPy-array inputs share
-one API; missing/NoData values propagate via masked arrays. `uv`-managed, PyPI-bound,
-version derived from git tags (hatch-vcs).
+one API; missing/NoData values propagate via masked arrays. `uv`-managed and
+PyPI-bound. Maturin builds one mixed Python/Rust wheel; its version comes from
+`rust/crates/cffdrs-py/Cargo.toml`.
 
 ## Architecture overview
 

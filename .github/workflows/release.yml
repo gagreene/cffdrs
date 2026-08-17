@@ -1,13 +1,7 @@
 name: Release
 
-# Publishing uses PyPI "Trusted Publishing" (OIDC) — no API tokens stored in the
-# repo. Before first use, register this repo+workflow as a trusted publisher:
-#   PyPI     -> project "cffdrs" -> Publishing -> add GitHub publisher
-#   TestPyPI -> same, for the testpypi environment
-#
-# Flow:
-#   - Manual run (workflow_dispatch)  -> build, test, publish to TestPyPI
-#   - Tag push v* (e.g. v0.1.0)       -> build, test, publish to PyPI
+# Publishing uses PyPI Trusted Publishing (OIDC); no API tokens are stored in
+# the repository. Manual runs publish to TestPyPI, while v* tags publish to PyPI.
 
 on:
   workflow_dispatch:
@@ -19,52 +13,103 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # hatch-vcs derives the version from git tags; a shallow, tagless
-          # checkout would misversion the build.
-          fetch-depth: 0
       - uses: astral-sh/setup-uv@v4
-      - name: Run test suite
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          package_version=$(awk -F '"' '/^version = / { print $2; exit }' rust/crates/cffdrs-py/Cargo.toml)
+          test "v${package_version}" = "${GITHUB_REF_NAME}"
+      - name: Build editable package and run test suite
         run: |
           uv sync --extra test --extra dev
           uv run pytest -q
           uv run ruff check src/
           uv run mypy
-      - name: Build sdist + wheel
-        run: uv build
-      - name: Check metadata
-        run: uvx twine check dist/*
+          cargo test --manifest-path rust/Cargo.toml
+
+  build-sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build source distribution
+        run: uv build --sdist --out-dir dist
       - uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: distributions-sdist
+          path: dist/*
 
-  publish-testpypi:
-    if: github.event_name == 'workflow_dispatch'
-    needs: build-and-test
+  build-wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-13, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build native wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: >-
+            --release --locked --compatibility pypi --out dist
+            --interpreter ${{ runner.os == 'Linux' && format('python{0}', matrix.python-version) || 'python' }}
+          manylinux: "2_17"
+          sccache: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: dist/*
+
+  check-distributions:
+    needs: [build-sdist, build-wheels]
     runs-on: ubuntu-latest
-    environment: testpypi
-    permissions:
-      id-token: write  # OIDC trusted publishing
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist
-          path: dist/
+          pattern: distributions-*
+          path: dist
+          merge-multiple: true
+      - name: Check package metadata
+        run: pipx run twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/*
+
+  publish-testpypi:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [build-and-test, check-distributions]
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build-and-test
+    needs: [build-and-test, check-distributions]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write  # OIDC trusted publishing
+      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: distributions
+          path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1

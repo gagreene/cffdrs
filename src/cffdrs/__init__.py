@@ -7,8 +7,9 @@ Subpackages / modules:
 
 Import the pieces you need, e.g. ``from cffdrs.cffbps import FBP``.
 """
+from importlib.metadata import PackageNotFoundError, version
+
 try:
-    # Written by the hatch-vcs build hook (from git tags) at build/install time.
-    from cffdrs._version import __version__
-except ImportError:  # fresh checkout that has never been built/installed
+    __version__ = version("cffdrs")
+except PackageNotFoundError:  # fresh checkout that has never been installed
     __version__ = "0.0.0+unknown"
