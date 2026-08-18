@@ -76,9 +76,9 @@ def calc_ros_percentile_growth(*,
     (the median, i.e. no adjustment).
 
     Head and backing ROS are adjusted using their own, direction-specific CFB
-    (hros_cfb/bros_cfb) to decide the surface-vs-crown regime — matching WISE's
-    FBPFuel::ROS/BROS each computing CFB from their own direction's spread rate,
-    rather than sharing one CFB value between both directions.
+    (hros_cfb/bros_cfb) to decide the surface-vs-crown regime — CFB is computed
+    from their own direction's spread rate, rather than sharing one CFB value
+    between both directions.
 
     Backing ROS additionally has its noise term scaled by a wind-speed decay
     factor, k(wsv) (paper Eq. 3's k(w)): backing-spread variability shrinks as
