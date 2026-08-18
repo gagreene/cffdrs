@@ -78,9 +78,9 @@ affecting others or the shared module table.
 One file per concern, all operating on `numpy.ma.MaskedArray` only (no separate
 scalar path — scalars are coerced upstream):
 - `slope_wind.py` — wind/slope geometry, zero-wind ISI, wind/slope-adjusted ISI, RSI, BUI effect
-- `ros.py` — head/backing rate of spread, C6/D2 special cases
+- `ros.py` — head/backing rate of spread, D2 handling, and separate C6 CROS/HROS equations
 - `surface.py` — surface fuel consumption (one formula per fuel type/group)
-- `crown.py` — CBH/CFL, CSFI, RSO, CFB, fire type, CFC, C6-specific ROS
+- `crown.py` — CBH/CFL, CSFI, RSO, directional/temporary C6 blend CFB, fire type, CFC
 - `consumption.py` — total fuel consumption, HFI, fire intensity class
 - `fmc.py` — foliar moisture content and effect
 - `growth.py` — growth-percentile ROS adjustment, point-ignition acceleration
@@ -101,17 +101,19 @@ back to the same log-normal form if its radicand goes negative. `sigma_surface`/
 `sigma_crown` are per-fuel-type fitted noise standard deviations (only 9 fuel
 types have them: C1-C7, D1, M3); `tinv` is a standard-normal quantile computed via
 `scipy.stats.t.ppf` at `freedom=9999999` (numerically indistinguishable from
-normal). `hros` and `bros` each use their own direction-specific CFB for the
-surface-vs-crown decision (`facade.py`'s `self.cfb`/`self.bros_cfb`, matching
-WISE's `FBPFuel::ROS`/`BROS` each computing CFB from their own spread rate), and
+normal). `hros` and `bros` each use their own pre-percentile directional CFB for
+the surface-vs-crown decision (`facade.py`'s `self.percentile_cfb`/
+`self.percentile_bros_cfb`), and
 `bros`'s noise term is additionally scaled by a wind-speed decay factor `k(wsv)`
 (the paper's Eq. 3) — backing-spread variability shrinks as wind speed increases,
 the same way backing ROS itself does. Two implementation gaps inherited from the
 WISE port were found and fixed here: the surface-regime sigma was previously
 checked for eligibility but never actually multiplied in, and `bros` previously
-shared `hros`'s unscaled noise term and CFB. One known simplification remains:
-C6's backing CFB reuses the head-fire-derived `sros` value, since no backing-fire
-equivalent of that C6-specific surface ROS exists elsewhere in the pipeline.
+shared `hros`'s unscaled noise term and CFB. C6 now completes its deterministic
+SROS/CFB/CROS blend before percentile growth. Generic heading/backing CFB then
+uses the completed directional ROS for regime selection and is recalculated from
+the adjusted ROS for final downstream outputs. Consequently, C6 backing CFB uses
+real BROS rather than reusing head-derived SROS.
 
 ### `cffwis.py` (~1150 lines) — FWI System
 Flat functions: `dailyFFMC`, `hourlyFFMC`, `dailyDMC`, `dailyDC`, `dailyISI`,
@@ -183,14 +185,16 @@ flowchart TD
         D --> E --> F --> G
     end
 
-    subgraph FBPRun["FBP.runFBP() - fixed 18-step sequence"]
+    subgraph FBPRun["FBP.runFBP() - fixed 23-step sequence"]
         direction TB
         S1["invertWindAspect"] --> S2["calcSF"] --> S3["calcISZ"] --> S4["calcFMC"]
         S4 --> S5["calcISI_RSI_BE"] --> S6["calcROS"] --> S7["calcSFC"]
         S7 --> S8["getCBH_CFL"] --> S9["calcCSFI"] --> S10["calcRSO"]
-        S10 --> S11["calcCFB"] --> S12["calcRosPercentileGrowth"]
-        S12 --> S13["calcAccelParam"] --> S14["calcFireType"] --> S15["calcCFC"]
-        S15 --> S16["calcC6hros"] --> S17["calcTFC"] --> S18["calcFireIntensityClass"]
+        S10 --> S11["calcC6BlendCFB"] --> S12["calcC6BlendCFC"]
+        S12 --> S13["calcC6CROS"] --> S14["calcC6HROS"] --> S15["calcPercentileCFB"]
+        S15 --> S16["calcRosPercentileGrowth"] --> S17["calcCFB"]
+        S17 --> S18["calcAccelParam"] --> S19["calcFireType"] --> S20["calcCFC"]
+        S20 --> S21["calcTFC"] --> S22["calcHFI"] --> S23["calcFireIntensityClass"]
     end
 
     subgraph Eq["cffbps.equations.* (pure functions, MaskedArray in/out)"]
@@ -220,18 +224,23 @@ flowchart TD
     S9 -.-> EQ4
     S10 -.-> EQ4
     S11 -.-> EQ4
-    S12 -.-> EQ6
-    S13 -.-> EQ6
-    S14 -.-> EQ4
+    S12 -.-> EQ4
+    S13 -.-> EQ2
+    S14 -.-> EQ2
     S15 -.-> EQ4
-    S16 -.-> EQ4
-    S17 -.-> EQ7
-    S18 -.-> EQ7
+    S16 -.-> EQ6
+    S17 -.-> EQ4
+    S18 -.-> EQ6
+    S19 -.-> EQ4
+    S20 -.-> EQ4
+    S21 -.-> EQ7
+    S22 -.-> EQ7
+    S23 -.-> EQ7
 
     Eq -.->|"reads"| Const
     FBPInit --> FBPRun
 
-    S18 --> H["getParams(out_request)\nfill masked -> NaN (array mode)\nor .item() (scalar mode)"]
+    S23 --> H["getParams(out_request)\nfill masked -> NaN (array mode)\nor .item() (scalar mode)"]
     H --> I["Output: hros, hfi, fire_type,\ncfb, tfc, fi_class, ... (up to 54 vars)"]
 
     subgraph Parallel["cffbps.parallel.fbpMultiprocessArray (large rasters)"]
@@ -243,7 +252,7 @@ flowchart TD
     end
 
     A -.->|"large raster path"| P1
-    P3 -.->|"same 18-step sequence"| FBPRun
+    P3 -.->|"same 23-step sequence"| FBPRun
 ```
 
 ## Implicit assumptions and gotchas
@@ -269,12 +278,13 @@ flowchart TD
   `test_fbp_unit.py` (`test_setattr_namedtuples_match_facade_attributes`,
   `test_fmc_result_field_order_matches_positional_unpack`,
   `test_slope_wind_isi_fields_are_wired_into_isi_rsi_be_result`).
-- **`runFBP()`'s 18-step order is hardcoded and order-dependent.** Each step reads
-  `self.*` attributes written by earlier steps (e.g. `calcCFB` depends on `calcRSO`
-  depends on `calcCSFI` depends on `calcFMC`). Reordering or skipping a step will
+- **`runFBP()`'s 23-step order is hardcoded and order-dependent.** Each step reads
+  `self.*` attributes written by earlier steps (e.g. final `calcCFB` depends on
+  percentile-adjusted ROS, which depends on completed C6 HROS and `calcRSO`).
+  Reordering or skipping a step will
   silently use stale/zero values from the template rather than failing loudly.
   `out_request` only controls what `getParams()` returns — it does **not** skip
-  unneeded calculation steps; all 18 always run.
+  unneeded calculation steps; all 23 always run.
 - **Unknown fuel-type keys fail hard, not gracefully.** `crown.calc_cbh_cfl`'s
   lookup-table indexing (`cbh_cfl_ht_lut[ftype]`) is explicitly documented in-code as
   intentionally unvalidated — an unrecognized `ftype` raises a bare `KeyError`, not a
@@ -330,11 +340,12 @@ flowchart TD
   purposes (the bug fixed here) silently misclassifies RH values near a class
   boundary for the first 30 minutes of every morning hour. Regression-locked by
   `test_hourly_ffmc_lawson_vectorized_rh_class_uses_half_hour_offset`.
-- **C6's backing-fire growth-percentile CFB reuses head-fire data.**
-  `growth.calc_ros_percentile_growth`'s backing-fire regime decision uses
-  `facade.py`'s `self.bros_cfb` (crown fraction burned computed from `bros`), but
-  for C6 specifically that computation still uses the head-fire-derived `sros`
-  value (there's no backing-fire equivalent of C6's surface-only ROS anywhere in
-  the pipeline). A documented simplification, not a bug — see `calcCFB()`'s
-  docstring — but a genuine gap if a future backing-fire-specific `sros` becomes
-  available and this isn't revisited.
+- **C6 has three distinct CFB roles; do not feed the final value back into the blend.**
+  `c6_blend_cfb` is derived from SROS only to calculate deterministic blended C6
+  HROS. `percentile_cfb`/`percentile_bros_cfb` are then calculated generically
+  from completed HROS/BROS to select the percentile-growth regimes. Finally,
+  `cfb`/`bros_cfb` are recalculated from adjusted HROS/BROS. Only final heading
+  CFB drives acceleration, fire type, CFC, TFC, and HFI; final backing CFB is
+  retained as directionally consistent facade state. Rerunning the C6 blend with
+  final CFB would overwrite percentile-adjusted HROS and reintroduce the original
+  ordering bug.

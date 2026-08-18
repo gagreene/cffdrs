@@ -1,4 +1,4 @@
-"""Crown fire equations: CBH/CFL, CSFI, RSO, CFB, fire type, CFC, C6 head ROS."""
+"""Crown fire equations: CBH/CFL, CSFI, RSO, CFB, fire type, and CFC."""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -80,37 +80,39 @@ def calc_cfb(*,
              fuel_type: MaskedArray,
              ftypes: Sequence[int],
              non_crowning_fuels: Sequence[int],
-             sros: MaskedArray,
              rso: MaskedArray,
-             hros: MaskedArray) -> MaskedArray:
-    """Calculate crown fraction burned (Forestry Canada Fire Danger Group 1992)."""
-    # Initialize CFB array
-    cfb = np.full_like(fuel_type, 0, dtype=np.float64)
+             ros: MaskedArray) -> MaskedArray:
+    """Calculate directional CFB from completed ROS.
 
+    The same equation applies to every crowning fuel type, including C6. The
+    C6-specific SROS-derived value needed by the deterministic blend is
+    calculated separately by :func:`calc_c6_blend_cfb`.
+    """
+    crowning = np.isin(fuel_type, ftypes) & ~np.isin(fuel_type, non_crowning_fuels)
+    cfb = mask.where(crowning, _calc_cfb_from_ros(ros=ros, rso=rso), 0)
+    return _sanitize_cfb(cfb)
+
+
+def calc_c6_blend_cfb(*,
+                      fuel_type: MaskedArray,
+                      sros: MaskedArray,
+                      rso: MaskedArray) -> MaskedArray:
+    """Calculate the temporary SROS-derived CFB used only by the C6 ROS blend."""
+    cfb = mask.where(fuel_type == 6, _calc_cfb_from_ros(ros=sros, rso=rso), 0)
+    return _sanitize_cfb(cfb)
+
+
+def _calc_cfb_from_ros(*, ros: MaskedArray, rso: MaskedArray) -> MaskedArray:
+    """Apply the CFB equation to one directional ROS array."""
+    delta_ros = ros - rso
     with np.errstate(over='ignore'):
-        # Create masks for C-6 and other fuel types
-        is_c6 = mask.where(fuel_type == 6, True, False)
-        non_crowning = mask.where(np.isin(fuel_type, non_crowning_fuels), True, False)
-        is_other = mask.where(np.isin(fuel_type, ftypes) & ~is_c6 & ~non_crowning, True, False)
+        return mask.where(delta_ros < -3086, 0, 1 - np.exp(-0.23 * delta_ros))
 
-        # Precompute rate of spread differences
-        delta_sros_c6 = sros - rso
-        delta_hros_other = hros - rso
 
-        # Compute CFB for C-6 and other fuel types
-        cfb_c6 = mask.where(delta_sros_c6 < -3086, 0, 1 - np.exp(-0.23 * delta_sros_c6))
-        cfb_other = mask.where(delta_hros_other < -3086, 0, 1 - np.exp(-0.23 * delta_hros_other))
-
-        # Apply the calculations
-        cfb = mask.where(is_c6, cfb_c6, cfb)
-        cfb = mask.where(is_other, cfb_other, cfb)
-
-        # Ensure cfb is finite and ranges between 0 and 1
-        is_finite = mask.where(np.isfinite(cfb), True, False)
-        cfb = mask.where(is_finite, cfb, 0)  # Replace NaNs/Infs with 0
-        cfb = mask.clip(cfb, 0, 1)  # Prevent extremely high values causing overflow
-
-    return cfb
+def _sanitize_cfb(cfb: MaskedArray) -> MaskedArray:
+    """Replace non-finite CFB values and constrain the result to [0, 1]."""
+    cfb = mask.where(np.isfinite(cfb), cfb, 0)
+    return mask.clip(cfb, 0, 1)
 
 
 def calc_fire_type(*, fuel_type: MaskedArray, cfb: MaskedArray) -> MaskedArray:
@@ -146,31 +148,3 @@ def calc_cfc(*,
                       mask.where((fuel_type == 12) | (fuel_type == 13),
                                  cfb * cfl * pdf / 100,
                                  cfb * cfl))
-
-
-def calc_c6hros(*,
-                fuel_type: MaskedArray,
-                cfc: MaskedArray,
-                isi: MaskedArray,
-                fme: MaskedArray,
-                cros: MaskedArray,
-                sros: MaskedArray,
-                cfb: MaskedArray,
-                hros: MaskedArray) -> tuple[MaskedArray, MaskedArray]:
-    """Calculate crown and total head fire rate of spread for the C6 fuel type.
-
-    ``cros``/``hros`` are passed in as current values (only C6 cells are updated).
-
-    :return: (cros, hros)
-    """
-    cros = mask.where(fuel_type == 6,
-                      mask.where(cfc == 0,
-                                 0,
-                                 60 * np.power(1 - np.exp(-0.0497 * isi), 1) * (fme / 0.778237)),
-                      cros)
-
-    hros = mask.where(fuel_type == 6,
-                      sros + (cfb * (cros - sros)),
-                      hros)
-
-    return cros, hros

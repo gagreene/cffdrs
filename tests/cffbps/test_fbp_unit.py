@@ -60,18 +60,14 @@ def test_percentile_growth_locks_current_behavior():
     Literals captured from the current, snapshot-validated code. If a refactor
     changes this branch, these values must be consciously regenerated.
 
-    bros values were regenerated twice: once when backing-fire noise was scaled
-    by the wind-decay factor k(wsv), and again when hros/bros were each given
-    their own direction-specific CFB for the surface-vs-crown regime decision
-    (Han & Braun 2014 / WISE FBPFuel::ROS vs BROS). hros is unaffected by either
-    fix (its noise is never wind-scaled, and its CFB was already head-fire-based)
-    — ft=2's bros_cfb happens to differ from its hros_cfb under these conditions,
-    changing its regime; ft=6 and ft=14 don't, so only ft=2's bros literal moved
-    again on the second regeneration.
+    The C6 literals reflect the corrected pipeline: deterministic C6 HROS is
+    blended before percentile growth, while HROS and BROS select their regimes
+    from direction-specific CFB. The adjusted C6 HROS is no longer overwritten
+    by a later blend, and C6 BROS no longer reuses head-derived SROS for its CFB.
     """
     expected = {
         2: (27.11959245018106, 1.6012591850964195),   # C-2: crown table entry
-        6: (11.284404397222712, 0.3243897622184262),  # C-6
+        6: (21.229110929146493, 0.074701148095697),  # C-6: adjust blended HROS; BROS uses its own CFB
         14: (17.667074274782212, 2.0109729485336385),  # O-1a: no crown entry
     }
     for ft, (hros_exp, bros_exp) in expected.items():
@@ -161,25 +157,169 @@ def test_percentile_growth_uses_direction_specific_cfb():
     assert float(hros90[0]) != pytest.approx(float(bros90[0]), rel=1e-9)
 
 
+@pytest.mark.parametrize(('percentile', 'expected'), [(0, 0.0), (100, np.inf)])
+def test_percentile_growth_boundary_behavior(percentile, expected):
+    """Percentiles 0/100 retain scipy's zero/infinity boundary behavior."""
+    from cffdrs.cffbps.equations.growth import calc_ros_percentile_growth
+
+    one = np.ma.array([1.0], mask=False)
+    zero = np.ma.array([0.0], mask=False)
+    with np.errstate(invalid='ignore', over='ignore'):
+        hros, bros = calc_ros_percentile_growth(
+            percentile_growth=percentile,
+            fuel_type=np.ma.array([8], dtype=np.int8, mask=False),
+            hros_cfb=zero, bros_cfb=zero, wsv=zero,
+            hros=one, bros=one,
+        )
+
+    if np.isinf(expected):
+        assert np.isposinf(hros[0])
+        assert np.isposinf(bros[0])
+    else:
+        assert float(hros[0]) == expected
+        assert float(bros[0]) == expected
+
+
+@pytest.mark.parametrize('percentile', [np.nan, -1, 101])
+def test_percentile_growth_invalid_values_propagate_nan(percentile):
+    """NaN and out-of-range percentiles preserve the existing NaN contract."""
+    from cffdrs.cffbps.equations.growth import calc_ros_percentile_growth
+
+    one = np.ma.array([1.0], mask=False)
+    zero = np.ma.array([0.0], mask=False)
+    with np.errstate(invalid='ignore'):
+        hros, bros = calc_ros_percentile_growth(
+            percentile_growth=percentile,
+            fuel_type=np.ma.array([8], dtype=np.int8, mask=False),
+            hros_cfb=zero, bros_cfb=zero, wsv=zero,
+            hros=one, bros=one,
+        )
+
+    assert np.isnan(hros[0])
+    assert np.isnan(bros[0])
+
+
 def test_calc_cfb_backing_uses_bros_not_hros():
-    """crown.calc_cfb, called with bros in place of hros (as facade.calcCFB does
-    for self.bros_cfb), must produce a different result than the hros-based call
-    whenever hros != bros for a CFB-sensitive fuel type — otherwise the facade's
-    two calc_cfb calls would be silently redundant."""
+    """Directional CFB must differ when HROS and BROS differ.
+
+    This applies to every crowning fuel type, including C6; otherwise the two
+    directional facade calls would be silently redundant.
+    """
     from cffdrs.cffbps.equations.crown import calc_cfb
 
-    fuel_type = np.ma.array([2], dtype=np.int8, mask=False)  # C2: not C6, not non-crowning -> uses hros arg directly
-    ftypes = [2]
+    fuel_type = np.ma.array([2, 6], dtype=np.int8, mask=False)
+    ftypes = [2, 6]
     non_crowning_fuels = constants.non_crowning_fuels
-    sros = np.ma.array([0.0], mask=False)
-    rso = np.ma.array([2.0], mask=False)
+    rso = np.ma.array([2.0, 2.0], mask=False)
 
     hros_based = calc_cfb(fuel_type=fuel_type, ftypes=ftypes, non_crowning_fuels=non_crowning_fuels,
-                          sros=sros, rso=rso, hros=np.ma.array([15.0], mask=False))
+                          rso=rso, ros=np.ma.array([15.0, 15.0], mask=False))
     bros_based = calc_cfb(fuel_type=fuel_type, ftypes=ftypes, non_crowning_fuels=non_crowning_fuels,
-                          sros=sros, rso=rso, hros=np.ma.array([3.0], mask=False))
+                          rso=rso, ros=np.ma.array([3.0, 3.0], mask=False))
 
-    assert float(hros_based[0]) != pytest.approx(float(bros_based[0]), rel=1e-9)
+    assert np.all(np.asarray(hros_based) != np.asarray(bros_based))
+
+
+# ── C6 percentile-growth pipeline ──────────────────────────────────────────────
+def test_c6_cros_and_hros_are_separate_ros_equations():
+    """C6 CROS and HROS must be independently callable from equations.ros."""
+    from cffdrs.cffbps.equations.ros import calc_c6_cros, calc_c6_hros
+
+    fuel_type = np.ma.array([6, 2], dtype=np.int8, mask=False)
+    cfc = np.ma.array([0.5, 0.5], mask=False)
+    isi = np.ma.array([10.0, 10.0], mask=False)
+    fme = np.ma.array([0.8, 0.8], mask=False)
+    cros_in = np.ma.array([0.0, 7.0], mask=False)
+    cros = calc_c6_cros(fuel_type=fuel_type, cfc=cfc, isi=isi, fme=fme, cros=cros_in)
+
+    expected_cros = 60 * (1 - np.exp(-0.0497 * 10.0)) * (0.8 / 0.778237)
+    assert float(cros[0]) == pytest.approx(expected_cros)
+    assert float(cros[1]) == 7.0
+
+    sros = np.ma.array([4.0, 4.0], mask=False)
+    hros_in = np.ma.array([4.0, 9.0], mask=False)
+    blend_cfb = np.ma.array([0.25, 0.25], mask=False)
+    hros = calc_c6_hros(
+        fuel_type=fuel_type, sros=sros, cros=cros,
+        c6_blend_cfb=blend_cfb, hros=hros_in,
+    )
+
+    assert float(hros[0]) == pytest.approx(4.0 + 0.25 * (expected_cros - 4.0))
+    assert float(hros[1]) == 9.0
+
+
+def test_c6_percentile_pipeline_uses_blended_hros_and_recalculates_cfb():
+    """C6 percentile growth must adjust blended HROS and final CFB must use it."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=6, percentile_growth=90, out_request=['hros'], **BASE_KWARGS)
+    fbp.runFBP()
+
+    deterministic_hros = (
+        float(fbp.sros[0])
+        + float(fbp.c6_blend_cfb[0]) * (float(fbp.cros[0]) - float(fbp.sros[0]))
+    )
+    expected_regime_cfb = 1 - np.exp(-0.23 * (deterministic_hros - float(fbp.rso[0])))
+    expected_final_cfb = 1 - np.exp(-0.23 * (float(fbp.hros[0]) - float(fbp.rso[0])))
+    expected_final_bros_cfb = 1 - np.exp(-0.23 * (float(fbp.bros[0]) - float(fbp.rso[0])))
+
+    assert float(fbp.hros[0]) != pytest.approx(deterministic_hros)
+    assert float(fbp.percentile_cfb[0]) == pytest.approx(np.clip(expected_regime_cfb, 0, 1))
+    assert float(fbp.cfb[0]) == pytest.approx(np.clip(expected_final_cfb, 0, 1))
+    assert float(fbp.bros_cfb[0]) == pytest.approx(np.clip(expected_final_bros_cfb, 0, 1))
+    assert float(fbp.c6_blend_cfc[0]) == pytest.approx(float(fbp.c6_blend_cfb[0] * fbp.cfl[0]))
+    assert float(fbp.cfc[0]) == pytest.approx(float(fbp.cfb[0] * fbp.cfl[0]))
+
+
+def test_c6_percentile_50_keeps_blended_hros_but_uses_generic_final_cfb():
+    """At percentile 50, C6 ROS is unchanged but final CFB is based on blended HROS."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=6, percentile_growth=50, out_request=['hros'], **BASE_KWARGS)
+    fbp.runFBP()
+
+    deterministic_hros = (
+        float(fbp.sros[0])
+        + float(fbp.c6_blend_cfb[0]) * (float(fbp.cros[0]) - float(fbp.sros[0]))
+    )
+    expected_final_cfb = 1 - np.exp(-0.23 * (deterministic_hros - float(fbp.rso[0])))
+
+    assert float(fbp.hros[0]) == pytest.approx(deterministic_hros)
+    assert float(fbp.cfb[0]) == pytest.approx(np.clip(expected_final_cfb, 0, 1))
+    assert float(fbp.cfb[0]) != pytest.approx(float(fbp.c6_blend_cfb[0]))
+
+
+def test_non_c6_downstream_outputs_use_post_percentile_cfb():
+    """Fire type, acceleration, and CFC must consume recalculated final CFB."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, percentile_growth=90, out_request=['hros'], **BASE_KWARGS)
+    fbp.runFBP()
+
+    expected_cfb = np.clip(1 - np.exp(-0.23 * (float(fbp.hros[0]) - float(fbp.rso[0]))), 0, 1)
+    expected_fire_type = 1 if expected_cfb <= 0.1 else 2 if expected_cfb < 0.9 else 3
+    expected_accel = 0.115 - 18.8 * expected_cfb ** 2.5 * np.exp(-8 * expected_cfb)
+
+    assert float(fbp.cfb[0]) == pytest.approx(expected_cfb)
+    assert int(fbp.fire_type[0]) == expected_fire_type
+    assert float(fbp.accel_param[0]) == pytest.approx(expected_accel)
+    assert float(fbp.cfc[0]) == pytest.approx(expected_cfb * float(fbp.cfl[0]))
+
+
+def test_percentile_regime_is_selected_once(monkeypatch):
+    """Final CFB recalculation must not trigger a second percentile adjustment."""
+    from cffdrs.cffbps import facade
+
+    calls = []
+
+    def adjust_once(**kwargs):
+        calls.append((kwargs['hros_cfb'].copy(), kwargs['bros_cfb'].copy()))
+        return kwargs['hros'] * 10, kwargs['bros'] * 10
+
+    monkeypatch.setattr(facade.growth_eq, 'calc_ros_percentile_growth', adjust_once)
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, percentile_growth=90, out_request=['hros'], **BASE_KWARGS)
+    fbp.runFBP()
+
+    assert len(calls) == 1
+    assert float(fbp.cfb[0]) != pytest.approx(float(calls[0][0][0]))
 
 
 # ── Multiprocessing driver ─────────────────────────────────────────────────────
