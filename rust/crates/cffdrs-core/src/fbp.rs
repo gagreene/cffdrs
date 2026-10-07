@@ -372,7 +372,8 @@ fn calc_slope_wind_isi(isf: f64, f_f: f64, wd: f64, aspect: f64, ws: f64) -> Slo
     // finite for downstream consumers (matches the Python fix). NaN wsv is a
     // masked cell in Python (`where(wsv > 0, raz, 0)` keeps the mask), so
     // NaN must pass through, not become 0.
-    if !wsv.is_nan() && !(wsv > 0.0) {
+    // (`wsv <= 0.0` is false for NaN, so a NaN wsv is left untouched.)
+    if wsv <= 0.0 {
         raz = 0.0;
     }
 

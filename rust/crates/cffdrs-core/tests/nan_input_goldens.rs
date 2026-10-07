@@ -71,11 +71,14 @@ fn nan_bui_leaves_wind_chain_intact() {
     assert!((r.raz - 170.954944453942).abs() < 1e-9, "raz finite: got {}", r.raz);
 }
 
+/// (mutator, sfc expectation) for one NaN-input scenario.
+type NanCase = (fn(&mut FbpInput), Option<f64>);
+
 #[test]
 fn nan_weather_inputs_propagate_to_nan_spread() {
     // (mutator, sfc expectation): sfc is BUI/FFMC-driven per fuel, so it
     // pins that NaN reaches exactly the fields Python's masks let through.
-    let cases: [(fn(&mut FbpInput), Option<f64>); 4] = [
+    let cases: [NanCase; 4] = [
         (|i| i.ws = f64::NAN, Some(2.9136045490065445)),
         (|i| i.ffmc = f64::NAN, Some(2.9136045490065445)),
         // sfc None: Python's masked pipeline leaks the fill value into sfc

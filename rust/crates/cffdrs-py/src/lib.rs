@@ -2,6 +2,12 @@
 //! lives in cffdrs-core; the cffdrs Python package remains the reference
 //! implementation and the spec.
 
+// pyo3 0.22's `#[pyfunction]` expansion converts `PyErr` into `PyErr`, which clippy
+// reports as a useless conversion at the signature of every pyfunction. The lint
+// fires in macro-generated code, so an attribute on the function does not reach
+// it; drop this allow when pyo3 is upgraded past the affected releases.
+#![allow(clippy::useless_conversion)]
+
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
