@@ -37,6 +37,33 @@ follows in the same PR, and the shared goldens prove agreement.
   19/20 non-fuel (NaN behaviour surfaces), M-1/2 use pc, M-3/4 use pdf,
   O-1a/b use gfl/gcf.
 
+## Percentile growth
+
+`percentile_growth` is a percentile (0-100) of the ROS distribution under the
+Han & Braun (2014) model, not a percent change; 50 is the exact no-op. The
+Rust port mirrors `cffdrs.cffbps.equations.growth`:
+
+- `percentile.rs`: pure `percentile_ros` / `percentile_tinv` / `wind_decay`
+  (pooled conifer sigmas, C-1..C-7 scope, `cfb < 0.1` regime rule, zero crown
+  result for a negative radicand, cap to 0.001-99.999, NaN propagates).
+- `quantile.rs`: dependency-free Student-t quantile at 9,999,999 degrees of
+  freedom (normal quantile by Newton on a series/continued-fraction `erfc`,
+  plus the Cornish-Fisher t correction). It agrees with
+  `scipy.stats.t.ppf` to 1e-11 relative; dropping the t correction would
+  differ by about 6.6e-8, so it is kept.
+- `fbp.rs` follows the Python pipeline order: C6 blend (SROS-derived
+  CFB/CFC/CROS/HROS) -> directional pre-percentile CFB -> percentile growth ->
+  final CFB from the adjusted head ROS.
+
+`tools/gen_fbp_goldens.py` also writes `percentile_ros_function_snapshot.json`
+(the pure function) and `percentile_growth_snapshot.json` (the full chain at
+each percentile); `tests/percentile_function_goldens.rs` and
+`tests/percentile_goldens.rs` hold the port to them.
+
+Rebuilding the extension after a Rust-only change needs
+`uv sync --reinstall-package cffdrs --extra test --extra dev`; a plain
+`uv sync` does not notice changes under `rust/`.
+
 ## Building
 
 ```bash
