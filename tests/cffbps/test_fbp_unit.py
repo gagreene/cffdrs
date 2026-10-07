@@ -401,6 +401,19 @@ def test_percentile_growth_nan_percentile_propagates_nan(cfb_value):
         assert np.isnan(float(out[0]))
 
 
+def test_calc_cfb_preserves_fuel_mask():
+    """A masked fuel cell stays masked in CFB even when ROS and RSO are valid there, so invalid fuel
+    cells are never turned into a computed (or zero) CFB."""
+    from cffdrs.cffbps.equations import crown as crown_eq
+
+    fuel = np.ma.array([2, 2, 6], mask=[False, True, False], dtype=np.int8)
+    ros = np.ma.array([10.0, 10.0, 10.0])
+    rso = np.ma.array([2.0, 2.0, 2.0])
+    cfb = crown_eq.calc_cfb(fuel_type=fuel, ftypes=list(range(1, 14)), non_crowning_fuels=[8, 9], rso=rso, ros=ros)
+    assert list(np.ma.getmaskarray(cfb)) == [False, True, False]
+    assert float(cfb[0]) > 0
+
+
 def test_calc_cfb_backing_uses_bros_not_hros():
     """Directional CFB must differ when HROS and BROS differ.
 
