@@ -127,7 +127,7 @@ class FBP:
         self.dj = cp.array([0], dtype=self.cupy_float_type)  # For FMC calculations
         self.out_request = cp.array([0], dtype=self.cupy_float_type)
         self.convert_fuel_type_codes = cp.array([0], dtype=self.cupy_float_type)
-        self.percentile_growth = 50,
+        self.percentile_growth = 50
         self.return_array_as = cp.array([0], dtype=self.cupy_float_type)
 
         # Internal tracking
@@ -189,9 +189,13 @@ class FBP:
         self.csfi = cp.array([0], dtype=self.cupy_float_type)
         self.rso = cp.array([0], dtype=self.cupy_float_type)
         self.rsc = cp.array([0], dtype=self.cupy_float_type)
+        self.c6_blend_cfb = cp.array([0], dtype=self.cupy_float_type)
+        self.percentile_cfb = cp.array([0], dtype=self.cupy_float_type)
+        self.percentile_bros_cfb = cp.array([0], dtype=self.cupy_float_type)
         self.cfb = cp.array([0], dtype=self.cupy_float_type)
         self.bros_cfb = cp.array([0], dtype=self.cupy_float_type)
         self.cfl = cp.array([0], dtype=self.cupy_float_type)
+        self.c6_blend_cfc = cp.array([0], dtype=self.cupy_float_type)
         self.cfc = cp.array([0], dtype=self.cupy_float_type)
         self.tfc = cp.array([0], dtype=self.cupy_float_type)
 
@@ -497,7 +501,14 @@ class FBP:
 
         :param convert_fuel_type_codes: Convert from CFS cffdrs R fuel type grid codes
             to the grid codes used in this module.
-        :param percentile_growth: Percentile growth to use for the ROS growth function.
+        :param percentile_growth: ROS percentile (0-100). 50 (default) gives the unadjusted FBP ROS. Among fires
+            with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at least as fast
+            as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires, and 25 gives
+            one reached or exceeded in about 75%. Values above 50 are faster than typical and values below 50 are
+            slower. It is a quantile, not a percent change: the multiplier depends on the fuel type and ROS (e.g. 95
+            scales surface-fire ROS by about 4.6x). Only conifer fuels C-1 to C-7 are adjusted (C-1 in the crown regime
+            only, C-5 in the surface regime only); all other fuels return the unadjusted ROS. Values outside
+            (0.001, 99.999) are capped to those bounds.
         :param return_array_as: If the results are arrays, the type of array to return as. Options: 'numpy', 'cupy'.
         """
         self.fuel_type = fuel_type
@@ -563,9 +574,13 @@ class FBP:
         self.csfi = self._init_array()
         self.rso = self._init_array()
         self.rsc = self._init_array()
+        self.c6_blend_cfb = self._init_array()
+        self.percentile_cfb = self._init_array()
+        self.percentile_bros_cfb = self._init_array()
         self.cfb = self._init_array()
         self.bros_cfb = self._init_array()
         self.cfl = self._init_array()
+        self.c6_blend_cfc = self._init_array()
         self.cfc = self._init_array()
         self.tfc = self._init_array()
         self.bfW = self._init_array()
@@ -869,11 +884,11 @@ class FBP:
         brsi_d1 = d1[0] * cp.power(1 - cp.exp(-d1[1] * self.bisi), d1[2])
         self.brsi = cp.where(
             (ft == 12),
-            (self.pdf / 100) * self.a * np.power(1 - np.exp(-self.b * self.bisi), self.c) +
+            (self.pdf / 100) * a * cp.power(1 - cp.exp(-b * self.bisi), c) +
             (1 - self.pdf / 100) * brsi_d1,
             cp.where(
                 (ft == 13),
-                (self.pdf / 100) * self.a * np.power(1 - np.exp(-self.b * self.bisi), self.c) +
+                (self.pdf / 100) * a * cp.power(1 - cp.exp(-b * self.bisi), c) +
                 0.2 * (1 - self.pdf / 100) * brsi_d1,
                 cp.where(
                     (ft == 11),
@@ -1099,50 +1114,107 @@ class FBP:
         )
         return
 
-    def calcCFB(self) -> None:
-        """
-        Function to calculate crown fraction burned using CuPy.
-        Equation per Forestry Canada Fire Danger Group (1992).
+    @staticmethod
+    def _sanitize_cfb(cfb: cp.ndarray) -> cp.ndarray:
+        """Replace non-finite CFB values with 0 and constrain the result to [0, 1]."""
+        return cp.clip(cp.where(cp.isfinite(cfb), cfb, 0.0), 0, 1)
 
-        Also computes a backing-fire-specific CFB (self.bros_cfb), using bros in
-        place of hfros, for calcRosPercentileGrowth's backing-fire regime decision
-        (matches WISE FBPFuel::BROS computing its own CFB from brss, distinct
-        from FBPFuel::ROS's head-fire CFB from rss). For C6, sfros (the
-        C6-specific surface ROS used in place of hfros for CFB) is head-fire-
-        derived only -- no backing-fire equivalent is computed elsewhere in
-        this pipeline, so the backing CFB for C6 reuses the same sfros as a
-        documented simplification.
+    def _calc_directional_cfb(self, ros: cp.ndarray) -> cp.ndarray:
+        """
+        Calculate CFB from one completed directional ROS using CuPy.
+        Equation per Forestry Canada Fire Danger Group (1992). The same equation applies to
+        every crowning fuel type, including C6.
+
+        :param ros: Directional rate of spread (head or backing).
+        :return: Crown fraction burned (0-1).
+        """
+        crowning = cp.isin(self.fuel_type, self.ftypes) & ~cp.isin(self.fuel_type, self.non_crowning_fuels)
+        delta_ros = ros - self.rso
+        cfb = cp.where(delta_ros < -3086, 0.0, 1 - cp.exp(-0.23 * delta_ros))
+        return self._sanitize_cfb(cp.where(crowning, cfb, 0.0))
+
+    def calcC6BlendCFB(self) -> None:
+        """
+        Calculate the temporary SROS-derived CFB used only by the deterministic C6 blend.
 
         :return: None
         """
-        # Masks
-        is_c6 = self.fuel_type == 6
-        non_crowning = cp.isin(self.fuel_type, self.non_crowning_fuels)
-        is_other = cp.isin(self.fuel_type, self.ftypes) & ~is_c6 & ~non_crowning
+        delta_sfros = self.sfros - self.rso
+        cfb = cp.where(delta_sfros < -3086, 0.0, 1 - cp.exp(-0.23 * delta_sfros))
+        self.c6_blend_cfb = self._sanitize_cfb(cp.where(self.fuel_type == 6, cfb, 0.0))
+        return
 
-        # C6 always uses sfros (head-fire-derived; no backing equivalent available)
-        delta_sfros_c6 = self.sfros - self.rso
-        cfb_c6 = cp.where(delta_sfros_c6 < -3086, 0.0, 1 - cp.exp(-0.23 * delta_sfros_c6))
+    def calcC6BlendCFC(self) -> None:
+        """
+        Calculate temporary CFC from the C6 blend CFB, used to activate C6 CFROS.
 
-        def _cfb_for_other(ros_other: cp.ndarray) -> cp.ndarray:
-            delta_other = ros_other - self.rso
-            cfb_other = cp.where(delta_other < -3086, 0.0, 1 - cp.exp(-0.23 * delta_other))
-            cfb = cp.zeros_like(self.fuel_type, dtype=self.cupy_float_type)
-            cfb = cp.where(is_c6, cfb_c6, cfb)
-            cfb = cp.where(is_other, cfb_other, cfb)
-            return cp.clip(cp.nan_to_num(cfb, nan=0.0), 0, 1)
+        :return: None
+        """
+        self.c6_blend_cfc = self._cfc_from_cfb(self.c6_blend_cfb)
+        return
 
-        self.cfb = _cfb_for_other(self.hfros)
-        self.bros_cfb = _cfb_for_other(self.bros)
+    def calcC6CFROS(self) -> None:
+        """
+        Calculate the C6 crown fire rate of spread using CuPy.
 
-        # Clean up memory
-        del is_c6, is_other, delta_sfros_c6, cfb_c6
+        :return: None
+        """
+        self.cfros = cp.where(
+            self.fuel_type == 6,
+            cp.where(
+                self.c6_blend_cfc == 0,
+                0.0,
+                60 * (1 - cp.exp(-0.0497 * self.isi)) * (self.fme / 0.778237),
+            ),
+            self.cfros
+        )
+        return
 
+    def calcC6HFROS(self) -> None:
+        """
+        Blend C6 surface and crown ROS into the deterministic head fire rate of spread using CuPy.
+
+        :return: None
+        """
+        self.hfros = cp.where(
+            self.fuel_type == 6,
+            self.sfros + self.c6_blend_cfb * (self.cfros - self.sfros),
+            self.hfros
+        )
+        return
+
+    def calcPercentileCFB(self) -> None:
+        """
+        Calculate directional CFB values used only to select percentile-growth regimes.
+
+        :return: None
+        """
+        self.percentile_cfb = self._calc_directional_cfb(self.hfros)
+        self.percentile_bros_cfb = self._calc_directional_cfb(self.bros)
+        return
+
+    def calcCFB(self) -> None:
+        """
+        Calculate final directional CFB from percentile-adjusted HFROS/BROS using CuPy.
+
+        Final heading CFB drives downstream fire behavior. Final backing CFB is retained as
+        directionally consistent state; no current downstream equation consumes it.
+
+        :return: None
+        """
+        self.cfb = self._calc_directional_cfb(self.hfros)
+        self.bros_cfb = self._calc_directional_cfb(self.bros)
         return
 
     def calcRosPercentileGrowth(self) -> None:
         """
         Calculates the percentile growth for head fire and backing fire rates of spread.
+
+        Meaning: the value is a percentile of the ROS distribution (model error only; see Han & Braun 2014).
+        Among fires with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at
+        least as fast as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires and
+        25 gives one reached or exceeded in about 75%. 50 is the unadjusted ROS. This holds for head fire in the
+        adjusted fuels (C-1 to C-7); backing-fire noise is scaled down by k(wind speed), and other fuels are unchanged.
         This function adjusts the `hfros` and `bros` attributes based on the percentile growth value and
         crown/surface spread parameters.
 
@@ -1150,15 +1222,19 @@ class FBP:
         W.J. (2014), "Dionysus: a stochastic fire growth scenario generator",
         Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1),
         ROS residuals are treated as log-normal and scaled by
-        exp(tinv * sigma_surface). At or above it, a closed-form Box-Cox
-        power-law adjustment (delta=0.6, the paper's fitted crown-fire
-        transform) applies unless its radicand would go negative (outside the
-        transform's valid domain), in which case it falls back to the same
-        log-normal-shift form using the crown-fire sigma. Fuel types with no
-        fitted sigma for the applicable regime are left unchanged.
+        exp(tinv * 0.923). At or above it, a closed-form Box-Cox power-law
+        adjustment (delta=0.6, sigma=1.637) applies, giving ROS 0 where its
+        radicand would go negative (outside the transform's range). The two sigmas are the paper's pooled conifer estimates. Fuel
+        types other than C-1..C-7 are left unchanged, as are C-1 in the surface
+        regime and C-5 in the crown regime.
 
-        hfros and bros each use their own direction-specific CFB (self.cfb /
-        self.bros_cfb) to decide the surface-vs-crown regime, and bros's noise
+        Project choices, not from the paper: the cfb < 0.1 regime rule (the
+        paper assumes the fire type is known), the negative-radicand zero guard,
+        the percentile cap to 0.001-99.999, and the C-1..C-7 fuel scope with its C-1 crown-only and C-5
+        surface-only coverage.
+
+        hfros and bros each use their own direction-specific pre-percentile CFB
+        (self.percentile_cfb / self.percentile_bros_cfb) to decide the surface-vs-crown regime, and bros's noise
         term is additionally scaled by a wind-speed decay factor k(wsv) (the
         paper's Eq. 3): backing-spread variability shrinks as wind speed
         increases, the same way backing ROS itself does. hfros's noise is not
@@ -1171,9 +1247,8 @@ class FBP:
             """
             Calculates the standard-normal quantile, via a Student's t at very high freedom.
 
-            Han & Braun (2014) specify the standard normal quantile directly; a t
-            distribution at freedom=9999999 is numerically indistinguishable from
-            it and is what this method's fuel-type sigmas were fit against.
+            Han & Braun (2014) use the standard normal quantile; a t distribution
+            at freedom=9999999 agrees with it to about 1e-7 relative.
 
             :param probability: The cumulative probability for which the quantile is calculated.
             :param freedom: The degrees of freedom for the t-distribution.
@@ -1195,48 +1270,43 @@ class FBP:
             high = cp.exp(-0.05039 * w) / (12.0 * (1.0 - cp.exp(-0.0818 * (w - 28.0))))
             return cp.where(w < 40, low, high)
 
-        if self.percentile_growth != 50:
+        if self.percentile_growth is not None and self.percentile_growth != 50:
             # Calculate the inverse t-distribution for the given percentile growth
-            tinv_value = _tinv(probability=self.percentile_growth / 100, freedom=9999999)
+            # Project choice (not from the paper): cap tails to (0.001, 99.999) so the 0th/100th
+            # percentile give finite ROS; NaN is not capped. Mirrors growth.py.
+            capped_percentile = float(np.clip(self.percentile_growth, 0.001, 99.999))
+            tinv_value = _tinv(probability=capped_percentile / 100, freedom=9999999)
 
-            # Prepare default table with structured dtype. Both are fitted noise
-            # standard deviations (Han & Braun 2014, Section 3): surface_vals scales
-            # a log-normal shift, crown_vals scales the Box-Cox power-law adjustment.
-            keys = cp.array([1, 2, 3, 4, 5, 6, 7, 8, 12], dtype=cp.uint8)
-            surface_vals = cp.array([cp.nan, 0.84, 0.62, 0.74, 0.8, 0.66, 1.22, 0.716, 0.551], dtype=cp.float32)
-            crown_vals = cp.array([0.95, 1.82, 1.78, 1.38, cp.nan, 1.54, 1.0, cp.nan, cp.nan], dtype=cp.float32)
-
-            # Initialize default arrays for lookup
-            surface_s = cp.full_like(self.fuel_type, cp.nan, dtype=cp.float32)
-            crown_s = cp.full_like(self.fuel_type, cp.nan, dtype=cp.float32)
-
-            # Create a mask for each valid fuel type and assign values
-            for k, s_val, c_val in zip(keys, surface_vals, crown_vals):
-                valid_mask = self.fuel_type == k
-                surface_s = cp.where(valid_mask, s_val, surface_s)
-                crown_s = cp.where(valid_mask, c_val, crown_s)
-
-            has_surface = ~cp.isnan(surface_s)
-            has_crown = ~cp.isnan(crown_s)
+            # Han & Braun (2014), Section 3: pooled conifer noise standard deviations
+            # (surface: log scale; crown: Box-Cox delta=0.6 scale). Single values,
+            # not per-fuel-type tables. Fuel scope per regime is a project choice:
+            # C-1 crown only, C-5 surface only, C-2/3/4/6/7 both, others unchanged.
+            surface_sigma = 0.923
+            crown_sigma = 1.637
+            crown_delta = 0.6
+            has_surface = cp.isin(self.fuel_type, cp.array([2, 3, 4, 5, 6, 7]))
+            has_crown = cp.isin(self.fuel_type, cp.array([1, 2, 3, 4, 6, 7]))
             wind_decay = _wind_decay(self.wsv)
 
             # Iterate over head fire and backing fire ROS attributes, each with its
             # own direction-specific CFB and noise-scaling factor.
             for ros_attr, regime_cfb, noise_scale in (
-                ('hfros', self.cfb, 1.0),
-                ('bros', self.bros_cfb, wind_decay),
+                ('hfros', self.percentile_cfb, 1.0),
+                ('bros', self.percentile_bros_cfb, wind_decay),
             ):
                 ros_in = getattr(self, ros_attr)  # Get the current ROS value
 
-                # Surface regime: log-normal shift, scaled by the fuel type's sigma
-                surface_regime = cp.where(has_surface, ros_in * cp.exp(tinv_value * surface_s * noise_scale), ros_in)
+                # Surface regime: log-normal shift, scaled by the pooled surface sigma
+                surface_regime = cp.where(has_surface, ros_in * cp.exp(tinv_value * surface_sigma * noise_scale), ros_in)
 
-                # Crown regime: Box-Cox power-law adjustment, falling back to the
-                # same log-normal-shift form (using crown_s) outside its domain
-                radicand = cp.power(ros_in, 0.6) + tinv_value * crown_s * noise_scale
-                power_law = cp.power(cp.where(radicand >= 0, radicand, 0.0), 1 / 0.6)
-                crown_fallback = ros_in * cp.exp(tinv_value * crown_s * noise_scale)
-                crown_regime = cp.where(has_crown, cp.where(radicand >= 0, power_law, crown_fallback), ros_in)
+                # Crown regime: Box-Cox power-law adjustment. Guard (project choice, not
+                # in the paper): a negative radicand is outside the transform's range,
+                # so no positive ROS exists and the result is 0 (continuous, monotone).
+                # NaN radicands fail the < 0 test and propagate as NaN.
+                shift = tinv_value * crown_sigma * noise_scale
+                radicand = cp.power(ros_in, crown_delta) + shift
+                power_law = cp.power(cp.where(radicand < 0, 0.0, radicand), 1 / crown_delta)
+                crown_regime = cp.where(has_crown, power_law, ros_in)
 
                 ros_growth = cp.where(regime_cfb < 0.1, surface_regime, crown_regime)
                 setattr(self, ros_attr, ros_growth)  # Update the ROS attribute with the adjusted value
@@ -1308,46 +1378,30 @@ class FBP:
 
         return
 
-    def calcCFC(self) -> None:
+    def _cfc_from_cfb(self, cfb: cp.ndarray) -> cp.ndarray:
         """
-        Function to calculate crown fuel consumed (kg/m^2) using CuPy.
+        Calculate crown fuel consumed (kg/m^2) from a CFB array using CuPy.
 
-        :return: None
+        :param cfb: Crown fraction burned (0-1).
+        :return: Crown fuel consumed.
         """
-        self.cfc = cp.where(
+        return cp.where(
             (self.fuel_type == 10) | (self.fuel_type == 11),
-            self.cfb * self.cfl * self.pc / 100,
+            cfb * self.cfl * self.pc / 100,
             cp.where(
                 (self.fuel_type == 12) | (self.fuel_type == 13),
-                self.cfb * self.cfl * self.pdf / 100,
-                self.cfb * self.cfl
+                cfb * self.cfl * self.pdf / 100,
+                cfb * self.cfl
             )
         )
 
-        return
-
-    def calcC6hfros(self) -> None:
+    def calcCFC(self) -> None:
         """
-        Function to calculate crown and total head fire rate of spread for the C6 fuel type using CuPy.
+        Function to calculate crown fuel consumed (kg/m^2) from the final CFB using CuPy.
 
-        :returns: None
+        :return: None
         """
-        self.cfros = cp.where(
-            self.fuel_type == 6,
-            cp.where(
-                self.cfc == 0,
-                cp.zeros_like(self.fuel_type),
-                60 * cp.power(1 - cp.exp(-0.0497 * self.isi), 1) * (self.fme / 0.778237),
-            ),
-            self.cfros
-        )
-
-        self.hfros = cp.where(
-            self.fuel_type == 6,
-            self.sfros + (self.cfb * (self.cfros - self.sfros)),
-            self.hfros
-        )
-
+        self.cfc = self._cfc_from_cfb(self.cfb)
         return
 
     def calcTFC(self) -> None:
@@ -1562,18 +1616,23 @@ class FBP:
         self.calcCSFI()
         # Calculate critical surface fire rate of spread
         self.calcRSO()
-        # Calculate crown fraction burned
-        self.calcCFB()
+        # Calculate temporary C6 CFB/CFC, then deterministic C6 crown and blended head fire ROS
+        self.calcC6BlendCFB()
+        self.calcC6BlendCFC()
+        self.calcC6CFROS()
+        self.calcC6HFROS()
+        # Calculate directional CFB values used to select percentile-growth regimes
+        self.calcPercentileCFB()
         # Calculate ROS percentile growth
         self.calcRosPercentileGrowth()
+        # Recalculate final directional CFB from percentile-adjusted ROS
+        self.calcCFB()
         # Calculate acceleration parameter
         self.calcAccelParam()
         # Calculate fire type
         self.calcFireType()
         # Calculate crown fuel consumed
         self.calcCFC()
-        # Calculate C6 head fire rate of spread
-        self.calcC6hfros()
         # Calculate total fuel consumption
         self.calcTFC()
         # Calculate head fire intensity

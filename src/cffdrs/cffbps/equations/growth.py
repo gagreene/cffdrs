@@ -13,32 +13,34 @@ MaskedArray = mask.MaskedArray
 def _tinv(probability: float | int, freedom: int = 9999999):
     """Standard-normal quantile, computed via a Student's t at very high freedom.
 
-    Han & Braun (2014) specify the standard normal quantile directly; a t
-    distribution at freedom=9999999 is numerically indistinguishable from it and
-    is what this coefficient table's fuel-type sigmas were fit against.
+    Han & Braun (2014) use the standard normal quantile; a t distribution at
+    freedom=9999999 agrees with it to about 1e-7 relative.
     """
     return t.ppf(probability, freedom)
 
 
-_MAX_FTYPE = 20
-# Per-fuel-type growth-percentile coefficients, indexed directly by CFFBPS
-# fuel-type code. Both are fitted noise standard deviations (Han & Braun 2014,
-# Section 3): the surface-fire value scales a log-normal shift, the crown-fire
-# value scales a Box-Cox-transformed (delta=0.6) power-law adjustment. NaN marks
-# a fuel type with no fitted coefficient for that regime (percentile growth is a
-# no-op there).
-_SURFACE_SIGMA = np.full(_MAX_FTYPE + 1, np.nan, dtype=np.float32)
-_CROWN_SIGMA = np.full(_MAX_FTYPE + 1, np.nan, dtype=np.float32)
-for _ftype, _surface, _crown in (
-    (1, None, 0.95), (2, 0.84, 1.82), (3, 0.62, 1.78), (4, 0.74, 1.38),
-    (5, 0.80, None), (6, 0.66, 1.54), (7, 1.22, 1.00), (8, 0.716, None),
-    (12, 0.551, None),
-):
-    if _surface is not None:
-        _SURFACE_SIGMA[_ftype] = _surface
-    if _crown is not None:
-        _CROWN_SIGMA[_ftype] = _crown
-del _ftype, _surface, _crown
+# Han & Braun (2014), Section 3: noise standard deviations estimated on pooled
+# conifer data (surface fires on the log scale, crown fires on the Box-Cox
+# delta=0.6 scale). The paper pools by category because per-fuel-type data are
+# sparse, so these are single values, not per-fuel-type tables.
+_SURFACE_SIGMA = 0.923
+_CROWN_SIGMA = 1.637
+_CROWN_DELTA = 0.6
+
+# Project choice, not from the paper: percentiles are capped to this open-interval margin so the
+# 0th/100th percentile (z = -inf/+inf) give finite ROS instead of 0/inf/masked values. The paper
+# only demonstrates 10-90 and does not discuss extreme percentiles. NaN is not capped.
+_MIN_PERCENTILE = 0.001
+_MAX_PERCENTILE = 99.999
+
+# Project choice, not from the paper: the pooled conifer fit is applied to the
+# CFFBPS conifer fuel types C-1..C-7 (codes 1-7), per regime. C-1 is adjusted
+# only for crown fires and C-5 only for surface fires. The paper reports only
+# pooled conifer values and has no per-fuel-type coverage, so this pattern is a
+# project decision, not something derived from it. Other fuel types are outside
+# the conifer estimates the paper reports and are left unadjusted.
+_SURFACE_FUEL_TYPES = (2, 3, 4, 5, 6, 7)
+_CROWN_FUEL_TYPES = (1, 2, 3, 4, 6, 7)
 
 
 def _wind_decay(w: MaskedArray) -> MaskedArray:
@@ -63,22 +65,33 @@ def calc_ros_percentile_growth(*,
                                bros: MaskedArray) -> tuple[MaskedArray, MaskedArray]:
     """Adjust head/backing ROS by a growth-percentile factor.
 
+    Meaning: the value is a percentile of the ROS distribution (model error only; see Han & Braun 2014).
+    Among fires with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at
+    least as fast as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires and
+    25 gives one reached or exceeded in about 75%. 50 is the unadjusted ROS. This holds for head fire in the
+    adjusted fuels (C-1 to C-7); backing-fire noise is scaled down by k(wind speed), and other fuels are unchanged.
+
     Implements the variance-stabilized ROS quantile model of Han, L. & Braun,
     W.J. (2014), "Dionysus: a stochastic fire growth scenario generator",
     Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1), ROS
     residuals are treated as log-normal and the ROS is scaled multiplicatively
-    by exp(tinv * sigma_surface). At or above it, a closed-form Box-Cox
-    power-law adjustment (delta=0.6, the paper's fitted crown-fire transform)
-    applies unless its radicand would go negative (outside the transform's
-    valid domain), in which case it falls back to the same log-normal-shift
-    form using the crown-fire sigma. Fuel types with no fitted sigma for the
-    applicable regime are left unchanged, as is percentile_growth of None or 50
-    (the median, i.e. no adjustment).
+    by exp(tinv * 0.923). At or above it, a closed-form Box-Cox power-law
+    adjustment (delta=0.6, sigma=1.637) applies, giving ROS 0 where its
+    radicand would go negative (outside the transform's range). The two
+    sigmas are the paper's pooled conifer estimates. Fuel types other than
+    C-1..C-7 are left unchanged, as are C-1 in the surface regime and C-5 in the
+    crown regime, and percentile_growth of None or 50 (the median, i.e. no
+    adjustment). Percentiles outside (0, 100) are capped to 0.001/99.999 rather than
+    rejected; NaN propagates as NaN.
+
+    Project choices, not from the paper: the cfb < 0.1 regime rule (the paper
+    assumes the fire type is known), the negative-radicand zero guard, the percentile cap, and the
+    C-1..C-7 fuel scope with its C-1 crown-only and C-5 surface-only coverage.
 
     Head and backing ROS are adjusted using their own, direction-specific CFB
-    (hros_cfb/bros_cfb) to decide the surface-vs-crown regime — matching WISE's
-    FBPFuel::ROS/BROS each computing CFB from their own direction's spread rate,
-    rather than sharing one CFB value between both directions.
+    (hros_cfb/bros_cfb) to decide the surface-vs-crown regime — CFB is computed
+    from their own direction's spread rate, rather than sharing one CFB value
+    between both directions.
 
     Backing ROS additionally has its noise term scaled by a wind-speed decay
     factor, k(wsv) (paper Eq. 3's k(w)): backing-spread variability shrinks as
@@ -88,24 +101,27 @@ def calc_ros_percentile_growth(*,
     if percentile_growth is None or percentile_growth == 50:
         return hros, bros
 
-    tinv_value = _tinv(probability=percentile_growth / 100, freedom=9999999)
+    capped_percentile = float(np.clip(percentile_growth, _MIN_PERCENTILE, _MAX_PERCENTILE))  # NaN stays NaN
+    tinv_value = _tinv(probability=capped_percentile / 100, freedom=9999999)
 
-    ftype_idx = np.ma.filled(fuel_type, 0).astype(np.intp)
-    surface_sigma = _SURFACE_SIGMA[ftype_idx]
-    crown_sigma = _CROWN_SIGMA[ftype_idx]
-    has_surface = ~np.isnan(surface_sigma)
-    has_crown = ~np.isnan(crown_sigma)
-
+    ftype = np.ma.filled(fuel_type, 0)
+    has_surface = np.isin(ftype, _SURFACE_FUEL_TYPES)
+    has_crown = np.isin(ftype, _CROWN_FUEL_TYPES)
     wind_decay = _wind_decay(wsv)
 
     adjusted = []
     for rsi, noise_scale, regime_cfb in ((hros, 1.0, hros_cfb), (bros, wind_decay, bros_cfb)):
-        surface_regime = mask.where(has_surface, rsi * np.exp(tinv_value * surface_sigma * noise_scale), rsi)
+        surface_regime = mask.where(has_surface, rsi * np.exp(tinv_value * _SURFACE_SIGMA * noise_scale), rsi)
 
-        radicand = mask.power(rsi, 0.6) + tinv_value * crown_sigma * noise_scale
-        power_law = mask.power(mask.where(radicand >= 0, radicand, 0.0), 1.0 / 0.6)
-        crown_fallback = rsi * np.exp(tinv_value * crown_sigma * noise_scale)
-        crown_regime = mask.where(has_crown, mask.where(radicand >= 0, power_law, crown_fallback), rsi)
+        shift = tinv_value * _CROWN_SIGMA * noise_scale
+        radicand = mask.power(rsi, _CROWN_DELTA) + shift
+        # Guard (project choice, not in the paper): a negative radicand is outside the Box-Cox
+        # transform's range, so no positive ROS exists at that percentile and the result is 0. This
+        # keeps the output continuous and non-decreasing in ROS. NaN radicands (invalid percentile)
+        # are restored as unmasked NaN, since mask.power would otherwise mask them.
+        power_law = mask.power(mask.where(radicand < 0, 0.0, radicand), 1.0 / _CROWN_DELTA)
+        power_law = mask.where(np.isnan(radicand), np.nan, power_law)
+        crown_regime = mask.where(has_crown, power_law, rsi)
 
         adjusted.append(mask.where(regime_cfb < 0.1, surface_regime, crown_regime))
 

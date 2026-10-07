@@ -151,9 +151,13 @@ class FBP:
         self.csfi = None
         self.rso = None
         self.rsc = None
+        self.c6_blend_cfb = None
+        self.percentile_cfb = None
+        self.percentile_bros_cfb = None
         self.cfb = None
         self.bros_cfb = None
         self.cfl = None
+        self.c6_blend_cfc = None
         self.cfc = None
         self.tfc = None
 
@@ -376,7 +380,14 @@ class FBP:
 
         :param convert_fuel_type_codes: Convert from CFS cffdrs R fuel type grid codes
             to the grid codes used in this module
-        :param percentile_growth: The ROS percentile growth (0-100) for the fire growth model
+        :param percentile_growth: ROS percentile (0-100). 50 (default) gives the unadjusted FBP ROS. Among fires
+            with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at least as fast
+            as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires, and 25 gives
+            one reached or exceeded in about 75%. Values above 50 are faster than typical and values below 50 are
+            slower. It is a quantile, not a percent change: the multiplier depends on the fuel type and ROS (e.g. 95
+            scales surface-fire ROS by about 4.6x). Only conifer fuels C-1 to C-7 are adjusted (C-1 in the crown regime
+            only, C-5 in the surface regime only); all other fuels return the unadjusted ROS. Values outside
+            (0.001, 99.999) are capped to those bounds.
         """
         # Initialize CFFBPS input parameters
         self.fuel_type = fuel_type
@@ -460,9 +471,13 @@ class FBP:
         self.cbh = template
         self.csfi = template
         self.rso = template
+        self.c6_blend_cfb = template
+        self.percentile_cfb = template
+        self.percentile_bros_cfb = template
         self.cfb = template
         self.bros_cfb = template
         self.cfl = template
+        self.c6_blend_cfc = template
         self.cfc = template
         self.tfc = template
 
@@ -632,29 +647,67 @@ class FBP:
         self.rso = crown_eq.calc_rso(sfc=self.sfc, csfi=self.csfi)
         return
 
+    def calcC6BlendCFB(self) -> None:
+        """Calculate the temporary SROS-derived CFB used by the deterministic C6 blend."""
+        self.c6_blend_cfb = crown_eq.calc_c6_blend_cfb(
+            fuel_type=self.fuel_type, sros=self.sros, rso=self.rso,
+        )
+        return
+
+    def calcC6BlendCFC(self) -> None:
+        """Calculate temporary CFC from C6 blend CFB for CROS activation."""
+        self.c6_blend_cfc = crown_eq.calc_cfc(
+            fuel_type=self.fuel_type, cfb=self.c6_blend_cfb,
+            cfl=self.cfl, pc=self.pc, pdf=self.pdf,
+        )
+        return
+
+    def calcC6CROS(self) -> None:
+        """Calculate C6 crown-fire rate of spread."""
+        self.cros = ros_eq.calc_c6_cros(
+            fuel_type=self.fuel_type, cfc=self.c6_blend_cfc,
+            isi=self.isi, fme=self.fme, cros=self.cros,
+        )
+        return
+
+    def calcC6HROS(self) -> None:
+        """Blend C6 surface and crown ROS into deterministic heading ROS."""
+        self.hros = ros_eq.calc_c6_hros(
+            fuel_type=self.fuel_type, sros=self.sros, cros=self.cros,
+            c6_blend_cfb=self.c6_blend_cfb, hros=self.hros,
+        )
+        return
+
+    def calcPercentileCFB(self) -> None:
+        """Calculate directional CFB values used only to select percentile regimes."""
+        self.percentile_cfb = crown_eq.calc_cfb(
+            fuel_type=self.fuel_type, ftypes=self.ftypes,
+            non_crowning_fuels=self.non_crowning_fuels,
+            rso=self.rso, ros=self.hros,
+        )
+        self.percentile_bros_cfb = crown_eq.calc_cfb(
+            fuel_type=self.fuel_type, ftypes=self.ftypes,
+            non_crowning_fuels=self.non_crowning_fuels,
+            rso=self.rso, ros=self.bros,
+        )
+        return
+
     def calcCFB(self) -> None:
-        """
-        Function calculates crown fraction burned using equation in Forestry Canada Fire Danger Group (1992).
+        """Calculate final directional CFB from percentile-adjusted HROS/BROS.
 
-        Also computes a backing-fire-specific CFB (self.bros_cfb), using bros in
-        place of hros, for calcRosPercentileGrowth's backing-fire regime decision
-        (matches WISE FBPFuel::BROS computing its own CFB from brss, distinct
-        from FBPFuel::ROS's head-fire CFB from rss). For C6, sros (the C6-specific
-        surface ROS used in place of hros for CFB) is head-fire-derived only —
-        no backing-fire equivalent is computed elsewhere in this pipeline, so
-        C6's backing CFB reuses the same sros as a documented simplification.
-
-        :return: None
+        Final heading CFB drives downstream fire behavior. Final backing CFB is
+        retained as directionally consistent facade state; no current downstream
+        equation consumes it.
         """
         self.cfb = crown_eq.calc_cfb(
             fuel_type=self.fuel_type, ftypes=self.ftypes,
             non_crowning_fuels=self.non_crowning_fuels,
-            sros=self.sros, rso=self.rso, hros=self.hros,
+            rso=self.rso, ros=self.hros,
         )
         self.bros_cfb = crown_eq.calc_cfb(
             fuel_type=self.fuel_type, ftypes=self.ftypes,
             non_crowning_fuels=self.non_crowning_fuels,
-            sros=self.sros, rso=self.rso, hros=self.bros,
+            rso=self.rso, ros=self.bros,
         )
         return
 
@@ -662,11 +715,17 @@ class FBP:
         """
         Calculates the rate of spread (ROS) percentile growth for head fire and backing fire rates of spread.
 
+        Meaning: the value is a percentile of the ROS distribution (model error only; see Han & Braun 2014).
+        Among fires with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at
+        least as fast as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires and
+        25 gives one reached or exceeded in about 75%. 50 is the unadjusted ROS. This holds for head fire in the
+        adjusted fuels (C-1 to C-7); backing-fire noise is scaled down by k(wind speed), and other fuels are unchanged.
+
         :return: None
         """
         self.hros, self.bros = growth_eq.calc_ros_percentile_growth(
             percentile_growth=self.percentile_growth, fuel_type=self.fuel_type,
-            hros_cfb=self.cfb, bros_cfb=self.bros_cfb, wsv=self.wsv,
+            hros_cfb=self.percentile_cfb, bros_cfb=self.percentile_bros_cfb, wsv=self.wsv,
             hros=self.hros, bros=self.bros,
         )
         return
@@ -701,18 +760,6 @@ class FBP:
         """
         self.cfc = crown_eq.calc_cfc(
             fuel_type=self.fuel_type, cfb=self.cfb, cfl=self.cfl, pc=self.pc, pdf=self.pdf,
-        )
-        return
-
-    def calcC6hros(self) -> None:
-        """
-        Function to calculate crown and total head fire rate of spread for the C6 fuel type
-
-        :returns: None
-        """
-        self.cros, self.hros = crown_eq.calc_c6hros(
-            fuel_type=self.fuel_type, cfc=self.cfc, isi=self.isi, fme=self.fme,
-            cros=self.cros, sros=self.sros, cfb=self.cfb, hros=self.hros,
         )
         return
 
@@ -924,18 +971,23 @@ class FBP:
         self.calcCSFI()
         # Calculate critical surface fire rate of spread
         self.calcRSO()
-        # Calculate crown fraction burned
-        self.calcCFB()
+        # Calculate temporary C6 CFB/CFC, then deterministic C6 crown and blended heading ROS
+        self.calcC6BlendCFB()
+        self.calcC6BlendCFC()
+        self.calcC6CROS()
+        self.calcC6HROS()
+        # Calculate directional CFB values used to select percentile-growth regimes
+        self.calcPercentileCFB()
         # Calculate ROS percentile growth
         self.calcRosPercentileGrowth()
+        # Recalculate final directional CFB from percentile-adjusted ROS
+        self.calcCFB()
         # Calculate acceleration parameter
         self.calcAccelParam()
         # Calculate fire type
         self.calcFireType()
         # Calculate crown fuel consumed
         self.calcCFC()
-        # Calculate C6 head fire rate of spread
-        self.calcC6hros()
         # Calculate total fuel consumption
         self.calcTFC()
         # Calculate head fire intensity

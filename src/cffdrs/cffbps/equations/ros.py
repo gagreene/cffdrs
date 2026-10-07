@@ -1,6 +1,7 @@
-"""Fire rate of spread (head, backing, and C6 surface rate of spread)."""
+"""Fire rate-of-spread equations."""
 from __future__ import annotations
 
+import numpy as np
 from numpy import ma as mask
 
 MaskedArray = mask.MaskedArray
@@ -43,3 +44,44 @@ def calc_ros(*,
     )
 
     return hros, bros, sros
+
+
+def calc_c6_cros(*,
+                 fuel_type: MaskedArray,
+                 cfc: MaskedArray,
+                 isi: MaskedArray,
+                 fme: MaskedArray,
+                 cros: MaskedArray) -> MaskedArray:
+    """Calculate C6 crown-fire ROS.
+
+    ``cfc`` is the temporary C6 crown fuel consumption derived from the
+    SROS-based blend CFB. ``cros`` is the initialized/current array; only C6
+    cells are replaced.
+    """
+    return mask.where(
+        fuel_type == 6,
+        mask.where(
+            cfc == 0,
+            0,
+            60 * (1 - np.exp(-0.0497 * isi)) * (fme / 0.778237),
+        ),
+        cros,
+    )
+
+
+def calc_c6_hros(*,
+                 fuel_type: MaskedArray,
+                 sros: MaskedArray,
+                 cros: MaskedArray,
+                 c6_blend_cfb: MaskedArray,
+                 hros: MaskedArray) -> MaskedArray:
+    """Blend C6 surface and crown ROS into deterministic heading ROS.
+
+    ``c6_blend_cfb`` is calculated from SROS solely for this blend. ``hros`` is
+    the current array; only C6 cells are replaced.
+    """
+    return mask.where(
+        fuel_type == 6,
+        sros + c6_blend_cfb * (cros - sros),
+        hros,
+    )
