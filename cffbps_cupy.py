@@ -1198,7 +1198,7 @@ class FBP:
             high = cp.exp(-0.05039 * w) / (12.0 * (1.0 - cp.exp(-0.0818 * (w - 28.0))))
             return cp.where(w < 40, low, high)
 
-        if self.percentile_growth != 50:
+        if self.percentile_growth is not None and self.percentile_growth != 50:
             # Calculate the inverse t-distribution for the given percentile growth
             tinv_value = _tinv(probability=self.percentile_growth / 100, freedom=9999999)
 

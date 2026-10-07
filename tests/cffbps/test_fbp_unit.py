@@ -140,12 +140,14 @@ def test_percentile_growth_matches_paper_equations_for_head_and_backing():
     assert float(bros[0]) == pytest.approx(h(k * isi, k * z * 1.637), rel=1e-9)
 
 
+@pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
 @pytest.mark.parametrize('fuel_code', [8, 12, 14, 19, 20])
-def test_percentile_growth_out_of_scope_fuels_unchanged(fuel_code):
-    """D-1, M-3, O-1a, NF and WA are outside the paper's conifer pool: ROS is returned unchanged."""
+def test_percentile_growth_out_of_scope_fuels_unchanged(fuel_code, cfb_value):
+    """D-1, M-3, O-1a, NF and WA are outside the paper's conifer pool: ROS is returned unchanged in
+    both regimes (M-3 and D-1 can crown, so the crown path matters)."""
     from cffdrs.cffbps.equations.growth import calc_ros_percentile_growth
 
-    cfb = np.ma.array([0.0], mask=False)
+    cfb = np.ma.array([cfb_value], mask=False)
     ros = np.ma.array([5.0], mask=False)
     hros, bros = calc_ros_percentile_growth(
         percentile_growth=90, fuel_type=np.ma.array([fuel_code], dtype=np.int8, mask=False),
@@ -200,6 +202,29 @@ def test_percentile_growth_c1_and_c5_use_the_pooled_sigmas():
         wsv=wsv, hros=ros.copy(), bros=ros.copy(),
     )
     assert float(c5[0]) == pytest.approx(8.0 * np.exp(z * 0.923), rel=1e-12)
+
+
+def test_percentile_growth_surface_regime_matches_paper_for_head_and_backing():
+    """Surface regime: R_p = h_0(I, z*sigma) = exp(z*sigma)*R and B_p = h_0(k(w)*I, k(w)*z*sigma)
+    = exp(k(w)*z*sigma)*B, with k(w) < 1 so the backing noise is visibly damped."""
+    from cffdrs.cffbps.equations.growth import _tinv, _wind_decay, calc_ros_percentile_growth
+
+    alpha, beta, gamma, isi, w = 110.0, 0.0282, 1.5, 12.0, 20.0
+    z = _tinv(0.9)
+    k = float(_wind_decay(np.ma.array([w], mask=False))[0])
+    assert 0.0 < k < 1.0
+
+    r_det = alpha * (1 - np.exp(-beta * isi)) ** gamma
+    b_det = alpha * (1 - np.exp(-beta * k * isi)) ** gamma
+    cfb = np.ma.array([0.0], mask=False)
+
+    hros, bros = calc_ros_percentile_growth(
+        percentile_growth=90, fuel_type=np.ma.array([2], dtype=np.int8, mask=False),
+        hros_cfb=cfb, bros_cfb=cfb, wsv=np.ma.array([w], mask=False),
+        hros=np.ma.array([r_det], mask=False), bros=np.ma.array([b_det], mask=False),
+    )
+    assert float(hros[0]) == pytest.approx(r_det * np.exp(z * 0.923), rel=1e-12)
+    assert float(bros[0]) == pytest.approx(b_det * np.exp(k * z * 0.923), rel=1e-12)
 
 
 def test_percentile_growth_mask_contract():
@@ -338,10 +363,12 @@ def test_percentile_growth_percentile_100_contract():
 @pytest.mark.parametrize('percentile', [np.nan, -1, 101])
 @pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
 def test_percentile_growth_invalid_values_propagate_nan(percentile, cfb_value):
-    """NaN and out-of-range percentiles give NaN (or masked) in both regimes."""
+    """NaN and out-of-range percentiles give an unmasked NaN in both regimes (only percentile 100's
+    crown result is masked, see test_percentile_growth_percentile_100_contract)."""
     hros, bros = _percentile_edge(percentile, cfb_value)
     for out in (hros, bros):
-        assert out[0] is np.ma.masked or np.isnan(float(out[0]))
+        assert out[0] is not np.ma.masked
+        assert np.isnan(float(out[0]))
 
 
 def test_calc_cfb_backing_uses_bros_not_hros():
