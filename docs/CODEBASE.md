@@ -109,8 +109,10 @@ itself does; head-fire noise is not wind-scaled.
 type is known; (2) if the crown radicand goes negative the adjustment falls back to
 the log-normal form with the crown sigma; (3) fuel scope: only C-1..C-7 are adjusted —
 C-2, C-3, C-4, C-6 and C-7 in both regimes, C-1 in the crown regime only and C-5 in
-the surface regime only (the paper does not explain these gaps); all other fuel types
-(D, M, O, S, NF, WA) are unchanged, since the paper's data are conifer-only.
+the surface regime only (the paper has no per-fuel-type coverage, so this pattern is a
+project decision, not derived from it); all other fuel types (D, M, O, S, NF, WA) are
+unchanged, since the paper reports estimates for conifer fuels only (deciduous and
+mixed data existed but were too sparse to report).
 
 C6 completes its deterministic SROS/CFB/CROS blend before percentile growth. Generic
 heading/backing CFB then uses the completed directional ROS for regime selection and

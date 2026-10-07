@@ -29,9 +29,10 @@ _CROWN_DELTA = 0.6
 
 # Project choice, not from the paper: the pooled conifer fit is applied to the
 # CFFBPS conifer fuel types C-1..C-7 (codes 1-7), per regime. C-1 is adjusted
-# only for crown fires and C-5 only for surface fires; the paper does not
-# explain the gaps. Other fuel types are outside the data the paper was fitted
-# on and are left unadjusted.
+# only for crown fires and C-5 only for surface fires. The paper reports only
+# pooled conifer values and has no per-fuel-type coverage, so this pattern is a
+# project decision, not something derived from it. Other fuel types are outside
+# the conifer estimates the paper reports and are left unadjusted.
 _SURFACE_FUEL_TYPES = (2, 3, 4, 5, 6, 7)
 _CROWN_FUEL_TYPES = (1, 2, 3, 4, 6, 7)
 
