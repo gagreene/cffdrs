@@ -81,3 +81,6 @@ Desktop.ini
 
 # build output (cargo package artifacts are attached to releases, not tracked)
 rust/target/
+
+# Local AI-assistant instruction files (not tracked)
+CLAUDE.md
