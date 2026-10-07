@@ -89,31 +89,33 @@ Multi-value returns use `NamedTuple`s (`FMCResult`, `SlopeWindISI`, `ISIRSIBERes
 whose field names double as the facade attribute contract.
 
 **`growth.calc_ros_percentile_growth`'s statistical basis.** Adjusts `hros`/`bros`
-for a requested `percentile_growth` (0-100, no-op at 50) using the variance-stabilized
-ROS quantile model of Han, L. & Braun, W.J. (2014), "Dionysus: a stochastic fire
-growth scenario generator", *Environmetrics* 25(6):431-442 — traced from the WISE
-C++ codebase (`Percentile.cpp`'s `ScenarioPercentile::RSI`, `excel_tinv.cpp`) back
-to its published source. Below the crowning threshold (`cfb < 0.1`) ROS
-residuals are treated as log-normal and scaled by
-`exp(tinv * sigma_surface)`; at or above it, a closed-form Box-Cox power-law
-adjustment (`delta=0.6`, the paper's fitted crown-fire transform) applies, falling
-back to the same log-normal form if its radicand goes negative. `sigma_surface`/
-`sigma_crown` are per-fuel-type fitted noise standard deviations (only 9 fuel
-types have them: C1-C7, D1, M3); `tinv` is a standard-normal quantile computed via
-`scipy.stats.t.ppf` at `freedom=9999999` (numerically indistinguishable from
-normal). `hros` and `bros` each use their own pre-percentile directional CFB for
-the surface-vs-crown decision (`facade.py`'s `self.percentile_cfb`/
-`self.percentile_bros_cfb`), and
-`bros`'s noise term is additionally scaled by a wind-speed decay factor `k(wsv)`
-(the paper's Eq. 3) — backing-spread variability shrinks as wind speed increases,
-the same way backing ROS itself does. Two implementation gaps inherited from the
-WISE port were found and fixed here: the surface-regime sigma was previously
-checked for eligibility but never actually multiplied in, and `bros` previously
-shared `hros`'s unscaled noise term and CFB. C6 now completes its deterministic
-SROS/CFB/CROS blend before percentile growth. Generic heading/backing CFB then
-uses the completed directional ROS for regime selection and is recalculated from
-the adjusted ROS for final downstream outputs. Consequently, C6 backing CFB uses
-real BROS rather than reusing head-derived SROS.
+for a requested `percentile_growth` (0-100, no-op at 50 or `None`) using the
+variance-stabilized ROS quantile model of Han, L. & Braun, W.J. (2014), "Dionysus:
+a stochastic fire growth scenario generator", *Environmetrics* 25(6):431-442. For
+surface fires ROS residuals are treated as log-normal, so ROS is scaled by
+`exp(tinv * 0.923)`; for crown fires a closed-form Box-Cox power-law adjustment
+(`delta=0.6`, `sigma=1.637`) applies, `(ROS^0.6 + tinv * 1.637)^(1/0.6)`. The two
+sigmas are the paper's pooled conifer estimates (the paper pools by category because
+per-fuel-type data are sparse, and reports no per-fuel values). `tinv` is a
+standard-normal quantile computed via `scipy.stats.t.ppf` at `freedom=9999999`, which
+agrees with the exact normal quantile to about 1e-7 relative. `bros`'s noise term is
+additionally scaled by a wind-speed decay factor `k(wsv)` (the paper's `k(w)`) —
+backing-spread variability shrinks as wind speed increases, the same way backing ROS
+itself does; head-fire noise is not wind-scaled.
+
+*Project choices, not from the paper:* (1) the surface-vs-crown regime is chosen by
+`cfb < 0.1`, using each direction's own pre-percentile CFB (`facade.py`'s
+`self.percentile_cfb`/`self.percentile_bros_cfb`), because the paper assumes the fire
+type is known; (2) if the crown radicand goes negative the adjustment falls back to
+the log-normal form with the crown sigma; (3) fuel scope: only C-1..C-7 are adjusted —
+C-2, C-3, C-4, C-6 and C-7 in both regimes, C-1 in the crown regime only and C-5 in
+the surface regime only (the paper does not explain these gaps); all other fuel types
+(D, M, O, S, NF, WA) are unchanged, since the paper's data are conifer-only.
+
+C6 completes its deterministic SROS/CFB/CROS blend before percentile growth. Generic
+heading/backing CFB then uses the completed directional ROS for regime selection and
+is recalculated from the adjusted ROS for final downstream outputs. Consequently, C6
+backing CFB uses real BROS rather than reusing head-derived SROS.
 
 ### `cffwis.py` (~1150 lines) — FWI System
 Flat functions: `dailyFFMC`, `hourlyFFMC`, `dailyDMC`, `dailyDC`, `dailyISI`,
