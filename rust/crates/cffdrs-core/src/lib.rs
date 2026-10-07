@@ -7,5 +7,5 @@
 //! (`tests/cffbps/data/golden/`).
 
 pub mod fbp;
-pub mod quantile;
 pub mod percentile;
+pub mod quantile;

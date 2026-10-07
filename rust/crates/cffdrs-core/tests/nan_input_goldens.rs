@@ -42,7 +42,11 @@ fn nan_gcf_propagates_for_grass_fuels() {
     input.fuel_type = 14;
     input.gcf = f64::NAN;
     let r = run(&input);
-    assert!(r.hros.is_nan(), "O-1a NaN gcf: hros must be NaN, got {}", r.hros);
+    assert!(
+        r.hros.is_nan(),
+        "O-1a NaN gcf: hros must be NaN, got {}",
+        r.hros
+    );
 }
 
 #[test]
@@ -54,9 +58,18 @@ fn masked_cell_observables_match_grid_truth() {
     let r = run(&input);
     assert!(r.cfb.is_nan(), "cfb must be NaN, got {}", r.cfb);
     assert!(r.accel.is_nan(), "accel must be NaN, got {}", r.accel);
-    assert_eq!(r.fire_type, 0.0, "fire_type observable is 0 for masked cells");
-    assert_eq!(r.fi_class, -99.0, "fi_class observable is -99 for masked cells");
-    assert!(r.wsv.is_nan() && r.raz.is_nan() && r.bros.is_nan(), "wind chain must be NaN");
+    assert_eq!(
+        r.fire_type, 0.0,
+        "fire_type observable is 0 for masked cells"
+    );
+    assert_eq!(
+        r.fi_class, -99.0,
+        "fi_class observable is -99 for masked cells"
+    );
+    assert!(
+        r.wsv.is_nan() && r.raz.is_nan() && r.bros.is_nan(),
+        "wind chain must be NaN"
+    );
 }
 
 #[test]
@@ -67,8 +80,16 @@ fn nan_bui_leaves_wind_chain_intact() {
     input.bui = f64::NAN;
     let r = run(&input);
     assert!(r.hros.is_nan() && r.bros.is_nan() && r.hfi.is_nan());
-    assert!((r.wsv - 20.251831110187).abs() < 1e-9, "wsv finite: got {}", r.wsv);
-    assert!((r.raz - 170.954944453942).abs() < 1e-9, "raz finite: got {}", r.raz);
+    assert!(
+        (r.wsv - 20.251831110187).abs() < 1e-9,
+        "wsv finite: got {}",
+        r.wsv
+    );
+    assert!(
+        (r.raz - 170.954944453942).abs() < 1e-9,
+        "raz finite: got {}",
+        r.raz
+    );
 }
 
 /// (mutator, sfc expectation) for one NaN-input scenario.
@@ -91,7 +112,11 @@ fn nan_weather_inputs_propagate_to_nan_spread() {
         let mut input = base();
         mutate(&mut input);
         let r = run(&input);
-        assert!(r.hros.is_nan(), "case {idx}: hros must be NaN, got {}", r.hros);
+        assert!(
+            r.hros.is_nan(),
+            "case {idx}: hros must be NaN, got {}",
+            r.hros
+        );
         assert!(r.hfi.is_nan(), "case {idx}: hfi must be NaN, got {}", r.hfi);
         if let Some(e) = sfc {
             assert!(

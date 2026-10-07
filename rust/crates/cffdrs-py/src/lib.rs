@@ -67,15 +67,32 @@ fn run_fbp_grid<'py>(
 
     let fuel = fuel_type.as_slice()?;
     let (lat_s, long_s) = (lat.as_slice()?, long.as_slice()?);
-    let (elev_s, slope_s, aspect_s) =
-        (elevation.as_slice()?, slope_pct.as_slice()?, aspect_deg.as_slice()?);
+    let (elev_s, slope_s, aspect_s) = (
+        elevation.as_slice()?,
+        slope_pct.as_slice()?,
+        aspect_deg.as_slice()?,
+    );
     let (pc_s, gc_s) = (pct_conifer.as_slice()?, grass_curing.as_slice()?);
     let (ws_s, wd_s) = (ws.as_slice()?, wd.as_slice()?);
 
     let grids = py.allow_threads(|| {
         cffdrs_core::fbp::run_grid(
-            fuel, lat_s, long_s, elev_s, slope_s, aspect_s, pc_s, gc_s, ws_s, wd_s, wx_date, ffmc,
-            bui, pct_dead_fir, grass_fuel_load, percentile_growth,
+            fuel,
+            lat_s,
+            long_s,
+            elev_s,
+            slope_s,
+            aspect_s,
+            pc_s,
+            gc_s,
+            ws_s,
+            wd_s,
+            wx_date,
+            ffmc,
+            bui,
+            pct_dead_fir,
+            grass_fuel_load,
+            percentile_growth,
         )
     });
 
@@ -92,7 +109,10 @@ fn run_fbp_grid<'py>(
         ("fmc", grids.fmc),
         ("accel", grids.accel),
     ] {
-        out.set_item(name, numpy::PyArray1::from_vec_bound(py, v).reshape([nrows, ncols])?)?;
+        out.set_item(
+            name,
+            numpy::PyArray1::from_vec_bound(py, v).reshape([nrows, ncols])?,
+        )?;
     }
     Ok(out)
 }

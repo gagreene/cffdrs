@@ -131,7 +131,6 @@ pub struct FbpResult {
     pub fuel_type: f64,
 }
 
-
 impl FbpResult {
     /// Value by its Python-package output name (the names `getParams`
     /// accepts, e.g. "hros", "fF", "fire_type"). None for unknown names.
@@ -315,7 +314,13 @@ fn calc_fmc(
     };
     let dj = match dj_override {
         Some(v) => v,
-        None => if latn.is_finite() { day_of_year(wx_date) } else { 0.0 },
+        None => {
+            if latn.is_finite() {
+                day_of_year(wx_date)
+            } else {
+                0.0
+            }
+        }
     };
     let nd = (dj - d0).abs();
     let fmc = if nd < 30.0 {
@@ -326,7 +331,14 @@ fn calc_fmc(
         120.0
     };
     let fme = 1000.0 * (1.5 - 0.00275 * fmc).powi(4) / (460.0 + 25.9 * fmc);
-    Fmc { latn, d0, dj, nd, fmc, fme }
+    Fmc {
+        latn,
+        d0,
+        dj,
+        nd,
+        fmc,
+        fme,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +379,11 @@ fn calc_slope_wind_isi(isf: f64, f_f: f64, wd: f64, aspect: f64, ws: f64) -> Slo
 
     let acos_val = (wsy / wsv).clamp(-1.0, 1.0);
     let angle_deg = acos_val.acos().to_degrees();
-    let mut raz = if wsx < 0.0 { 360.0 - angle_deg } else { angle_deg };
+    let mut raz = if wsx < 0.0 {
+        360.0 - angle_deg
+    } else {
+        angle_deg
+    };
     // wsv == 0: azimuth undefined, spread circular — substitute 0 to keep raz
     // finite for downstream consumers (matches the Python fix). NaN wsv is a
     // masked cell in Python (`where(wsv > 0, raz, 0)` keeps the mask), so
@@ -459,7 +475,11 @@ pub fn run(input: &FbpInput) -> FbpResult {
 
     // --- invert_wind_aspect
     wd = if wd > 180.0 { wd - 180.0 } else { wd + 180.0 };
-    aspect = if aspect > 180.0 { aspect - 180.0 } else { aspect + 180.0 };
+    aspect = if aspect > 180.0 {
+        aspect - 180.0
+    } else {
+        aspect + 180.0
+    };
 
     // --- calc_sf
     // where(slope < 70, exp(...), 10): NaN slope stays masked in Python —
@@ -481,8 +501,22 @@ pub fn run(input: &FbpInput) -> FbpResult {
     // calcFMC never runs, so latn/d0/dj/nd/fme keep their zero templates —
     // the zero fme is load-bearing for C-6, see FbpInput::fmc_override)
     let fmc = match input.fmc_override {
-        Some(v) => Fmc { latn: 0.0, d0: 0.0, dj: 0.0, nd: 0.0, fmc: v, fme: 0.0 },
-        None => calc_fmc(lat, abs_long, elevation, input.wx_date, input.d0_override, input.dj_override),
+        Some(v) => Fmc {
+            latn: 0.0,
+            d0: 0.0,
+            dj: 0.0,
+            nd: 0.0,
+            fmc: v,
+            fme: 0.0,
+        },
+        None => calc_fmc(
+            lat,
+            abs_long,
+            elevation,
+            input.wx_date,
+            input.d0_override,
+            input.dj_override,
+        ),
     };
 
     // --- calc_isi_rsi_be
@@ -647,14 +681,22 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let (cbh, cfl) = cbh_cfl(ft);
 
     // --- calc_csfi / calc_rso
-    let csfi = if ft < 14 { (0.01 * cbh * (460.0 + 25.9 * fmc.fmc)).powf(1.5) } else { 0.0 };
+    let csfi = if ft < 14 {
+        (0.01 * cbh * (460.0 + 25.9 * fmc.fmc)).powf(1.5)
+    } else {
+        0.0
+    };
     let rso = if sfc > 0.0 { csfi / (300.0 * sfc) } else { 0.0 };
 
     // --- crown fraction burned. The equation is the same for every crowning
     // fuel (including C-6); only the ROS it is applied to differs per step.
     let cfb_from_ros = |ros: f64| -> f64 {
         let delta = ros - rso;
-        let mut cfb = if delta < -3086.0 { 0.0 } else { 1.0 - (-0.23 * delta).exp() };
+        let mut cfb = if delta < -3086.0 {
+            0.0
+        } else {
+            1.0 - (-0.23 * delta).exp()
+        };
         if !cfb.is_finite() && !cfb.is_nan() {
             // infinities zero out; NaN is a masked cell in Python and must
             // stay NaN (grid-truth: cfb/accel are NaN at NaN-input cells)
@@ -663,7 +705,13 @@ pub fn run(input: &FbpInput) -> FbpResult {
         cfb.clamp(0.0, 1.0)
     };
     let crowning = is_modeled(ft) && !is_non_crowning(ft);
-    let directional_cfb = |ros: f64| -> f64 { if crowning { cfb_from_ros(ros) } else { 0.0 } };
+    let directional_cfb = |ros: f64| -> f64 {
+        if crowning {
+            cfb_from_ros(ros)
+        } else {
+            0.0
+        }
+    };
 
     // --- deterministic C-6 blend: SROS-derived CFB -> CFC -> CROS -> blended
     // HROS. This CFB is temporary; it is not the CFB used downstream.
@@ -689,7 +737,11 @@ pub fn run(input: &FbpInput) -> FbpResult {
         let tinv = crate::percentile::percentile_tinv(input.percentile_growth);
         hros = crate::percentile::percentile_ros(ft, hros, percentile_cfb, tinv, 1.0);
         bros = crate::percentile::percentile_ros(
-            ft, bros, percentile_bros_cfb, tinv, crate::percentile::wind_decay(sw.wsv),
+            ft,
+            bros,
+            percentile_bros_cfb,
+            tinv,
+            crate::percentile::wind_decay(sw.wsv),
         );
     }
 
@@ -697,7 +749,11 @@ pub fn run(input: &FbpInput) -> FbpResult {
     // only at the percentile step (NaN percentile) is an unmasked non-finite
     // value in Python, which the CFB sanitiser zeroes; a NaN that was already
     // there is a masked cell and stays NaN.
-    let cfb = if hros.is_nan() && !hros_before_percentile.is_nan() { 0.0 } else { directional_cfb(hros) };
+    let cfb = if hros.is_nan() && !hros_before_percentile.is_nan() {
+        0.0
+    } else {
+        directional_cfb(hros)
+    };
 
     // --- calc_accel_param
     let accel = if is_open_fuel(ft) {
