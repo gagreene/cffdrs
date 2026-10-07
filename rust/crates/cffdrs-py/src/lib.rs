@@ -11,6 +11,10 @@ use pyo3::types::PyDict;
 /// grids plus scalar ffmc/bui/date. Returns a dict of 2-D float64 arrays
 /// (`hros, bros, raz, wsv, hfi, rso, sros, sfc, fmc, accel`); cells with
 /// fuel codes outside 1..18 are NaN.
+///
+/// `percentile_growth` is a percentile (0-100) of the ROS distribution, not a
+/// percent change: 50 is the unadjusted ROS, values outside (0.001, 99.999) are
+/// capped, and NaN propagates, matching the Python package.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn run_fbp_grid<'py>(
@@ -32,13 +36,6 @@ fn run_fbp_grid<'py>(
     grass_fuel_load: f64,
     percentile_growth: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    if percentile_growth != 50.0 {
-        return Err(PyValueError::new_err(
-            "percentile_growth != 50 is not yet supported by the compiled grid pass; \
-             use the Python package for percentile-growth runs",
-        ));
-    }
-
     let (nrows, ncols) = (fuel_type.shape()[0], fuel_type.shape()[1]);
     let expect = |name: &str, s: &[usize]| -> PyResult<()> {
         if s != [nrows, ncols] {

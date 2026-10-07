@@ -129,7 +129,10 @@ mod tests {
         for &(p, expected) in SCIPY_T {
             let got = t_quantile_large_df(p, 9_999_999.0);
             let rel = ((got - expected) / expected).abs();
-            assert!(rel <= 1e-11, "p={p}: expected {expected}, got {got} (rel {rel:e})");
+            assert!(
+                rel <= 1e-11,
+                "p={p}: expected {expected}, got {got} (rel {rel:e})"
+            );
         }
     }
 
@@ -144,7 +147,10 @@ mod tests {
         // dyadic p so that 1 - p is exact in floating point
         for p in [2f64.powi(-17), 2f64.powi(-10), 0.0625, 0.125, 0.25, 0.375] {
             let (lo, hi) = (normal_quantile(p), normal_quantile(1.0 - p));
-            assert!((lo + hi).abs() <= 1e-14 * lo.abs().max(1.0), "p={p}: {lo} vs {hi}");
+            assert!(
+                (lo + hi).abs() <= 1e-14 * lo.abs().max(1.0),
+                "p={p}: {lo} vs {hi}"
+            );
         }
     }
 

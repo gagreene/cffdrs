@@ -60,7 +60,7 @@ def grids():
 SCALARS = dict(wx_date=20230615, ffmc=91.2, bui=76.4, pdf=42.0, gfl=0.41)
 
 
-def python_reference(g):
+def python_reference(g, percentile=50):
     fbp = FBP()
     fbp.initialize(
         fuel_type=g['fuel_type'].astype(np.float64),
@@ -71,6 +71,7 @@ def python_reference(g):
         ffmc=SCALARS['ffmc'], bui=SCALARS['bui'],
         pc=g['pc'], pdf=SCALARS['pdf'], gfl=SCALARS['gfl'], gcf=g['gcf'],
         out_request=FIELDS,
+        percentile_growth=percentile,
     )
     result = fbp.runFBP()
     out = {}
@@ -80,7 +81,7 @@ def python_reference(g):
     return out
 
 
-def rust_grid(g):
+def rust_grid(g, percentile=50.0):
     res = rust_backend.run_fbp_grid(
         g['fuel_type'],
         g['lat'], g['long'], g['elevation'],
@@ -88,14 +89,14 @@ def rust_grid(g):
         g['pc'], g['gcf'],
         g['ws'], g['wd'],
         SCALARS['wx_date'], SCALARS['ffmc'], SCALARS['bui'],
-        SCALARS['pdf'], SCALARS['gfl'], 50.0,
+        SCALARS['pdf'], SCALARS['gfl'], percentile,
     )
     return {name: np.asarray(res[name]) for name in FIELDS}
 
 
-def test_grid_parity_all_fields(grids):
-    py = python_reference(grids)
-    rs = rust_grid(grids)
+def assert_grid_parity(grids, percentile):
+    py = python_reference(grids, percentile)
+    rs = rust_grid(grids, float(percentile))
     modeled = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18)
     for name in FIELDS:
         a, b = py[name], rs[name]
@@ -110,21 +111,33 @@ def test_grid_parity_all_fields(grids):
         )
 
 
+def test_grid_parity_all_fields(grids):
+    assert_grid_parity(grids, 50)
+
+
+# 0 and 100 are capped to 0.001 / 99.999 by both implementations; -5 and 150
+# exercise the cap from outside the 0-100 range.
+@pytest.mark.parametrize('percentile', [5, 10, 25, 45, 75, 90, 95, 99, 0, 100, -5, 150])
+def test_grid_parity_percentile_growth(grids, percentile):
+    assert_grid_parity(grids, percentile)
+
+
+def test_percentile_growth_changes_results(grids):
+    """The percentile actually reaches the compiled pass: 90 differs from the median on adjusted fuels."""
+    median = rust_grid(grids, 50.0)['hros']
+    p90 = rust_grid(grids, 90.0)['hros']
+    conifer = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 7)
+    assert (p90[conifer] > median[conifer]).any()
+
+
+def test_nan_percentile_matches_python(grids):
+    """NaN is not capped: both implementations propagate it identically."""
+    assert_grid_parity(grids, float('nan'))
+
+
 def test_non_fuel_cells_are_nan(grids):
     rs = rust_grid(grids)
     non_fuel = ~((grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18))
     assert non_fuel.sum() >= 5
     for name in FIELDS:
         assert np.isnan(rs[name][non_fuel]).all(), name
-
-
-def test_percentile_growth_not_yet_supported():
-    with pytest.raises(ValueError):
-        rust_backend.run_fbp_grid(
-            np.full((2, 2), 2, dtype=np.int32),
-            np.full((2, 2), 55.0), np.full((2, 2), -110.0), np.zeros((2, 2)),
-            np.zeros((2, 2)), np.full((2, 2), 270.0),
-            np.full((2, 2), 50.0), np.full((2, 2), 80.0),
-            np.full((2, 2), 10.0), np.zeros((2, 2)),
-            20230615, 90.0, 80.0, 35.0, 0.35, 90.0,  # percentile 90
-        )

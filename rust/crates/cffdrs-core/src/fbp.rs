@@ -683,6 +683,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let percentile_bros_cfb = directional_cfb(bros);
 
     // --- calc_ros_percentile_growth: 50 is an exact no-op; NaN propagates
+    let hros_before_percentile = hros;
     if input.percentile_growth != 50.0 {
         let tinv = crate::percentile::percentile_tinv(input.percentile_growth);
         hros = crate::percentile::percentile_ros(ft, hros, percentile_cfb, tinv, 1.0);
@@ -691,8 +692,11 @@ pub fn run(input: &FbpInput) -> FbpResult {
         );
     }
 
-    // --- final CFB from the percentile-adjusted head ROS
-    let cfb = directional_cfb(hros);
+    // --- final CFB from the percentile-adjusted head ROS. A NaN that appears
+    // only at the percentile step (NaN percentile) is an unmasked non-finite
+    // value in Python, which the CFB sanitiser zeroes; a NaN that was already
+    // there is a masked cell and stays NaN.
+    let cfb = if hros.is_nan() && !hros_before_percentile.is_nan() { 0.0 } else { directional_cfb(hros) };
 
     // --- calc_accel_param
     let accel = if is_open_fuel(ft) {

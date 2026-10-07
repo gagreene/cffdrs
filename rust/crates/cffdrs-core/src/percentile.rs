@@ -56,7 +56,13 @@ pub fn percentile_tinv(percentile_growth: f64) -> f64 {
 
 /// Adjust one directional ROS. `regime_cfb` is that direction's pre-percentile
 /// CFB; `noise_scale` is 1.0 for head fire and `wind_decay(wsv)` for backing.
-pub fn percentile_ros(fuel_type: i32, ros: f64, regime_cfb: f64, tinv: f64, noise_scale: f64) -> f64 {
+pub fn percentile_ros(
+    fuel_type: i32,
+    ros: f64,
+    regime_cfb: f64,
+    tinv: f64,
+    noise_scale: f64,
+) -> f64 {
     if regime_cfb < 0.1 {
         if has_surface(fuel_type) {
             ros * (tinv * SURFACE_SIGMA * noise_scale).exp()
@@ -88,7 +94,10 @@ mod tests {
 
     #[test]
     fn tails_are_capped_to_the_bounds() {
-        let (lo, hi) = (percentile_tinv(MIN_PERCENTILE), percentile_tinv(MAX_PERCENTILE));
+        let (lo, hi) = (
+            percentile_tinv(MIN_PERCENTILE),
+            percentile_tinv(MAX_PERCENTILE),
+        );
         for p in [0.0, -5.0, -1e9] {
             assert_eq!(percentile_tinv(p), lo, "p={p}");
         }
@@ -126,7 +135,11 @@ mod tests {
         let tinv = percentile_tinv(90.0);
         for fuel in [8, 12, 14, 19, 20] {
             for cfb in [0.0, 0.9] {
-                assert_eq!(percentile_ros(fuel, 5.0, cfb, tinv, 1.0), 5.0, "fuel {fuel} cfb {cfb}");
+                assert_eq!(
+                    percentile_ros(fuel, 5.0, cfb, tinv, 1.0),
+                    5.0,
+                    "fuel {fuel} cfb {cfb}"
+                );
             }
         }
     }
