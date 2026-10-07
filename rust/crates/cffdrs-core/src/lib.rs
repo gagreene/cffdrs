@@ -7,3 +7,4 @@
 //! (`tests/cffbps/data/golden/`).
 
 pub mod fbp;
+pub mod quantile;
