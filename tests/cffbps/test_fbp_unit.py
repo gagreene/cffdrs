@@ -66,9 +66,11 @@ def test_percentile_growth_locks_current_behavior():
     by a later blend, and C6 BROS no longer reuses head-derived SROS for its CFB.
     """
     expected = {
-        2: (27.11959245018106, 1.6012591850964195),   # C-2: crown table entry
-        6: (21.229110929146493, 0.074701148095697),  # C-6: adjust blended HROS; BROS uses its own CFB
-        14: (17.667074274782212, 2.0109729485336385),  # O-1a: no crown entry
+        # Values derived independently from Han & Braun (2014) h_delta applied to the
+        # deterministic (percentile 50) ROS, with the pooled conifer sigmas.
+        2: (25.672088380839398, 1.6327410105311078),   # C-2: head crown regime, backing surface regime
+        6: (21.93704237984093, 0.07882205463625494),  # C-6: adjust blended HROS; BROS uses its own CFB
+        14: (17.667074274782212, 2.0109729485336385),  # O-1a: outside the conifer scope, unchanged
     }
     for ft, (hros_exp, bros_exp) in expected.items():
         hros, bros = _run(ft, ['hros', 'bros'], percentile_growth=90)
