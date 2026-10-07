@@ -66,8 +66,10 @@ def calc_ros_percentile_growth(*,
     """Adjust head/backing ROS by a growth-percentile factor.
 
     Meaning: the value is a percentile of the ROS distribution (model error only; see Han & Braun 2014).
-    At percentile p, about (100 - p)% of fires spread at least that fast, so 75 gives ROS reached or exceeded
-    in about 25% of fires and 25 gives ROS reached or exceeded in about 75% of fires. 50 is the unadjusted ROS.
+    Among fires with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at
+    least as fast as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires and
+    25 gives one reached or exceeded in about 75%. 50 is the unadjusted ROS. This holds for head fire in the
+    adjusted fuels (C-1 to C-7); backing-fire noise is scaled down by k(wind speed), and other fuels are unchanged.
 
     Implements the variance-stabilized ROS quantile model of Han, L. & Braun,
     W.J. (2014), "Dionysus: a stochastic fire growth scenario generator",

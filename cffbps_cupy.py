@@ -501,12 +501,14 @@ class FBP:
 
         :param convert_fuel_type_codes: Convert from CFS cffdrs R fuel type grid codes
             to the grid codes used in this module.
-        :param percentile_growth: ROS percentile (0-100) for the fire growth model. 50 (default) gives the
-            unadjusted FBP ROS. Values above 50 give faster-than-typical ROS and values below 50 give slower. At
-            percentile p, about (100 - p)% of fires spread at least that fast. For example, 75 yields ROS values
-            reached or exceeded in about 25% of fires, and 25 yields ROS values reached or exceeded in about 75% of
-            fires. It is a quantile, not a percent change: the multiplier depends on the fuel type and ROS (e.g. 95
-            scales surface-fire ROS by about 4.6x). Values outside (0.001, 99.999) are capped to those bounds.
+        :param percentile_growth: ROS percentile (0-100). 50 (default) gives the unadjusted FBP ROS. Among fires
+            with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at least as fast
+            as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires, and 25 gives
+            one reached or exceeded in about 75%. Values above 50 are faster than typical and values below 50 are
+            slower. It is a quantile, not a percent change: the multiplier depends on the fuel type and ROS (e.g. 95
+            scales surface-fire ROS by about 4.6x). Only conifer fuels C-1 to C-7 are adjusted (C-1 in the crown regime
+            only, C-5 in the surface regime only); all other fuels return the unadjusted ROS. Values outside
+            (0.001, 99.999) are capped to those bounds.
         :param return_array_as: If the results are arrays, the type of array to return as. Options: 'numpy', 'cupy'.
         """
         self.fuel_type = fuel_type
@@ -1209,8 +1211,10 @@ class FBP:
         Calculates the percentile growth for head fire and backing fire rates of spread.
 
         Meaning: the value is a percentile of the ROS distribution (model error only; see Han & Braun 2014).
-        At percentile p, about (100 - p)% of fires spread at least that fast, so 75 gives ROS reached or exceeded
-        in about 25% of fires and 25 gives ROS reached or exceeded in about 75% of fires. 50 is the unadjusted ROS.
+        Among fires with the same fuel, weather inputs and fire type, the model implies about (100 - p)% spread at
+        least as fast as the ROS at percentile p: 75 gives an ROS reached or exceeded in about 25% of such fires and
+        25 gives one reached or exceeded in about 75%. 50 is the unadjusted ROS. This holds for head fire in the
+        adjusted fuels (C-1 to C-7); backing-fire noise is scaled down by k(wind speed), and other fuels are unchanged.
         This function adjusts the `hfros` and `bros` attributes based on the percentile growth value and
         crown/surface spread parameters.
 
