@@ -1105,13 +1105,11 @@ class FBP:
         Equation per Forestry Canada Fire Danger Group (1992).
 
         Also computes a backing-fire-specific CFB (self.bros_cfb), using bros in
-        place of hfros, for calcRosPercentileGrowth's backing-fire regime decision
-        (matches WISE FBPFuel::BROS computing its own CFB from brss, distinct
-        from FBPFuel::ROS's head-fire CFB from rss). For C6, sfros (the
-        C6-specific surface ROS used in place of hfros for CFB) is head-fire-
-        derived only -- no backing-fire equivalent is computed elsewhere in
-        this pipeline, so the backing CFB for C6 reuses the same sfros as a
-        documented simplification.
+        place of hfros, for calcRosPercentileGrowth's backing-fire regime decision.
+        For C6, sfros (the C6-specific surface ROS used in place of hfros for CFB)
+        is head-fire-derived only -- no backing-fire equivalent is computed
+        elsewhere in this pipeline, so the backing CFB for C6 reuses the same sfros
+        as a documented simplification.
 
         :return: None
         """
@@ -1150,12 +1148,18 @@ class FBP:
         W.J. (2014), "Dionysus: a stochastic fire growth scenario generator",
         Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1),
         ROS residuals are treated as log-normal and scaled by
-        exp(tinv * sigma_surface). At or above it, a closed-form Box-Cox
-        power-law adjustment (delta=0.6, the paper's fitted crown-fire
-        transform) applies unless its radicand would go negative (outside the
-        transform's valid domain), in which case it falls back to the same
-        log-normal-shift form using the crown-fire sigma. Fuel types with no
-        fitted sigma for the applicable regime are left unchanged.
+        exp(tinv * 0.923). At or above it, a closed-form Box-Cox power-law
+        adjustment (delta=0.6, sigma=1.637) applies unless its radicand would
+        go negative (outside the transform's valid domain), in which case it
+        falls back to the same log-normal-shift form using the crown-fire
+        sigma. The two sigmas are the paper's pooled conifer estimates. Fuel
+        types other than C-1..C-7 are left unchanged, as are C-1 in the surface
+        regime and C-5 in the crown regime.
+
+        Project choices, not from the paper: the cfb < 0.1 regime rule (the
+        paper assumes the fire type is known), the negative-radicand fallback,
+        and the C-1..C-7 fuel scope with its C-1 crown-only and C-5
+        surface-only coverage.
 
         hfros and bros each use their own direction-specific CFB (self.cfb /
         self.bros_cfb) to decide the surface-vs-crown regime, and bros's noise
@@ -1171,9 +1175,8 @@ class FBP:
             """
             Calculates the standard-normal quantile, via a Student's t at very high freedom.
 
-            Han & Braun (2014) specify the standard normal quantile directly; a t
-            distribution at freedom=9999999 is numerically indistinguishable from
-            it and is what this method's fuel-type sigmas were fit against.
+            Han & Braun (2014) use the standard normal quantile; a t distribution
+            at freedom=9999999 agrees with it to about 1e-7 relative.
 
             :param probability: The cumulative probability for which the quantile is calculated.
             :param freedom: The degrees of freedom for the t-distribution.
@@ -1199,25 +1202,15 @@ class FBP:
             # Calculate the inverse t-distribution for the given percentile growth
             tinv_value = _tinv(probability=self.percentile_growth / 100, freedom=9999999)
 
-            # Prepare default table with structured dtype. Both are fitted noise
-            # standard deviations (Han & Braun 2014, Section 3): surface_vals scales
-            # a log-normal shift, crown_vals scales the Box-Cox power-law adjustment.
-            keys = cp.array([1, 2, 3, 4, 5, 6, 7, 8, 12], dtype=cp.uint8)
-            surface_vals = cp.array([cp.nan, 0.84, 0.62, 0.74, 0.8, 0.66, 1.22, 0.716, 0.551], dtype=cp.float32)
-            crown_vals = cp.array([0.95, 1.82, 1.78, 1.38, cp.nan, 1.54, 1.0, cp.nan, cp.nan], dtype=cp.float32)
-
-            # Initialize default arrays for lookup
-            surface_s = cp.full_like(self.fuel_type, cp.nan, dtype=cp.float32)
-            crown_s = cp.full_like(self.fuel_type, cp.nan, dtype=cp.float32)
-
-            # Create a mask for each valid fuel type and assign values
-            for k, s_val, c_val in zip(keys, surface_vals, crown_vals):
-                valid_mask = self.fuel_type == k
-                surface_s = cp.where(valid_mask, s_val, surface_s)
-                crown_s = cp.where(valid_mask, c_val, crown_s)
-
-            has_surface = ~cp.isnan(surface_s)
-            has_crown = ~cp.isnan(crown_s)
+            # Han & Braun (2014), Section 3: pooled conifer noise standard deviations
+            # (surface: log scale; crown: Box-Cox delta=0.6 scale). Single values,
+            # not per-fuel-type tables. Fuel scope per regime is a project choice:
+            # C-1 crown only, C-5 surface only, C-2/3/4/6/7 both, others unchanged.
+            surface_sigma = 0.923
+            crown_sigma = 1.637
+            crown_delta = 0.6
+            has_surface = cp.isin(self.fuel_type, cp.array([2, 3, 4, 5, 6, 7]))
+            has_crown = cp.isin(self.fuel_type, cp.array([1, 2, 3, 4, 6, 7]))
             wind_decay = _wind_decay(self.wsv)
 
             # Iterate over head fire and backing fire ROS attributes, each with its
@@ -1228,15 +1221,16 @@ class FBP:
             ):
                 ros_in = getattr(self, ros_attr)  # Get the current ROS value
 
-                # Surface regime: log-normal shift, scaled by the fuel type's sigma
-                surface_regime = cp.where(has_surface, ros_in * cp.exp(tinv_value * surface_s * noise_scale), ros_in)
+                # Surface regime: log-normal shift, scaled by the pooled surface sigma
+                surface_regime = cp.where(has_surface, ros_in * cp.exp(tinv_value * surface_sigma * noise_scale), ros_in)
 
-                # Crown regime: Box-Cox power-law adjustment, falling back to the
-                # same log-normal-shift form (using crown_s) outside its domain
-                radicand = cp.power(ros_in, 0.6) + tinv_value * crown_s * noise_scale
-                power_law = cp.power(cp.where(radicand >= 0, radicand, 0.0), 1 / 0.6)
-                crown_fallback = ros_in * cp.exp(tinv_value * crown_s * noise_scale)
-                crown_regime = cp.where(has_crown, cp.where(radicand >= 0, power_law, crown_fallback), ros_in)
+                # Crown regime: Box-Cox power-law adjustment. Guard (project choice, not
+                # in the paper): a negative radicand is outside the transform's domain,
+                # so fall back to the log-normal shift form using the crown sigma.
+                shift = tinv_value * crown_sigma * noise_scale
+                radicand = cp.power(ros_in, crown_delta) + shift
+                power_law = cp.power(cp.where(radicand >= 0, radicand, 0.0), 1 / crown_delta)
+                crown_regime = cp.where(has_crown, cp.where(radicand >= 0, power_law, ros_in * cp.exp(shift)), ros_in)
 
                 ros_growth = cp.where(regime_cfb < 0.1, surface_regime, crown_regime)
                 setattr(self, ros_attr, ros_growth)  # Update the ROS attribute with the adjusted value
