@@ -189,9 +189,13 @@ class FBP:
         self.csfi = cp.array([0], dtype=self.cupy_float_type)
         self.rso = cp.array([0], dtype=self.cupy_float_type)
         self.rsc = cp.array([0], dtype=self.cupy_float_type)
+        self.c6_blend_cfb = cp.array([0], dtype=self.cupy_float_type)
+        self.percentile_cfb = cp.array([0], dtype=self.cupy_float_type)
+        self.percentile_bros_cfb = cp.array([0], dtype=self.cupy_float_type)
         self.cfb = cp.array([0], dtype=self.cupy_float_type)
         self.bros_cfb = cp.array([0], dtype=self.cupy_float_type)
         self.cfl = cp.array([0], dtype=self.cupy_float_type)
+        self.c6_blend_cfc = cp.array([0], dtype=self.cupy_float_type)
         self.cfc = cp.array([0], dtype=self.cupy_float_type)
         self.tfc = cp.array([0], dtype=self.cupy_float_type)
 
@@ -563,9 +567,13 @@ class FBP:
         self.csfi = self._init_array()
         self.rso = self._init_array()
         self.rsc = self._init_array()
+        self.c6_blend_cfb = self._init_array()
+        self.percentile_cfb = self._init_array()
+        self.percentile_bros_cfb = self._init_array()
         self.cfb = self._init_array()
         self.bros_cfb = self._init_array()
         self.cfl = self._init_array()
+        self.c6_blend_cfc = self._init_array()
         self.cfc = self._init_array()
         self.tfc = self._init_array()
         self.bfW = self._init_array()
@@ -1099,43 +1107,96 @@ class FBP:
         )
         return
 
-    def calcCFB(self) -> None:
-        """
-        Function to calculate crown fraction burned using CuPy.
-        Equation per Forestry Canada Fire Danger Group (1992).
+    @staticmethod
+    def _sanitize_cfb(cfb: cp.ndarray) -> cp.ndarray:
+        """Replace non-finite CFB values with 0 and constrain the result to [0, 1]."""
+        return cp.clip(cp.where(cp.isfinite(cfb), cfb, 0.0), 0, 1)
 
-        Also computes a backing-fire-specific CFB (self.bros_cfb), using bros in
-        place of hfros, for calcRosPercentileGrowth's backing-fire regime decision.
-        For C6, sfros (the C6-specific surface ROS used in place of hfros for CFB)
-        is head-fire-derived only -- no backing-fire equivalent is computed
-        elsewhere in this pipeline, so the backing CFB for C6 reuses the same sfros
-        as a documented simplification.
+    def _calc_directional_cfb(self, ros: cp.ndarray) -> cp.ndarray:
+        """
+        Calculate CFB from one completed directional ROS using CuPy.
+        Equation per Forestry Canada Fire Danger Group (1992). The same equation applies to
+        every crowning fuel type, including C6.
+
+        :param ros: Directional rate of spread (head or backing).
+        :return: Crown fraction burned (0-1).
+        """
+        crowning = cp.isin(self.fuel_type, self.ftypes) & ~cp.isin(self.fuel_type, self.non_crowning_fuels)
+        delta_ros = ros - self.rso
+        cfb = cp.where(delta_ros < -3086, 0.0, 1 - cp.exp(-0.23 * delta_ros))
+        return self._sanitize_cfb(cp.where(crowning, cfb, 0.0))
+
+    def calcC6BlendCFB(self) -> None:
+        """
+        Calculate the temporary SROS-derived CFB used only by the deterministic C6 blend.
 
         :return: None
         """
-        # Masks
-        is_c6 = self.fuel_type == 6
-        non_crowning = cp.isin(self.fuel_type, self.non_crowning_fuels)
-        is_other = cp.isin(self.fuel_type, self.ftypes) & ~is_c6 & ~non_crowning
+        delta_sfros = self.sfros - self.rso
+        cfb = cp.where(delta_sfros < -3086, 0.0, 1 - cp.exp(-0.23 * delta_sfros))
+        self.c6_blend_cfb = self._sanitize_cfb(cp.where(self.fuel_type == 6, cfb, 0.0))
+        return
 
-        # C6 always uses sfros (head-fire-derived; no backing equivalent available)
-        delta_sfros_c6 = self.sfros - self.rso
-        cfb_c6 = cp.where(delta_sfros_c6 < -3086, 0.0, 1 - cp.exp(-0.23 * delta_sfros_c6))
+    def calcC6BlendCFC(self) -> None:
+        """
+        Calculate temporary CFC from the C6 blend CFB, used to activate C6 CFROS.
 
-        def _cfb_for_other(ros_other: cp.ndarray) -> cp.ndarray:
-            delta_other = ros_other - self.rso
-            cfb_other = cp.where(delta_other < -3086, 0.0, 1 - cp.exp(-0.23 * delta_other))
-            cfb = cp.zeros_like(self.fuel_type, dtype=self.cupy_float_type)
-            cfb = cp.where(is_c6, cfb_c6, cfb)
-            cfb = cp.where(is_other, cfb_other, cfb)
-            return cp.clip(cp.nan_to_num(cfb, nan=0.0), 0, 1)
+        :return: None
+        """
+        self.c6_blend_cfc = self._cfc_from_cfb(self.c6_blend_cfb)
+        return
 
-        self.cfb = _cfb_for_other(self.hfros)
-        self.bros_cfb = _cfb_for_other(self.bros)
+    def calcC6CFROS(self) -> None:
+        """
+        Calculate the C6 crown fire rate of spread using CuPy.
 
-        # Clean up memory
-        del is_c6, is_other, delta_sfros_c6, cfb_c6
+        :return: None
+        """
+        self.cfros = cp.where(
+            self.fuel_type == 6,
+            cp.where(
+                self.c6_blend_cfc == 0,
+                0.0,
+                60 * (1 - cp.exp(-0.0497 * self.isi)) * (self.fme / 0.778237),
+            ),
+            self.cfros
+        )
+        return
 
+    def calcC6HFROS(self) -> None:
+        """
+        Blend C6 surface and crown ROS into the deterministic head fire rate of spread using CuPy.
+
+        :return: None
+        """
+        self.hfros = cp.where(
+            self.fuel_type == 6,
+            self.sfros + self.c6_blend_cfb * (self.cfros - self.sfros),
+            self.hfros
+        )
+        return
+
+    def calcPercentileCFB(self) -> None:
+        """
+        Calculate directional CFB values used only to select percentile-growth regimes.
+
+        :return: None
+        """
+        self.percentile_cfb = self._calc_directional_cfb(self.hfros)
+        self.percentile_bros_cfb = self._calc_directional_cfb(self.bros)
+        return
+
+    def calcCFB(self) -> None:
+        """
+        Calculate final directional CFB from percentile-adjusted HFROS/BROS using CuPy.
+
+        Final heading CFB drives downstream fire behavior. Final backing CFB is retained as
+        directionally consistent state; no current downstream equation consumes it.
+
+        :return: None
+        """
+        self.cfb = self._calc_directional_cfb(self.hfros)
+        self.bros_cfb = self._calc_directional_cfb(self.bros)
         return
 
     def calcRosPercentileGrowth(self) -> None:
@@ -1161,8 +1222,8 @@ class FBP:
         and the C-1..C-7 fuel scope with its C-1 crown-only and C-5
         surface-only coverage.
 
-        hfros and bros each use their own direction-specific CFB (self.cfb /
-        self.bros_cfb) to decide the surface-vs-crown regime, and bros's noise
+        hfros and bros each use their own direction-specific pre-percentile CFB
+        (self.percentile_cfb / self.percentile_bros_cfb) to decide the surface-vs-crown regime, and bros's noise
         term is additionally scaled by a wind-speed decay factor k(wsv) (the
         paper's Eq. 3): backing-spread variability shrinks as wind speed
         increases, the same way backing ROS itself does. hfros's noise is not
@@ -1216,8 +1277,8 @@ class FBP:
             # Iterate over head fire and backing fire ROS attributes, each with its
             # own direction-specific CFB and noise-scaling factor.
             for ros_attr, regime_cfb, noise_scale in (
-                ('hfros', self.cfb, 1.0),
-                ('bros', self.bros_cfb, wind_decay),
+                ('hfros', self.percentile_cfb, 1.0),
+                ('bros', self.percentile_bros_cfb, wind_decay),
             ):
                 ros_in = getattr(self, ros_attr)  # Get the current ROS value
 
@@ -1302,46 +1363,30 @@ class FBP:
 
         return
 
-    def calcCFC(self) -> None:
+    def _cfc_from_cfb(self, cfb: cp.ndarray) -> cp.ndarray:
         """
-        Function to calculate crown fuel consumed (kg/m^2) using CuPy.
+        Calculate crown fuel consumed (kg/m^2) from a CFB array using CuPy.
 
-        :return: None
+        :param cfb: Crown fraction burned (0-1).
+        :return: Crown fuel consumed.
         """
-        self.cfc = cp.where(
+        return cp.where(
             (self.fuel_type == 10) | (self.fuel_type == 11),
-            self.cfb * self.cfl * self.pc / 100,
+            cfb * self.cfl * self.pc / 100,
             cp.where(
                 (self.fuel_type == 12) | (self.fuel_type == 13),
-                self.cfb * self.cfl * self.pdf / 100,
-                self.cfb * self.cfl
+                cfb * self.cfl * self.pdf / 100,
+                cfb * self.cfl
             )
         )
 
-        return
-
-    def calcC6hfros(self) -> None:
+    def calcCFC(self) -> None:
         """
-        Function to calculate crown and total head fire rate of spread for the C6 fuel type using CuPy.
+        Function to calculate crown fuel consumed (kg/m^2) from the final CFB using CuPy.
 
-        :returns: None
+        :return: None
         """
-        self.cfros = cp.where(
-            self.fuel_type == 6,
-            cp.where(
-                self.cfc == 0,
-                cp.zeros_like(self.fuel_type),
-                60 * cp.power(1 - cp.exp(-0.0497 * self.isi), 1) * (self.fme / 0.778237),
-            ),
-            self.cfros
-        )
-
-        self.hfros = cp.where(
-            self.fuel_type == 6,
-            self.sfros + (self.cfb * (self.cfros - self.sfros)),
-            self.hfros
-        )
-
+        self.cfc = self._cfc_from_cfb(self.cfb)
         return
 
     def calcTFC(self) -> None:
@@ -1556,18 +1601,23 @@ class FBP:
         self.calcCSFI()
         # Calculate critical surface fire rate of spread
         self.calcRSO()
-        # Calculate crown fraction burned
-        self.calcCFB()
+        # Calculate temporary C6 CFB/CFC, then deterministic C6 crown and blended head fire ROS
+        self.calcC6BlendCFB()
+        self.calcC6BlendCFC()
+        self.calcC6CFROS()
+        self.calcC6HFROS()
+        # Calculate directional CFB values used to select percentile-growth regimes
+        self.calcPercentileCFB()
         # Calculate ROS percentile growth
         self.calcRosPercentileGrowth()
+        # Recalculate final directional CFB from percentile-adjusted ROS
+        self.calcCFB()
         # Calculate acceleration parameter
         self.calcAccelParam()
         # Calculate fire type
         self.calcFireType()
         # Calculate crown fuel consumed
         self.calcCFC()
-        # Calculate C6 head fire rate of spread
-        self.calcC6hfros()
         # Calculate total fuel consumption
         self.calcTFC()
         # Calculate head fire intensity
