@@ -273,6 +273,30 @@ def test_percentile_growth_zero_ros_crown_guard_returns_zero_not_nan():
     assert float(bros[0]) == 0.0
 
 
+def test_percentile_growth_crown_regime_monotone_in_ros_below_threshold():
+    """Crown-regime output must never decrease as the input ROS increases. When the radicand is
+    negative the Box-Cox inverse has no positive ROS, so the result is 0; it must not jump up to
+    R * exp(shift) just below the radicand-zero threshold (C-2, percentile 5: R=5.2 gave 0.352 but
+    R=5.3 gave 0.0025)."""
+    from cffdrs.cffbps.equations.growth import _CROWN_DELTA, _CROWN_SIGMA, _tinv, calc_ros_percentile_growth
+
+    percentile = 5
+    threshold = (-_tinv(percentile / 100) * _CROWN_SIGMA) ** (1 / _CROWN_DELTA)
+    ros = np.concatenate([np.linspace(0.0, 2 * threshold, 400), [threshold * 0.999, threshold * 1.001]])
+    ros.sort()
+    cfb = np.ma.array(np.full(ros.shape, 0.9), mask=False)
+    hros, bros = calc_ros_percentile_growth(
+        percentile_growth=percentile, fuel_type=np.ma.array(np.full(ros.shape, 2, dtype=np.int8), mask=False),
+        hros_cfb=cfb, bros_cfb=cfb, wsv=np.ma.array(np.zeros(ros.shape), mask=False),
+        hros=np.ma.array(ros.copy(), mask=False), bros=np.ma.array(ros.copy(), mask=False),
+    )
+    for out in (hros, bros):
+        values = np.ma.filled(out, np.nan)
+        assert not np.isnan(values).any()
+        assert np.all(np.diff(values) >= -1e-12)
+        assert values[ros <= threshold].max() == pytest.approx(0.0, abs=1e-9)
+
+
 def test_percentile_growth_bros_wind_decay():
     """Backing-fire growth-percentile noise must shrink toward the unadjusted
     value as wind speed increases (Han & Braun 2014's k(w)); head-fire noise must
@@ -342,8 +366,8 @@ def _percentile_edge(percentile, cfb_value):
 
 @pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
 def test_percentile_growth_percentile_zero_gives_zero(cfb_value):
-    """Percentile 0 gives ROS 0 in both regimes (crown: the radicand goes to -inf, so the guard's
-    rsi * exp(-inf) applies)."""
+    """Percentile 0 gives ROS 0 in both regimes (crown: the radicand goes to -inf, so the zero
+    guard applies)."""
     hros, bros = _percentile_edge(0, cfb_value)
     assert float(hros[0]) == 0.0
     assert float(bros[0]) == 0.0

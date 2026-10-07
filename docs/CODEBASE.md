@@ -106,8 +106,8 @@ itself does; head-fire noise is not wind-scaled.
 *Project choices, not from the paper:* (1) the surface-vs-crown regime is chosen by
 `cfb < 0.1`, using each direction's own pre-percentile CFB (`facade.py`'s
 `self.percentile_cfb`/`self.percentile_bros_cfb`), because the paper assumes the fire
-type is known; (2) if the crown radicand goes negative the adjustment falls back to
-the log-normal form with the crown sigma; (3) fuel scope: only C-1..C-7 are adjusted —
+type is known; (2) if the crown radicand goes negative the adjusted ROS is 0 (no positive ROS
+exists there, and this keeps the output continuous and non-decreasing in ROS); (3) fuel scope: only C-1..C-7 are adjusted —
 C-2, C-3, C-4, C-6 and C-7 in both regimes, C-1 in the crown regime only and C-5 in
 the surface regime only (the paper has no per-fuel-type coverage, so this pattern is a
 project decision, not derived from it); all other fuel types (D, M, O, S, NF, WA) are

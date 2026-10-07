@@ -1210,15 +1210,13 @@ class FBP:
         Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1),
         ROS residuals are treated as log-normal and scaled by
         exp(tinv * 0.923). At or above it, a closed-form Box-Cox power-law
-        adjustment (delta=0.6, sigma=1.637) applies unless its radicand would
-        go negative (outside the transform's valid domain), in which case it
-        falls back to the same log-normal-shift form using the crown-fire
-        sigma. The two sigmas are the paper's pooled conifer estimates. Fuel
+        adjustment (delta=0.6, sigma=1.637) applies, giving ROS 0 where its
+        radicand would go negative (outside the transform's range). The two sigmas are the paper's pooled conifer estimates. Fuel
         types other than C-1..C-7 are left unchanged, as are C-1 in the surface
         regime and C-5 in the crown regime.
 
         Project choices, not from the paper: the cfb < 0.1 regime rule (the
-        paper assumes the fire type is known), the negative-radicand fallback,
+        paper assumes the fire type is known), the negative-radicand zero guard,
         and the C-1..C-7 fuel scope with its C-1 crown-only and C-5
         surface-only coverage.
 
@@ -1286,12 +1284,13 @@ class FBP:
                 surface_regime = cp.where(has_surface, ros_in * cp.exp(tinv_value * surface_sigma * noise_scale), ros_in)
 
                 # Crown regime: Box-Cox power-law adjustment. Guard (project choice, not
-                # in the paper): a negative radicand is outside the transform's domain,
-                # so fall back to the log-normal shift form using the crown sigma.
+                # in the paper): a negative radicand is outside the transform's range,
+                # so no positive ROS exists and the result is 0 (continuous, monotone).
+                # NaN radicands fail the < 0 test and propagate as NaN.
                 shift = tinv_value * crown_sigma * noise_scale
                 radicand = cp.power(ros_in, crown_delta) + shift
-                power_law = cp.power(cp.where(radicand >= 0, radicand, 0.0), 1 / crown_delta)
-                crown_regime = cp.where(has_crown, cp.where(radicand >= 0, power_law, ros_in * cp.exp(shift)), ros_in)
+                power_law = cp.power(cp.where(radicand < 0, 0.0, radicand), 1 / crown_delta)
+                crown_regime = cp.where(has_crown, power_law, ros_in)
 
                 ros_growth = cp.where(regime_cfb < 0.1, surface_regime, crown_regime)
                 setattr(self, ros_attr, ros_growth)  # Update the ROS attribute with the adjusted value

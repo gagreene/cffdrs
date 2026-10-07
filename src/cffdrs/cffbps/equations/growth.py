@@ -64,16 +64,15 @@ def calc_ros_percentile_growth(*,
     Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1), ROS
     residuals are treated as log-normal and the ROS is scaled multiplicatively
     by exp(tinv * 0.923). At or above it, a closed-form Box-Cox power-law
-    adjustment (delta=0.6, sigma=1.637) applies unless its radicand would go
-    negative (outside the transform's valid domain), in which case it falls
-    back to the same log-normal-shift form using the crown-fire sigma. The two
+    adjustment (delta=0.6, sigma=1.637) applies, giving ROS 0 where its
+    radicand would go negative (outside the transform's range). The two
     sigmas are the paper's pooled conifer estimates. Fuel types other than
     C-1..C-7 are left unchanged, as are C-1 in the surface regime and C-5 in the
     crown regime, and percentile_growth of None or 50 (the median, i.e. no
     adjustment).
 
     Project choices, not from the paper: the cfb < 0.1 regime rule (the paper
-    assumes the fire type is known), the negative-radicand fallback, and the
+    assumes the fire type is known), the negative-radicand zero guard, and the
     C-1..C-7 fuel scope with its C-1 crown-only and C-5 surface-only coverage.
 
     Head and backing ROS are adjusted using their own, direction-specific CFB
@@ -102,10 +101,13 @@ def calc_ros_percentile_growth(*,
 
         shift = tinv_value * _CROWN_SIGMA * noise_scale
         radicand = mask.power(rsi, _CROWN_DELTA) + shift
-        power_law = mask.power(mask.where(radicand >= 0, radicand, 0.0), 1.0 / _CROWN_DELTA)
-        # Guard (project choice, not in the paper): a negative radicand is outside the
-        # Box-Cox transform's domain, so fall back to the log-normal shift form.
-        crown_regime = mask.where(has_crown, mask.where(radicand >= 0, power_law, rsi * np.exp(shift)), rsi)
+        # Guard (project choice, not in the paper): a negative radicand is outside the Box-Cox
+        # transform's range, so no positive ROS exists at that percentile and the result is 0. This
+        # keeps the output continuous and non-decreasing in ROS. NaN radicands (invalid percentile)
+        # are restored as unmasked NaN, since mask.power would otherwise mask them.
+        power_law = mask.power(mask.where(radicand < 0, 0.0, radicand), 1.0 / _CROWN_DELTA)
+        power_law = mask.where(np.isnan(radicand), np.nan, power_law)
+        crown_regime = mask.where(has_crown, power_law, rsi)
 
         adjusted.append(mask.where(regime_cfb < 0.1, surface_regime, crown_regime))
 
