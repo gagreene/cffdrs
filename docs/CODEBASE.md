@@ -89,7 +89,7 @@ Multi-value returns use `NamedTuple`s (`FMCResult`, `SlopeWindISI`, `ISIRSIBERes
 whose field names double as the facade attribute contract.
 
 **`growth.calc_ros_percentile_growth`'s statistical basis.** Adjusts `hros`/`bros`
-for a requested `percentile_growth` (0-100, no-op at 50 or `None`) using the
+for a requested `percentile_growth` (0-100, no-op at 50 or `None`; values outside (0.001, 99.999) are capped to those bounds, NaN propagates) using the
 variance-stabilized ROS quantile model of Han, L. & Braun, W.J. (2014), "Dionysus:
 a stochastic fire growth scenario generator", *Environmetrics* 25(6):431-442. For
 surface fires ROS residuals are treated as log-normal, so ROS is scaled by

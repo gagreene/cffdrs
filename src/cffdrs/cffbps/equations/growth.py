@@ -27,6 +27,12 @@ _SURFACE_SIGMA = 0.923
 _CROWN_SIGMA = 1.637
 _CROWN_DELTA = 0.6
 
+# Project choice, not from the paper: percentiles are capped to this open-interval margin so the
+# 0th/100th percentile (z = -inf/+inf) give finite ROS instead of 0/inf/masked values. The paper
+# only demonstrates 10-90 and does not discuss extreme percentiles. NaN is not capped.
+_MIN_PERCENTILE = 0.001
+_MAX_PERCENTILE = 99.999
+
 # Project choice, not from the paper: the pooled conifer fit is applied to the
 # CFFBPS conifer fuel types C-1..C-7 (codes 1-7), per regime. C-1 is adjusted
 # only for crown fires and C-5 only for surface fires. The paper reports only
@@ -69,10 +75,11 @@ def calc_ros_percentile_growth(*,
     sigmas are the paper's pooled conifer estimates. Fuel types other than
     C-1..C-7 are left unchanged, as are C-1 in the surface regime and C-5 in the
     crown regime, and percentile_growth of None or 50 (the median, i.e. no
-    adjustment).
+    adjustment). Percentiles outside (0, 100) are capped to 0.001/99.999 rather than
+    rejected; NaN propagates as NaN.
 
     Project choices, not from the paper: the cfb < 0.1 regime rule (the paper
-    assumes the fire type is known), the negative-radicand zero guard, and the
+    assumes the fire type is known), the negative-radicand zero guard, the percentile cap, and the
     C-1..C-7 fuel scope with its C-1 crown-only and C-5 surface-only coverage.
 
     Head and backing ROS are adjusted using their own, direction-specific CFB
@@ -88,7 +95,8 @@ def calc_ros_percentile_growth(*,
     if percentile_growth is None or percentile_growth == 50:
         return hros, bros
 
-    tinv_value = _tinv(probability=percentile_growth / 100, freedom=9999999)
+    capped_percentile = float(np.clip(percentile_growth, _MIN_PERCENTILE, _MAX_PERCENTILE))  # NaN stays NaN
+    tinv_value = _tinv(probability=capped_percentile / 100, freedom=9999999)
 
     ftype = np.ma.filled(fuel_type, 0)
     has_surface = np.isin(ftype, _SURFACE_FUEL_TYPES)

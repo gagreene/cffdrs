@@ -365,31 +365,37 @@ def _percentile_edge(percentile, cfb_value):
 
 
 @pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
-def test_percentile_growth_percentile_zero_gives_zero(cfb_value):
-    """Percentile 0 gives ROS 0 in both regimes (crown: the radicand goes to -inf, so the zero
-    guard applies)."""
-    hros, bros = _percentile_edge(0, cfb_value)
-    assert float(hros[0]) == 0.0
-    assert float(bros[0]) == 0.0
+@pytest.mark.parametrize('percentile, capped', [(0, 'min'), (-1, 'min'), (-1e9, 'min'),
+                                                (100, 'max'), (101, 'max'), (1e9, 'max')])
+def test_percentile_growth_tails_are_capped(percentile, capped, cfb_value):
+    """Percentiles outside (0, 100) are capped to the nearest bound instead of failing: the result is
+    finite, unmasked, and identical to the result at that bound (so 0 and 100 no longer give 0/inf)."""
+    from cffdrs.cffbps.equations.growth import _MAX_PERCENTILE, _MIN_PERCENTILE
 
-
-def test_percentile_growth_percentile_100_contract():
-    """Percentile 100: surface regime returns +inf; crown regime returns a masked value because
-    np.ma.power masks the non-finite power-law result. The crown behaviour already existed and is
-    the accepted contract."""
-    hros, bros = _percentile_edge(100, 0.0)
-    assert np.isposinf(hros[0]) and np.isposinf(bros[0])
-
-    hros, bros = _percentile_edge(100, 0.9)
-    assert hros[0] is np.ma.masked and bros[0] is np.ma.masked
-
-
-@pytest.mark.parametrize('percentile', [np.nan, -1, 101])
-@pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
-def test_percentile_growth_invalid_values_propagate_nan(percentile, cfb_value):
-    """NaN and out-of-range percentiles give an unmasked NaN in both regimes (only percentile 100's
-    crown result is masked, see test_percentile_growth_percentile_100_contract)."""
+    bound = _MIN_PERCENTILE if capped == 'min' else _MAX_PERCENTILE
     hros, bros = _percentile_edge(percentile, cfb_value)
+    exp_hros, exp_bros = _percentile_edge(bound, cfb_value)
+    for out, expected in ((hros, exp_hros), (bros, exp_bros)):
+        assert out[0] is not np.ma.masked
+        assert np.isfinite(float(out[0]))
+        assert float(out[0]) == float(expected[0])
+
+
+@pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
+def test_percentile_growth_cap_bounds_are_inside_open_interval(cfb_value):
+    """The bounds must lie strictly inside (0, 100) and leave ordinary percentiles untouched."""
+    from cffdrs.cffbps.equations.growth import _MAX_PERCENTILE, _MIN_PERCENTILE
+
+    assert 0 < _MIN_PERCENTILE < 1 and 99 < _MAX_PERCENTILE < 100
+    low, _ = _percentile_edge(0.1, cfb_value)
+    capped_low, _ = _percentile_edge(0.0, cfb_value)
+    assert float(capped_low[0]) <= float(low[0])
+
+
+@pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
+def test_percentile_growth_nan_percentile_propagates_nan(cfb_value):
+    """NaN is not a tail value and is not capped: it gives an unmasked NaN in both regimes."""
+    hros, bros = _percentile_edge(np.nan, cfb_value)
     for out in (hros, bros):
         assert out[0] is not np.ma.masked
         assert np.isnan(float(out[0]))

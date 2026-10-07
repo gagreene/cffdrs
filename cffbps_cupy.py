@@ -1217,7 +1217,7 @@ class FBP:
 
         Project choices, not from the paper: the cfb < 0.1 regime rule (the
         paper assumes the fire type is known), the negative-radicand zero guard,
-        and the C-1..C-7 fuel scope with its C-1 crown-only and C-5
+        the percentile cap to 0.001-99.999, and the C-1..C-7 fuel scope with its C-1 crown-only and C-5
         surface-only coverage.
 
         hfros and bros each use their own direction-specific pre-percentile CFB
@@ -1259,7 +1259,10 @@ class FBP:
 
         if self.percentile_growth is not None and self.percentile_growth != 50:
             # Calculate the inverse t-distribution for the given percentile growth
-            tinv_value = _tinv(probability=self.percentile_growth / 100, freedom=9999999)
+            # Project choice (not from the paper): cap tails to (0.001, 99.999) so the 0th/100th
+            # percentile give finite ROS; NaN is not capped. Mirrors growth.py.
+            capped_percentile = float(np.clip(self.percentile_growth, 0.001, 99.999))
+            tinv_value = _tinv(probability=capped_percentile / 100, freedom=9999999)
 
             # Han & Braun (2014), Section 3: pooled conifer noise standard deviations
             # (surface: log scale; crown: Box-Cox delta=0.6 scale). Single values,
