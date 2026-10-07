@@ -127,7 +127,7 @@ class FBP:
         self.dj = cp.array([0], dtype=self.cupy_float_type)  # For FMC calculations
         self.out_request = cp.array([0], dtype=self.cupy_float_type)
         self.convert_fuel_type_codes = cp.array([0], dtype=self.cupy_float_type)
-        self.percentile_growth = 50,
+        self.percentile_growth = 50
         self.return_array_as = cp.array([0], dtype=self.cupy_float_type)
 
         # Internal tracking
