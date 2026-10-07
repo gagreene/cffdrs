@@ -88,7 +88,11 @@ scalar path — scalars are coerced upstream):
 Multi-value returns use `NamedTuple`s (`FMCResult`, `SlopeWindISI`, `ISIRSIBEResult`)
 whose field names double as the facade attribute contract.
 
-**`growth.calc_ros_percentile_growth`'s statistical basis.** Adjusts `hros`/`bros`
+**`growth.calc_ros_percentile_growth`'s statistical basis.** `percentile_growth` is a percentile of the ROS
+distribution (model error only), not a percent change: at percentile p, about (100 - p)% of fires spread at
+least that fast, so 75 gives ROS reached or exceeded in about 25% of fires and 25 gives ROS reached or exceeded
+in about 75%. 50 is the unadjusted ROS. CFB, fire type, CFC, TFC and HFI are then recomputed from the adjusted
+ROS; that chaining is a project extension, not part of the paper. Adjusts `hros`/`bros`
 for a requested `percentile_growth` (0-100, no-op at 50 or `None`; values outside (0.001, 99.999) are capped to those bounds, NaN propagates) using the
 variance-stabilized ROS quantile model of Han, L. & Braun, W.J. (2014), "Dionysus:
 a stochastic fire growth scenario generator", *Environmetrics* 25(6):431-442. For

@@ -380,7 +380,12 @@ class FBP:
 
         :param convert_fuel_type_codes: Convert from CFS cffdrs R fuel type grid codes
             to the grid codes used in this module
-        :param percentile_growth: The ROS percentile growth (0-100) for the fire growth model
+        :param percentile_growth: ROS percentile (0-100) for the fire growth model. 50 (default) gives the
+            unadjusted FBP ROS. Values above 50 give faster-than-typical ROS and values below 50 give slower. At
+            percentile p, about (100 - p)% of fires spread at least that fast. For example, 75 yields ROS values
+            reached or exceeded in about 25% of fires, and 25 yields ROS values reached or exceeded in about 75% of
+            fires. It is a quantile, not a percent change: the multiplier depends on the fuel type and ROS (e.g. 95
+            scales surface-fire ROS by about 4.6x). Values outside (0.001, 99.999) are capped to those bounds.
         """
         # Initialize CFFBPS input parameters
         self.fuel_type = fuel_type
@@ -707,6 +712,10 @@ class FBP:
     def calcRosPercentileGrowth(self) -> None:
         """
         Calculates the rate of spread (ROS) percentile growth for head fire and backing fire rates of spread.
+
+        Meaning: the value is a percentile of the ROS distribution (model error only; see Han & Braun 2014).
+        At percentile p, about (100 - p)% of fires spread at least that fast, so 75 gives ROS reached or exceeded
+        in about 25% of fires and 25 gives ROS reached or exceeded in about 75% of fires. 50 is the unadjusted ROS.
 
         :return: None
         """

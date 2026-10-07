@@ -65,6 +65,10 @@ def calc_ros_percentile_growth(*,
                                bros: MaskedArray) -> tuple[MaskedArray, MaskedArray]:
     """Adjust head/backing ROS by a growth-percentile factor.
 
+    Meaning: the value is a percentile of the ROS distribution (model error only; see Han & Braun 2014).
+    At percentile p, about (100 - p)% of fires spread at least that fast, so 75 gives ROS reached or exceeded
+    in about 25% of fires and 25 gives ROS reached or exceeded in about 75% of fires. 50 is the unadjusted ROS.
+
     Implements the variance-stabilized ROS quantile model of Han, L. & Braun,
     W.J. (2014), "Dionysus: a stochastic fire growth scenario generator",
     Environmetrics 25(6):431-442. Below the crowning threshold (cfb < 0.1), ROS
