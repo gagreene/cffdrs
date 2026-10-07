@@ -38,8 +38,9 @@ pub struct FbpInput {
     pub gfl: f64,
     /// Grass curing factor, percent (O-1a/b).
     pub gcf: f64,
-    /// Percentile growth (50 = median behaviour; the only value the golden
-    /// snapshot exercises — non-50 support is differential-tested).
+    /// Percentile growth: a percentile (0-100) of the ROS distribution, not a
+    /// percent change; 50 is the exact no-op. Values outside (0.001, 99.999)
+    /// are capped; NaN propagates. See `percentile` for the model.
     pub percentile_growth: f64,
     /// Optional caller-supplied Julian date of minimum foliar moisture
     /// (`initialize(d0=...)`); derived from latitude/elevation when None.
@@ -56,8 +57,7 @@ pub struct FbpInput {
     pub fmc_override: Option<f64>,
     /// Injected head ROS (`setParams({'hros': ...})` after calcROS): replaces
     /// hros before calcCSFI onward; bros and sros keep their computed values,
-    /// so C-6 cfb (which reads sros) is unaffected and the C-6 blend can
-    /// overwrite the injected value.
+    /// so the C-6 blend (which reads sros) can overwrite the injected value.
     pub hros_override: Option<f64>,
 }
 
@@ -591,8 +591,8 @@ pub fn run(input: &FbpInput) -> FbpResult {
         }
     }
     // setParams({'hros': ...}) injection point: replaces hros after calcROS,
-    // before calcCSFI onward. bros/sros keep their computed values (C-6 cfb
-    // reads sros, and the C-6 blend below may overwrite the injected hros).
+    // before calcCSFI onward. bros/sros keep their computed values (the C-6
+    // blend reads sros and may overwrite the injected hros).
     if let Some(v) = input.hros_override {
         hros = v;
     }
@@ -649,28 +649,50 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let csfi = if ft < 14 { (0.01 * cbh * (460.0 + 25.9 * fmc.fmc)).powf(1.5) } else { 0.0 };
     let rso = if sfc > 0.0 { csfi / (300.0 * sfc) } else { 0.0 };
 
-    // --- calc_cfb
-    let mut cfb = 0.0;
-    if ft == 6 {
-        let delta = sros - rso;
-        cfb = if delta < -3086.0 { 0.0 } else { 1.0 - (-0.23 * delta).exp() };
-    } else if is_modeled(ft) && !is_non_crowning(ft) {
-        let delta = hros - rso;
-        cfb = if delta < -3086.0 { 0.0 } else { 1.0 - (-0.23 * delta).exp() };
-    }
-    if !cfb.is_finite() && !cfb.is_nan() {
-        // infinities zero out; NaN is a masked cell in Python and must
-        // stay NaN (grid-truth: cfb/accel are NaN at NaN-input cells)
-        cfb = 0.0;
-    }
-    cfb = cfb.clamp(0.0, 1.0);
+    // --- crown fraction burned. The equation is the same for every crowning
+    // fuel (including C-6); only the ROS it is applied to differs per step.
+    let cfb_from_ros = |ros: f64| -> f64 {
+        let delta = ros - rso;
+        let mut cfb = if delta < -3086.0 { 0.0 } else { 1.0 - (-0.23 * delta).exp() };
+        if !cfb.is_finite() && !cfb.is_nan() {
+            // infinities zero out; NaN is a masked cell in Python and must
+            // stay NaN (grid-truth: cfb/accel are NaN at NaN-input cells)
+            cfb = 0.0;
+        }
+        cfb.clamp(0.0, 1.0)
+    };
+    let crowning = is_modeled(ft) && !is_non_crowning(ft);
+    let directional_cfb = |ros: f64| -> f64 { if crowning { cfb_from_ros(ros) } else { 0.0 } };
 
-    // --- calc_ros_percentile_growth: no-op at 50/None, matching the golden
-    // scenarios. Non-50 percentiles are exercised by the differential tests.
-    debug_assert!(
-        input.percentile_growth == 50.0,
-        "percentile_growth != 50 not yet ported"
-    );
+    // --- deterministic C-6 blend: SROS-derived CFB -> CFC -> CROS -> blended
+    // HROS. This CFB is temporary; it is not the CFB used downstream.
+    let mut cros = 0.0;
+    if ft == 6 {
+        let blend_cfb = cfb_from_ros(sros);
+        let blend_cfc = blend_cfb * cfl;
+        cros = if blend_cfc == 0.0 {
+            0.0
+        } else {
+            60.0 * (1.0 - (-0.0497 * isi).exp()) * (fmc.fme / 0.778237)
+        };
+        hros = sros + blend_cfb * (cros - sros);
+    }
+
+    // --- directional CFB used only to pick the percentile-growth regime
+    let percentile_cfb = directional_cfb(hros);
+    let percentile_bros_cfb = directional_cfb(bros);
+
+    // --- calc_ros_percentile_growth: 50 is an exact no-op; NaN propagates
+    if input.percentile_growth != 50.0 {
+        let tinv = crate::percentile::percentile_tinv(input.percentile_growth);
+        hros = crate::percentile::percentile_ros(ft, hros, percentile_cfb, tinv, 1.0);
+        bros = crate::percentile::percentile_ros(
+            ft, bros, percentile_bros_cfb, tinv, crate::percentile::wind_decay(sw.wsv),
+        );
+    }
+
+    // --- final CFB from the percentile-adjusted head ROS
+    let cfb = directional_cfb(hros);
 
     // --- calc_accel_param
     let accel = if is_open_fuel(ft) {
@@ -702,17 +724,6 @@ pub fn run(input: &FbpInput) -> FbpResult {
         12 | 13 => cfb * cfl * pdf / 100.0,
         _ => cfb * cfl,
     };
-
-    // --- calc_c6hros
-    let mut cros = 0.0;
-    if ft == 6 {
-        cros = if cfc == 0.0 {
-            0.0
-        } else {
-            60.0 * (1.0 - (-0.0497 * isi).exp()) * (fmc.fme / 0.778237)
-        };
-        hros = sros + cfb * (cros - sros);
-    }
 
     // ffc/wfc stay NaN where the Python package masks them (fuels without
     // a fine/woody split): the GRID path surfaces masked cells as NaN.

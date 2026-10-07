@@ -4,17 +4,19 @@
 //!
 //!   initialize -> invertWindAspect -> calcSF -> calcISZ -> setParams(fmc)
 //!   -> calcISI_RSI_BE -> calcSFC -> getCBH_CFL -> calcROS -> setParams(hros)
-//!   -> calcCSFI -> calcRSO -> calcCFB -> calcRosPercentileGrowth
-//!   -> calcFireType -> calcCFC -> calcC6hros -> calcTFC -> calcHFI
-//!   -> calcFireIntensityClass
+//!   -> calcCSFI -> calcRSO -> calcC6BlendCFB -> calcC6BlendCFC -> calcC6CROS
+//!   -> calcC6HROS -> calcPercentileCFB -> calcRosPercentileGrowth -> calcCFB
+//!   -> calcFireType -> calcCFC -> calcTFC -> calcHFI -> calcFireIntensityClass
 //!
 //! Notable spec behaviours these goldens pin (captured verbatim from the
 //! Python package running that exact sequence):
 //! - calcFMC never runs, so fme keeps its zero template value — C-6 crown
 //!   ROS is therefore 0 and the C-6 blend collapses to sros * (1 - cfb),
 //!   OVERWRITING the injected hros (case 3).
-//! - C-6 cfb comes from sros (not the injected hros); other crowning fuels
-//!   use the injected hros.
+//! - C-6 blends from an SROS-derived temporary cfb, then the FINAL cfb is
+//!   recomputed from the blended hros (case 2: hros 1.378 is far below rso, so
+//!   cfb is 0 and the cell is a surface fire); other crowning fuels use the
+//!   injected hros.
 //! - hfi = 0 yields fi_class -99 (case 5).
 
 use cffdrs_core::fbp::{run, FbpInput};
@@ -54,9 +56,9 @@ const CASES: [Case; 5] = [
         fuel_type: 6, ws: 25.0, wd: 90.0, ffmc: 92.5, bui: 85.0,
         fmc_override: 105.0, hros_override: 10.0,
         expected: [
-            3320.360999080089, 5.030716309746868, 0.9114986320304777, 3.0,
-            1.6406975376548598, 1.3782364289505988, 3.8407560015936735,
-            1588.0409508321136, 3.0, 2.2000584639388134, 105.0,
+            3320.360999080089, 5.030716309746868, 0.0, 1.0,
+            0.0, 1.3782364289505988, 2.2000584639388134,
+            909.660216246471, 3.0, 2.2000584639388134, 105.0,
         ],
     },
     Case {
