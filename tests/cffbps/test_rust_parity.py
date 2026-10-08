@@ -60,16 +60,17 @@ def grids():
 SCALARS = dict(wx_date=20230615, ffmc=91.2, bui=76.4, pdf=42.0, gfl=0.41)
 
 
-def python_reference(g, percentile=50, wx_date=None):
+def python_reference(g, percentile=50, wx_date=None, scalars=None):
+    sc = SCALARS if scalars is None else scalars
     fbp = FBP()
     fbp.initialize(
         fuel_type=g['fuel_type'].astype(np.float64),
-        wx_date=SCALARS['wx_date'] if wx_date is None else wx_date,
+        wx_date=sc['wx_date'] if wx_date is None else wx_date,
         lat=g['lat'], long=g['long'], elevation=g['elevation'],
         slope=g['slope'], aspect=g['aspect'],
         ws=g['ws'], wd=g['wd'],
-        ffmc=SCALARS['ffmc'], bui=SCALARS['bui'],
-        pc=g['pc'], pdf=SCALARS['pdf'], gfl=SCALARS['gfl'], gcf=g['gcf'],
+        ffmc=sc['ffmc'], bui=sc['bui'],
+        pc=g['pc'], pdf=sc['pdf'], gfl=sc['gfl'], gcf=g['gcf'],
         out_request=FIELDS,
         percentile_growth=percentile,
     )
@@ -81,22 +82,24 @@ def python_reference(g, percentile=50, wx_date=None):
     return out
 
 
-def rust_grid(g, percentile=50.0, wx_date=None):
+def rust_grid(g, percentile=50.0, wx_date=None, scalars=None):
+    sc = SCALARS if scalars is None else scalars
     res = rust_backend.run_fbp_grid(
         g['fuel_type'],
         g['lat'], g['long'], g['elevation'],
         g['slope'], g['aspect'],
         g['pc'], g['gcf'],
         g['ws'], g['wd'],
-        SCALARS['wx_date'] if wx_date is None else wx_date, SCALARS['ffmc'], SCALARS['bui'],
-        SCALARS['pdf'], SCALARS['gfl'], percentile,
+        sc['wx_date'] if wx_date is None else wx_date, sc['ffmc'], sc['bui'],
+        sc['pdf'], sc['gfl'], percentile,
     )
     return {name: np.asarray(res[name]) for name in FIELDS}
 
 
-def assert_grid_parity(grids, percentile, wx_date=None):
-    py = python_reference(grids, percentile, wx_date)
-    rs = rust_grid(grids, float(percentile), wx_date)
+def assert_grid_parity(grids, percentile, wx_date=None, scalars=None):
+    """Every field agrees on every modeled cell. ``scalars`` overrides ``SCALARS`` for one call."""
+    py = python_reference(grids, percentile, wx_date, scalars)
+    rs = rust_grid(grids, float(percentile), wx_date, scalars)
     modeled = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18)
     for name in FIELDS:
         a, b = py[name], rs[name]
@@ -147,6 +150,26 @@ def test_nan_geography_matches_python(grids):
     g['long'][6, 0:6] = np.nan
     g['elevation'][7, 0:6] = np.nan
     assert_grid_parity(g, 50)
+
+
+# Missing inputs: a NaN must give NaN (or Python's scalar default) identically in both
+# implementations, on every field, with no exceptions.
+@pytest.mark.parametrize('percentile', [50, 90])
+@pytest.mark.parametrize('name', ['bui', 'ffmc', 'gfl', 'pdf'])
+def test_nan_scalar_matches_python(grids, name, percentile):
+    """A NaN scalar bui/ffmc propagates as NaN; a NaN scalar gfl/pdf takes Python's default."""
+    assert_grid_parity(grids, percentile, scalars={**SCALARS, name: float('nan')})
+
+
+@pytest.mark.parametrize('percentile', [5, 50, 90, 0, 100])
+def test_nan_geography_matches_python_at_percentiles(grids, percentile):
+    """A missing latitude, longitude or elevation masks the percentile regime CFB, so the adjusted
+    ROS (and everything derived from it) is NaN in both implementations, for every fuel."""
+    g = _copy(grids)
+    g['lat'][5, 0:6] = np.nan
+    g['long'][6, 0:6] = np.nan
+    g['elevation'][7, 0:6] = np.nan
+    assert_grid_parity(g, percentile)
 
 
 @pytest.mark.parametrize('order', ['fortran', 'strided'])
