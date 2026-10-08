@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["crates/cffdrs-core", "crates/cffdrs-py"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+rust-version = "1.78"
+repository = "https://github.com/gagreene/cffdrs"
+
+[workspace.lints.rust]
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# The allows below exist because the code deliberately mirrors the Python equations.
+# Exact `== 0.0` / `!= 50.0` comparisons reproduce Python's `where(x == 0, ...)`.
+float_cmp = "allow"
+# FBP symbols are published names (wse1/wse2, rsi/bsi, a/b/c/q); renaming would break the Python correspondence.
+similar_names = "allow"

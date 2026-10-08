@@ -89,8 +89,8 @@ def calc_cfb(*,
     calculated separately by :func:`calc_c6_blend_cfb`.
     """
     # np.isin drops the mask, so reapply the fuel mask: masked fuel cells must stay masked.
-    crowning = mask.masked_array(np.isin(fuel_type, ftypes) & ~np.isin(fuel_type, non_crowning_fuels),
-                                 mask=mask.getmaskarray(fuel_type))
+    crowning = MaskedArray(np.isin(fuel_type, ftypes) & ~np.isin(fuel_type, non_crowning_fuels),
+                           mask=mask.getmaskarray(fuel_type))
     cfb = mask.where(crowning, _calc_cfb_from_ros(ros=ros, rso=rso), 0)
     return _sanitize_cfb(cfb)
 

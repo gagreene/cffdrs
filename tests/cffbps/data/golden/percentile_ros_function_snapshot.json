@@ -1,0 +1,6830 @@
+{
+  "rows": [
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 1,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 1,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 1,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6915684128455086,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 23.208642271305163,
+      "fuel_type": 1,
+      "hros": 3.6217608740945826,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.204225203203291,
+      "fuel_type": 1,
+      "hros": 0.4969197286291064,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 33.095623306764594,
+      "fuel_type": 1,
+      "hros": 22.369490804059502,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.866301470519545,
+      "fuel_type": 1,
+      "hros": 1.4544398673795134,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 34.57545816985419,
+      "fuel_type": 1,
+      "hros": 25.90978444655406,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.10369672440701766,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.057264494683872,
+      "fuel_type": 1,
+      "hros": 3.8513932676536826,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 37.1056164453438,
+      "fuel_type": 1,
+      "hros": 32.28023066110223,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.4088024243547603,
+      "fuel_type": 1,
+      "hros": 0.2682256308520349,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.221915719657651,
+      "fuel_type": 1,
+      "hros": 6.748240889841016,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 39.454179354371604,
+      "fuel_type": 1,
+      "hros": 38.51185012571982,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.1068224267949849,
+      "fuel_type": 1,
+      "hros": 2.575060015151835,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.063423208212528,
+      "fuel_type": 1,
+      "hros": 12.05765844029696,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 42.98069350816467,
+      "fuel_type": 1,
+      "hros": 48.36784966826214,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.8056276584205895,
+      "fuel_type": 1,
+      "hros": 5.422917028856339,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 10.570015596243818,
+      "fuel_type": 1,
+      "hros": 16.86709546962653,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 45.73618963512189,
+      "fuel_type": 1,
+      "hros": 56.43321573541549,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.286799967968247,
+      "fuel_type": 1,
+      "hros": 7.509113124165601,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.515468350160575,
+      "fuel_type": 1,
+      "hros": 20.046353185585623,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 47.41785223241091,
+      "fuel_type": 1,
+      "hros": 61.49526206566779,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.97859890235661,
+      "fuel_type": 1,
+      "hros": 29.645128035612323,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 19.255492024833163,
+      "fuel_type": 1,
+      "hros": 49.009134002319364,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 60.25209049165586,
+      "fuel_type": 1,
+      "hros": 102.94899261889614,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6915684128455086,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 23.208642271305163,
+      "fuel_type": 1,
+      "hros": 3.6217608740945826,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.204225203203291,
+      "fuel_type": 1,
+      "hros": 0.4969197286291064,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 33.095623306764594,
+      "fuel_type": 1,
+      "hros": 22.369490804059502,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.866301470519545,
+      "fuel_type": 1,
+      "hros": 1.4544398673795134,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 34.57545816985419,
+      "fuel_type": 1,
+      "hros": 25.90978444655406,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.10369672440701766,
+      "fuel_type": 1,
+      "hros": 0.0,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.057264494683872,
+      "fuel_type": 1,
+      "hros": 3.8513932676536826,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 37.1056164453438,
+      "fuel_type": 1,
+      "hros": 32.28023066110223,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.4088024243547603,
+      "fuel_type": 1,
+      "hros": 0.2682256308520349,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.221915719657651,
+      "fuel_type": 1,
+      "hros": 6.748240889841016,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 39.454179354371604,
+      "fuel_type": 1,
+      "hros": 38.51185012571982,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.1068224267949849,
+      "fuel_type": 1,
+      "hros": 2.575060015151835,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.063423208212528,
+      "fuel_type": 1,
+      "hros": 12.05765844029696,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 42.98069350816467,
+      "fuel_type": 1,
+      "hros": 48.36784966826214,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.8056276584205895,
+      "fuel_type": 1,
+      "hros": 5.422917028856339,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 10.570015596243818,
+      "fuel_type": 1,
+      "hros": 16.86709546962653,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 45.73618963512189,
+      "fuel_type": 1,
+      "hros": 56.43321573541549,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.286799967968247,
+      "fuel_type": 1,
+      "hros": 7.509113124165601,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.515468350160575,
+      "fuel_type": 1,
+      "hros": 20.046353185585623,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 47.41785223241091,
+      "fuel_type": 1,
+      "hros": 61.49526206566779,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.97859890235661,
+      "fuel_type": 1,
+      "hros": 29.645128035612323,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 19.255492024833163,
+      "fuel_type": 1,
+      "hros": 49.009134002319364,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 60.25209049165586,
+      "fuel_type": 1,
+      "hros": 102.94899261889614,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.11883117570586822,
+      "fuel_type": 2,
+      "hros": 0.00975823952059475,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.7824676355880233,
+      "fuel_type": 2,
+      "hros": 0.14637359280892126,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.506494056469458,
+      "fuel_type": 2,
+      "hros": 0.78065916164758,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.2872730004024359,
+      "fuel_type": 2,
+      "hros": 0.10955295723925111,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.3090950060365385,
+      "fuel_type": 2,
+      "hros": 1.6432943585887667,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 22.981840032194874,
+      "fuel_type": 2,
+      "hros": 8.76423657914009,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.32467826732200183,
+      "fuel_type": 2,
+      "hros": 0.1531987235395853,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.870174009830028,
+      "fuel_type": 2,
+      "hros": 2.2979808530937795,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 25.974261385760148,
+      "fuel_type": 2,
+      "hros": 12.255897883166824,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.39836262273204365,
+      "fuel_type": 2,
+      "hros": 0.26828612359180615,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 5.975439340980655,
+      "fuel_type": 2,
+      "hros": 4.024291853877092,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.86900981856349,
+      "fuel_type": 2,
+      "hros": 21.46288988734449,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.479273284279063,
+      "fuel_type": 2,
+      "hros": 0.44524410054771835,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.189099264185945,
+      "fuel_type": 2,
+      "hros": 6.678661508215775,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 38.34186274232504,
+      "fuel_type": 2,
+      "hros": 35.61952804381747,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6275689176997941,
+      "fuel_type": 2,
+      "hros": 0.9318409638672619,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.413533765496911,
+      "fuel_type": 2,
+      "hros": 13.977614458008928,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 50.205513415983525,
+      "fuel_type": 2,
+      "hros": 74.54727710938096,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.769993021282391,
+      "fuel_type": 2,
+      "hros": 1.631867382598668,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.549895319235866,
+      "fuel_type": 2,
+      "hros": 24.47801073898002,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 61.59944170259128,
+      "fuel_type": 2,
+      "hros": 130.54939060789343,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.8702523371489111,
+      "fuel_type": 2,
+      "hros": 2.282001383623342,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 13.053785057233668,
+      "fuel_type": 2,
+      "hros": 34.230020754350136,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 69.62018697191289,
+      "fuel_type": 2,
+      "hros": 182.56011068986737,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.103825014899108,
+      "fuel_type": 2,
+      "hros": 25.61937524407325,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.557375223486616,
+      "fuel_type": 2,
+      "hros": 384.29062866109876,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 168.30600119192863,
+      "fuel_type": 2,
+      "hros": 2049.55001952586,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.11883117570586822,
+      "fuel_type": 2,
+      "hros": 0.00975823952059475,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.7824676355880233,
+      "fuel_type": 2,
+      "hros": 0.14637359280892126,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.506494056469458,
+      "fuel_type": 2,
+      "hros": 0.78065916164758,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.2872730004024359,
+      "fuel_type": 2,
+      "hros": 0.10955295723925111,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.3090950060365385,
+      "fuel_type": 2,
+      "hros": 1.6432943585887667,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 22.981840032194874,
+      "fuel_type": 2,
+      "hros": 8.76423657914009,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.32467826732200183,
+      "fuel_type": 2,
+      "hros": 0.1531987235395853,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.870174009830028,
+      "fuel_type": 2,
+      "hros": 2.2979808530937795,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 25.974261385760148,
+      "fuel_type": 2,
+      "hros": 12.255897883166824,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.39836262273204365,
+      "fuel_type": 2,
+      "hros": 0.26828612359180615,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 5.975439340980655,
+      "fuel_type": 2,
+      "hros": 4.024291853877092,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.86900981856349,
+      "fuel_type": 2,
+      "hros": 21.46288988734449,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.479273284279063,
+      "fuel_type": 2,
+      "hros": 0.44524410054771835,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.189099264185945,
+      "fuel_type": 2,
+      "hros": 6.678661508215775,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 38.34186274232504,
+      "fuel_type": 2,
+      "hros": 35.61952804381747,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6275689176997941,
+      "fuel_type": 2,
+      "hros": 0.9318409638672619,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.413533765496911,
+      "fuel_type": 2,
+      "hros": 13.977614458008928,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 50.205513415983525,
+      "fuel_type": 2,
+      "hros": 74.54727710938096,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.769993021282391,
+      "fuel_type": 2,
+      "hros": 1.631867382598668,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.549895319235866,
+      "fuel_type": 2,
+      "hros": 24.47801073898002,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 61.59944170259128,
+      "fuel_type": 2,
+      "hros": 130.54939060789343,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.8702523371489111,
+      "fuel_type": 2,
+      "hros": 2.282001383623342,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 13.053785057233668,
+      "fuel_type": 2,
+      "hros": 34.230020754350136,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 69.62018697191289,
+      "fuel_type": 2,
+      "hros": 182.56011068986737,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.103825014899108,
+      "fuel_type": 2,
+      "hros": 25.61937524407325,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.557375223486616,
+      "fuel_type": 2,
+      "hros": 384.29062866109876,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 168.30600119192863,
+      "fuel_type": 2,
+      "hros": 2049.55001952586,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6915684128455086,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 23.208642271305163,
+      "fuel_type": 2,
+      "hros": 3.6217608740945826,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.204225203203291,
+      "fuel_type": 2,
+      "hros": 0.4969197286291064,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 33.095623306764594,
+      "fuel_type": 2,
+      "hros": 22.369490804059502,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.866301470519545,
+      "fuel_type": 2,
+      "hros": 1.4544398673795134,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 34.57545816985419,
+      "fuel_type": 2,
+      "hros": 25.90978444655406,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.10369672440701766,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.057264494683872,
+      "fuel_type": 2,
+      "hros": 3.8513932676536826,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 37.1056164453438,
+      "fuel_type": 2,
+      "hros": 32.28023066110223,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.4088024243547603,
+      "fuel_type": 2,
+      "hros": 0.2682256308520349,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.221915719657651,
+      "fuel_type": 2,
+      "hros": 6.748240889841016,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 39.454179354371604,
+      "fuel_type": 2,
+      "hros": 38.51185012571982,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.1068224267949849,
+      "fuel_type": 2,
+      "hros": 2.575060015151835,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.063423208212528,
+      "fuel_type": 2,
+      "hros": 12.05765844029696,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 42.98069350816467,
+      "fuel_type": 2,
+      "hros": 48.36784966826214,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.8056276584205895,
+      "fuel_type": 2,
+      "hros": 5.422917028856339,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 10.570015596243818,
+      "fuel_type": 2,
+      "hros": 16.86709546962653,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 45.73618963512189,
+      "fuel_type": 2,
+      "hros": 56.43321573541549,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.286799967968247,
+      "fuel_type": 2,
+      "hros": 7.509113124165601,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.515468350160575,
+      "fuel_type": 2,
+      "hros": 20.046353185585623,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 47.41785223241091,
+      "fuel_type": 2,
+      "hros": 61.49526206566779,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.97859890235661,
+      "fuel_type": 2,
+      "hros": 29.645128035612323,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 19.255492024833163,
+      "fuel_type": 2,
+      "hros": 49.009134002319364,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 60.25209049165586,
+      "fuel_type": 2,
+      "hros": 102.94899261889614,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6915684128455086,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 23.208642271305163,
+      "fuel_type": 2,
+      "hros": 3.6217608740945826,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.204225203203291,
+      "fuel_type": 2,
+      "hros": 0.4969197286291064,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 33.095623306764594,
+      "fuel_type": 2,
+      "hros": 22.369490804059502,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.866301470519545,
+      "fuel_type": 2,
+      "hros": 1.4544398673795134,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 34.57545816985419,
+      "fuel_type": 2,
+      "hros": 25.90978444655406,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.10369672440701766,
+      "fuel_type": 2,
+      "hros": 0.0,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.057264494683872,
+      "fuel_type": 2,
+      "hros": 3.8513932676536826,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 37.1056164453438,
+      "fuel_type": 2,
+      "hros": 32.28023066110223,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.4088024243547603,
+      "fuel_type": 2,
+      "hros": 0.2682256308520349,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.221915719657651,
+      "fuel_type": 2,
+      "hros": 6.748240889841016,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 39.454179354371604,
+      "fuel_type": 2,
+      "hros": 38.51185012571982,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.1068224267949849,
+      "fuel_type": 2,
+      "hros": 2.575060015151835,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.063423208212528,
+      "fuel_type": 2,
+      "hros": 12.05765844029696,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 42.98069350816467,
+      "fuel_type": 2,
+      "hros": 48.36784966826214,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.8056276584205895,
+      "fuel_type": 2,
+      "hros": 5.422917028856339,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 10.570015596243818,
+      "fuel_type": 2,
+      "hros": 16.86709546962653,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 45.73618963512189,
+      "fuel_type": 2,
+      "hros": 56.43321573541549,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.286799967968247,
+      "fuel_type": 2,
+      "hros": 7.509113124165601,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.515468350160575,
+      "fuel_type": 2,
+      "hros": 20.046353185585623,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 47.41785223241091,
+      "fuel_type": 2,
+      "hros": 61.49526206566779,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.97859890235661,
+      "fuel_type": 2,
+      "hros": 29.645128035612323,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 19.255492024833163,
+      "fuel_type": 2,
+      "hros": 49.009134002319364,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 60.25209049165586,
+      "fuel_type": 2,
+      "hros": 102.94899261889614,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.11883117570586822,
+      "fuel_type": 5,
+      "hros": 0.00975823952059475,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.7824676355880233,
+      "fuel_type": 5,
+      "hros": 0.14637359280892126,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.506494056469458,
+      "fuel_type": 5,
+      "hros": 0.78065916164758,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.2872730004024359,
+      "fuel_type": 5,
+      "hros": 0.10955295723925111,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.3090950060365385,
+      "fuel_type": 5,
+      "hros": 1.6432943585887667,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 22.981840032194874,
+      "fuel_type": 5,
+      "hros": 8.76423657914009,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.32467826732200183,
+      "fuel_type": 5,
+      "hros": 0.1531987235395853,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.870174009830028,
+      "fuel_type": 5,
+      "hros": 2.2979808530937795,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 25.974261385760148,
+      "fuel_type": 5,
+      "hros": 12.255897883166824,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.39836262273204365,
+      "fuel_type": 5,
+      "hros": 0.26828612359180615,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 5.975439340980655,
+      "fuel_type": 5,
+      "hros": 4.024291853877092,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.86900981856349,
+      "fuel_type": 5,
+      "hros": 21.46288988734449,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.479273284279063,
+      "fuel_type": 5,
+      "hros": 0.44524410054771835,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.189099264185945,
+      "fuel_type": 5,
+      "hros": 6.678661508215775,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 38.34186274232504,
+      "fuel_type": 5,
+      "hros": 35.61952804381747,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6275689176997941,
+      "fuel_type": 5,
+      "hros": 0.9318409638672619,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.413533765496911,
+      "fuel_type": 5,
+      "hros": 13.977614458008928,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 50.205513415983525,
+      "fuel_type": 5,
+      "hros": 74.54727710938096,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.769993021282391,
+      "fuel_type": 5,
+      "hros": 1.631867382598668,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.549895319235866,
+      "fuel_type": 5,
+      "hros": 24.47801073898002,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 61.59944170259128,
+      "fuel_type": 5,
+      "hros": 130.54939060789343,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.8702523371489111,
+      "fuel_type": 5,
+      "hros": 2.282001383623342,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 13.053785057233668,
+      "fuel_type": 5,
+      "hros": 34.230020754350136,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 69.62018697191289,
+      "fuel_type": 5,
+      "hros": 182.56011068986737,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.103825014899108,
+      "fuel_type": 5,
+      "hros": 25.61937524407325,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.557375223486616,
+      "fuel_type": 5,
+      "hros": 384.29062866109876,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 168.30600119192863,
+      "fuel_type": 5,
+      "hros": 2049.55001952586,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.11883117570586822,
+      "fuel_type": 5,
+      "hros": 0.00975823952059475,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.7824676355880233,
+      "fuel_type": 5,
+      "hros": 0.14637359280892126,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.506494056469458,
+      "fuel_type": 5,
+      "hros": 0.78065916164758,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.2872730004024359,
+      "fuel_type": 5,
+      "hros": 0.10955295723925111,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.3090950060365385,
+      "fuel_type": 5,
+      "hros": 1.6432943585887667,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 22.981840032194874,
+      "fuel_type": 5,
+      "hros": 8.76423657914009,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.32467826732200183,
+      "fuel_type": 5,
+      "hros": 0.1531987235395853,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.870174009830028,
+      "fuel_type": 5,
+      "hros": 2.2979808530937795,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 25.974261385760148,
+      "fuel_type": 5,
+      "hros": 12.255897883166824,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.39836262273204365,
+      "fuel_type": 5,
+      "hros": 0.26828612359180615,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 5.975439340980655,
+      "fuel_type": 5,
+      "hros": 4.024291853877092,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.86900981856349,
+      "fuel_type": 5,
+      "hros": 21.46288988734449,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.479273284279063,
+      "fuel_type": 5,
+      "hros": 0.44524410054771835,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.189099264185945,
+      "fuel_type": 5,
+      "hros": 6.678661508215775,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 38.34186274232504,
+      "fuel_type": 5,
+      "hros": 35.61952804381747,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6275689176997941,
+      "fuel_type": 5,
+      "hros": 0.9318409638672619,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.413533765496911,
+      "fuel_type": 5,
+      "hros": 13.977614458008928,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 50.205513415983525,
+      "fuel_type": 5,
+      "hros": 74.54727710938096,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.769993021282391,
+      "fuel_type": 5,
+      "hros": 1.631867382598668,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.549895319235866,
+      "fuel_type": 5,
+      "hros": 24.47801073898002,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 61.59944170259128,
+      "fuel_type": 5,
+      "hros": 130.54939060789343,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.8702523371489111,
+      "fuel_type": 5,
+      "hros": 2.282001383623342,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 13.053785057233668,
+      "fuel_type": 5,
+      "hros": 34.230020754350136,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 69.62018697191289,
+      "fuel_type": 5,
+      "hros": 182.56011068986737,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.103825014899108,
+      "fuel_type": 5,
+      "hros": 25.61937524407325,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.557375223486616,
+      "fuel_type": 5,
+      "hros": 384.29062866109876,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 168.30600119192863,
+      "fuel_type": 5,
+      "hros": 2049.55001952586,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 5,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 5,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 5,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.11883117570586822,
+      "fuel_type": 6,
+      "hros": 0.00975823952059475,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.7824676355880233,
+      "fuel_type": 6,
+      "hros": 0.14637359280892126,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.506494056469458,
+      "fuel_type": 6,
+      "hros": 0.78065916164758,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.2872730004024359,
+      "fuel_type": 6,
+      "hros": 0.10955295723925111,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.3090950060365385,
+      "fuel_type": 6,
+      "hros": 1.6432943585887667,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 22.981840032194874,
+      "fuel_type": 6,
+      "hros": 8.76423657914009,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.32467826732200183,
+      "fuel_type": 6,
+      "hros": 0.1531987235395853,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.870174009830028,
+      "fuel_type": 6,
+      "hros": 2.2979808530937795,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 25.974261385760148,
+      "fuel_type": 6,
+      "hros": 12.255897883166824,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.39836262273204365,
+      "fuel_type": 6,
+      "hros": 0.26828612359180615,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 5.975439340980655,
+      "fuel_type": 6,
+      "hros": 4.024291853877092,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.86900981856349,
+      "fuel_type": 6,
+      "hros": 21.46288988734449,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.479273284279063,
+      "fuel_type": 6,
+      "hros": 0.44524410054771835,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.189099264185945,
+      "fuel_type": 6,
+      "hros": 6.678661508215775,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 38.34186274232504,
+      "fuel_type": 6,
+      "hros": 35.61952804381747,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6275689176997941,
+      "fuel_type": 6,
+      "hros": 0.9318409638672619,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.413533765496911,
+      "fuel_type": 6,
+      "hros": 13.977614458008928,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 50.205513415983525,
+      "fuel_type": 6,
+      "hros": 74.54727710938096,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.769993021282391,
+      "fuel_type": 6,
+      "hros": 1.631867382598668,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.549895319235866,
+      "fuel_type": 6,
+      "hros": 24.47801073898002,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 61.59944170259128,
+      "fuel_type": 6,
+      "hros": 130.54939060789343,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.8702523371489111,
+      "fuel_type": 6,
+      "hros": 2.282001383623342,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 13.053785057233668,
+      "fuel_type": 6,
+      "hros": 34.230020754350136,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 69.62018697191289,
+      "fuel_type": 6,
+      "hros": 182.56011068986737,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.103825014899108,
+      "fuel_type": 6,
+      "hros": 25.61937524407325,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.557375223486616,
+      "fuel_type": 6,
+      "hros": 384.29062866109876,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 168.30600119192863,
+      "fuel_type": 6,
+      "hros": 2049.55001952586,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.11883117570586822,
+      "fuel_type": 6,
+      "hros": 0.00975823952059475,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.7824676355880233,
+      "fuel_type": 6,
+      "hros": 0.14637359280892126,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.506494056469458,
+      "fuel_type": 6,
+      "hros": 0.78065916164758,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.2872730004024359,
+      "fuel_type": 6,
+      "hros": 0.10955295723925111,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.3090950060365385,
+      "fuel_type": 6,
+      "hros": 1.6432943585887667,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 22.981840032194874,
+      "fuel_type": 6,
+      "hros": 8.76423657914009,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.32467826732200183,
+      "fuel_type": 6,
+      "hros": 0.1531987235395853,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.870174009830028,
+      "fuel_type": 6,
+      "hros": 2.2979808530937795,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 25.974261385760148,
+      "fuel_type": 6,
+      "hros": 12.255897883166824,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.39836262273204365,
+      "fuel_type": 6,
+      "hros": 0.26828612359180615,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 5.975439340980655,
+      "fuel_type": 6,
+      "hros": 4.024291853877092,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.86900981856349,
+      "fuel_type": 6,
+      "hros": 21.46288988734449,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.479273284279063,
+      "fuel_type": 6,
+      "hros": 0.44524410054771835,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.189099264185945,
+      "fuel_type": 6,
+      "hros": 6.678661508215775,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 38.34186274232504,
+      "fuel_type": 6,
+      "hros": 35.61952804381747,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6275689176997941,
+      "fuel_type": 6,
+      "hros": 0.9318409638672619,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.413533765496911,
+      "fuel_type": 6,
+      "hros": 13.977614458008928,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 50.205513415983525,
+      "fuel_type": 6,
+      "hros": 74.54727710938096,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.769993021282391,
+      "fuel_type": 6,
+      "hros": 1.631867382598668,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.549895319235866,
+      "fuel_type": 6,
+      "hros": 24.47801073898002,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 61.59944170259128,
+      "fuel_type": 6,
+      "hros": 130.54939060789343,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.8702523371489111,
+      "fuel_type": 6,
+      "hros": 2.282001383623342,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 13.053785057233668,
+      "fuel_type": 6,
+      "hros": 34.230020754350136,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 69.62018697191289,
+      "fuel_type": 6,
+      "hros": 182.56011068986737,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.103825014899108,
+      "fuel_type": 6,
+      "hros": 25.61937524407325,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 31.557375223486616,
+      "fuel_type": 6,
+      "hros": 384.29062866109876,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 168.30600119192863,
+      "fuel_type": 6,
+      "hros": 2049.55001952586,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6915684128455086,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 23.208642271305163,
+      "fuel_type": 6,
+      "hros": 3.6217608740945826,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.204225203203291,
+      "fuel_type": 6,
+      "hros": 0.4969197286291064,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 33.095623306764594,
+      "fuel_type": 6,
+      "hros": 22.369490804059502,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.866301470519545,
+      "fuel_type": 6,
+      "hros": 1.4544398673795134,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 34.57545816985419,
+      "fuel_type": 6,
+      "hros": 25.90978444655406,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.10369672440701766,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.057264494683872,
+      "fuel_type": 6,
+      "hros": 3.8513932676536826,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 37.1056164453438,
+      "fuel_type": 6,
+      "hros": 32.28023066110223,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.4088024243547603,
+      "fuel_type": 6,
+      "hros": 0.2682256308520349,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.221915719657651,
+      "fuel_type": 6,
+      "hros": 6.748240889841016,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 39.454179354371604,
+      "fuel_type": 6,
+      "hros": 38.51185012571982,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.1068224267949849,
+      "fuel_type": 6,
+      "hros": 2.575060015151835,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.063423208212528,
+      "fuel_type": 6,
+      "hros": 12.05765844029696,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 42.98069350816467,
+      "fuel_type": 6,
+      "hros": 48.36784966826214,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.8056276584205895,
+      "fuel_type": 6,
+      "hros": 5.422917028856339,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 10.570015596243818,
+      "fuel_type": 6,
+      "hros": 16.86709546962653,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 45.73618963512189,
+      "fuel_type": 6,
+      "hros": 56.43321573541549,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.286799967968247,
+      "fuel_type": 6,
+      "hros": 7.509113124165601,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.515468350160575,
+      "fuel_type": 6,
+      "hros": 20.046353185585623,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 47.41785223241091,
+      "fuel_type": 6,
+      "hros": 61.49526206566779,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.97859890235661,
+      "fuel_type": 6,
+      "hros": 29.645128035612323,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 19.255492024833163,
+      "fuel_type": 6,
+      "hros": 49.009134002319364,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 60.25209049165586,
+      "fuel_type": 6,
+      "hros": 102.94899261889614,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.6915684128455086,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 23.208642271305163,
+      "fuel_type": 6,
+      "hros": 3.6217608740945826,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.204225203203291,
+      "fuel_type": 6,
+      "hros": 0.4969197286291064,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 33.095623306764594,
+      "fuel_type": 6,
+      "hros": 22.369490804059502,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.0,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 4.866301470519545,
+      "fuel_type": 6,
+      "hros": 1.4544398673795134,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 34.57545816985419,
+      "fuel_type": 6,
+      "hros": 25.90978444655406,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.10369672440701766,
+      "fuel_type": 6,
+      "hros": 0.0,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.057264494683872,
+      "fuel_type": 6,
+      "hros": 3.8513932676536826,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 37.1056164453438,
+      "fuel_type": 6,
+      "hros": 32.28023066110223,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.4088024243547603,
+      "fuel_type": 6,
+      "hros": 0.2682256308520349,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.221915719657651,
+      "fuel_type": 6,
+      "hros": 6.748240889841016,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 39.454179354371604,
+      "fuel_type": 6,
+      "hros": 38.51185012571982,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.1068224267949849,
+      "fuel_type": 6,
+      "hros": 2.575060015151835,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 9.063423208212528,
+      "fuel_type": 6,
+      "hros": 12.05765844029696,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 42.98069350816467,
+      "fuel_type": 6,
+      "hros": 48.36784966826214,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 1.8056276584205895,
+      "fuel_type": 6,
+      "hros": 5.422917028856339,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 10.570015596243818,
+      "fuel_type": 6,
+      "hros": 16.86709546962653,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 45.73618963512189,
+      "fuel_type": 6,
+      "hros": 56.43321573541549,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 2.286799967968247,
+      "fuel_type": 6,
+      "hros": 7.509113124165601,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 11.515468350160575,
+      "fuel_type": 6,
+      "hros": 20.046353185585623,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 47.41785223241091,
+      "fuel_type": 6,
+      "hros": 61.49526206566779,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 6.97859890235661,
+      "fuel_type": 6,
+      "hros": 29.645128035612323,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 19.255492024833163,
+      "fuel_type": 6,
+      "hros": 49.009134002319364,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 60.25209049165586,
+      "fuel_type": 6,
+      "hros": 102.94899261889614,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 8,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 8,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 8,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 12,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 12,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 12,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.0,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.09999,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.1,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 0,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 5,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 10,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 25,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 45,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 75,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 90,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 95,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    },
+    {
+      "bros": 0.5,
+      "fuel_type": 14,
+      "hros": 0.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 0.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 7.5,
+      "fuel_type": 14,
+      "hros": 7.5,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 7.5,
+      "wsv": 10.0
+    },
+    {
+      "bros": 40.0,
+      "fuel_type": 14,
+      "hros": 40.0,
+      "percentile": 100,
+      "regime_cfb": 0.9,
+      "ros": 40.0,
+      "wsv": 10.0
+    }
+  ],
+  "wind_decay": [
+    {
+      "k": 1.0,
+      "wsv": 0.0
+    },
+    {
+      "k": 0.36502114338323416,
+      "wsv": 10.0
+    },
+    {
+      "k": 0.01775480278897897,
+      "wsv": 39.999
+    },
+    {
+      "k": 0.01775718273562726,
+      "wsv": 40.0
+    },
+    {
+      "k": 0.004372025462010941,
+      "wsv": 60.0
+    }
+  ]
+}

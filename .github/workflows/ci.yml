@@ -1,0 +1,68 @@
+name: CI
+
+# Rust checks on every pull request and on pushes to feature branches and
+# master. Lints live here rather than in the release workflow, so a new stable
+# clippy lint blocks a PR, not a tagged release.
+
+on:
+  pull_request:
+  push:
+    branches: ["feature/**", "master"]
+
+# A newer push to the same PR or branch cancels the superseded run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # cffdrs-py's pyo3 build script needs a Python interpreter; pin one
+      # rather than depend on the runner image's default python3.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path rust/Cargo.toml --all --check
+      - name: Clippy
+        run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --all-features -- -D warnings
+      - name: Docs
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --manifest-path rust/Cargo.toml --workspace --no-deps
+      # cffdrs-py has no Rust tests and links against Python; pytest covers it
+      # in the python job below.
+      - name: Tests
+        run: cargo test --manifest-path rust/Cargo.toml -p cffdrs-core
+
+  # The MSRV is declared once, as rust-version in rust/Cargo.toml; read it from
+  # there so this job cannot drift from the manifest.
+  rust-msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the declared MSRV
+        id: msrv
+        run: echo "version=$(grep -m1 '^rust-version' rust/Cargo.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - run: cargo check --manifest-path rust/Cargo.toml --workspace --all-targets --locked
+
+  # The Python test suite, including the native Python/Rust parity tests. The
+  # extension is built by maturin during `uv sync`.
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build editable package and run test suite
+        run: |
+          uv sync --extra test --extra dev
+          uv run pytest -q
+          uv run ruff check src/
+          uv run mypy

@@ -3,8 +3,9 @@
 Python implementation of the Canadian Forest Fire Danger Rating System: the Fire
 Behaviour Prediction (FBP) System and the Fire Weather Index (FWI) System. Library
 only — no server, no CLI, no event handlers. Scalar and NumPy-array inputs share
-one API; missing/NoData values propagate via masked arrays. `uv`-managed, PyPI-bound,
-version derived from git tags (hatch-vcs).
+one API; missing/NoData values propagate via masked arrays. `uv`-managed and
+PyPI-bound. Maturin builds one mixed Python/Rust wheel; its version comes from
+`rust/crates/cffdrs-py/Cargo.toml`.
 
 ## Architecture overview
 
@@ -306,6 +307,13 @@ flowchart TD
   the other without regenerating goldens. Now actually exercised by
   `test_nan_optional_fields_use_documented_defaults` (previously only documented in
   a docstring, never tested).
+- **Missing inputs propagate as NaN, in both implementations.** A masked (NaN) input
+  stays masked through `sfc`/`rso`/`ffc`/`wfc`/`tfc` (and, at percentiles other than
+  50, through the percentile-adjusted ROS when the regime CFB is missing). Equation
+  code must select with `mask.where`, never plain `np.where`, which drops the mask and
+  exposes the finite data numpy.ma arithmetic leaves under it. The Rust core and the
+  grid binding match Python exactly here (`tests/cffbps/test_missing_inputs.py`,
+  `test_rust_parity.py`).
 - **Two independent hourly-FFMC algorithms coexist** (`cffwis.hourlyFFMC` — Van
   Wagner/Alexander recursive; `diurnal_ffmc_lawson` via `cffwis.diurnalFFMC_lawson` —
   table interpolation from a daily 1200 FFMC). They are not interchangeable and not

@@ -1,0 +1,255 @@
+"""Differential parity: the compiled grid pass vs the Python implementation.
+
+The Python package is the spec. These tests run both implementations over the
+same synthetic grids (all modeled fuel types, slopes, aspects, calm and windy
+cells, non-fuel cells) and require agreement at rtol 1e-9 on every consumed
+output. Complements the static Wotton goldens (which pin the scalar chain) by
+exercising the array path end to end.
+
+The extension is part of the main package and is built by ``uv sync``.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from cffdrs import _rust as rust_backend
+from cffdrs.cffbps import FBP
+
+RNG = np.random.default_rng(42)
+SHAPE = (12, 18)  # every modeled fuel type appears more than once
+
+# outputs consumed by fire-growth engines, in the order we request them
+FIELDS = ['hros', 'bros', 'raz', 'wsv', 'hfi', 'rso', 'sros', 'sfc', 'fmc', 'accel']
+
+
+@pytest.fixture(scope='module')
+def grids():
+    n = SHAPE[0] * SHAPE[1]
+    fuel = np.tile(np.arange(1, 19, dtype=np.int32), n // 18 + 1)[:n].reshape(SHAPE)
+    # sprinkle non-fuel and water cells
+    fuel = fuel.copy()
+    fuel[0, :3] = 19
+    fuel[1, :2] = 20
+    g = {
+        'fuel_type': fuel,
+        'lat': RNG.uniform(48, 60, SHAPE),
+        'long': RNG.uniform(-120, -95, SHAPE),
+        'elevation': RNG.uniform(0, 1500, SHAPE),
+        'slope': RNG.uniform(0, 60, SHAPE),
+        'aspect': RNG.uniform(0, 360, SHAPE),
+        'ws': RNG.uniform(0, 45, SHAPE),
+        'wd': RNG.uniform(0, 360, SHAPE),
+        'pc': RNG.uniform(0, 100, SHAPE),
+        'gcf': RNG.uniform(0, 100, SHAPE),
+    }
+    g['ws'][2, :4] = 0.0        # calm-wind cells (zero-WSV path)
+    g['slope'][2, :4] = 0.0
+    g['gcf'][3, 0] = 0.0        # gcf==0 -> 0.1 clamp
+    # nodata cells: NaN inputs arrive masked in the Python package and must
+    # surface as NaN behaviour, never be laundered into calm/flat/default
+    g['ws'][4, 0] = np.nan
+    g['slope'][4, 1] = np.nan
+    g['aspect'][4, 2] = np.nan
+    g['pc'][4, 3] = np.nan
+    g['gcf'][4, 4] = np.nan
+    return g
+
+
+SCALARS = dict(wx_date=20230615, ffmc=91.2, bui=76.4, pdf=42.0, gfl=0.41)
+
+
+def python_reference(g, percentile=50, wx_date=None, scalars=None):
+    sc = SCALARS if scalars is None else scalars
+    fbp = FBP()
+    fbp.initialize(
+        fuel_type=g['fuel_type'].astype(np.float64),
+        wx_date=sc['wx_date'] if wx_date is None else wx_date,
+        lat=g['lat'], long=g['long'], elevation=g['elevation'],
+        slope=g['slope'], aspect=g['aspect'],
+        ws=g['ws'], wd=g['wd'],
+        ffmc=sc['ffmc'], bui=sc['bui'],
+        pc=g['pc'], pdf=sc['pdf'], gfl=sc['gfl'], gcf=g['gcf'],
+        out_request=FIELDS,
+        percentile_growth=percentile,
+    )
+    result = fbp.runFBP()
+    out = {}
+    for name, arr in zip(FIELDS, result, strict=True):
+        a = np.ma.asarray(arr).astype(np.float64)
+        out[name] = a.filled(np.nan)
+    return out
+
+
+def rust_grid(g, percentile=50.0, wx_date=None, scalars=None):
+    sc = SCALARS if scalars is None else scalars
+    res = rust_backend.run_fbp_grid(
+        g['fuel_type'],
+        g['lat'], g['long'], g['elevation'],
+        g['slope'], g['aspect'],
+        g['pc'], g['gcf'],
+        g['ws'], g['wd'],
+        sc['wx_date'] if wx_date is None else wx_date, sc['ffmc'], sc['bui'],
+        sc['pdf'], sc['gfl'], percentile,
+    )
+    return {name: np.asarray(res[name]) for name in FIELDS}
+
+
+def assert_grid_parity(grids, percentile, wx_date=None, scalars=None):
+    """Every field agrees on every modeled cell. ``scalars`` overrides ``SCALARS`` for one call."""
+    py = python_reference(grids, percentile, wx_date, scalars)
+    rs = rust_grid(grids, float(percentile), wx_date, scalars)
+    modeled = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18)
+    for name in FIELDS:
+        a, b = py[name], rs[name]
+        assert a.shape == b.shape == SHAPE, name
+        pa, pb = a[modeled], b[modeled]
+        both_nan = np.isnan(pa) & np.isnan(pb)
+        close = np.isclose(pb, pa, rtol=1e-9, atol=1e-12)
+        bad = ~(both_nan | close)
+        assert not bad.any(), (
+            f'{name}: {int(bad.sum())} modeled cells differ; '
+            f'first: py={pa[bad][0]!r} rs={pb[bad][0]!r}'
+        )
+
+
+def test_grid_parity_all_fields(grids):
+    assert_grid_parity(grids, 50)
+
+
+# 0 and 100 are capped to 0.001 / 99.999 by both implementations; -5 and 150
+# exercise the cap from outside the 0-100 range.
+@pytest.mark.parametrize('percentile', [5, 10, 25, 45, 75, 90, 95, 99, 0, 100, -5, 150])
+def test_grid_parity_percentile_growth(grids, percentile):
+    assert_grid_parity(grids, percentile)
+
+
+def test_percentile_growth_changes_results(grids):
+    """The percentile actually reaches the compiled pass: 90 differs from the median on adjusted fuels."""
+    median = rust_grid(grids, 50.0)['hros']
+    p90 = rust_grid(grids, 90.0)['hros']
+    conifer = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 7)
+    assert (p90[conifer] > median[conifer]).any()
+
+
+def test_nan_percentile_matches_python(grids):
+    """NaN is not capped: both implementations propagate it identically."""
+    assert_grid_parity(grids, float('nan'))
+
+
+def _copy(g):
+    return {k: v.copy() for k, v in g.items()}
+
+
+def test_nan_geography_matches_python(grids):
+    """A missing latitude, longitude or elevation is a masked cell in Python and must not become a
+    valid foliar moisture (and so valid crown behaviour) in the compiled pass."""
+    g = _copy(grids)
+    g['lat'][5, 0:6] = np.nan
+    g['long'][6, 0:6] = np.nan
+    g['elevation'][7, 0:6] = np.nan
+    assert_grid_parity(g, 50)
+
+
+# Missing inputs: a NaN must give NaN (or Python's scalar default) identically in both
+# implementations, on every field, with no exceptions.
+@pytest.mark.parametrize('percentile', [50, 90])
+@pytest.mark.parametrize('name', ['bui', 'ffmc', 'gfl', 'pdf'])
+def test_nan_scalar_matches_python(grids, name, percentile):
+    """A NaN scalar bui/ffmc propagates as NaN; a NaN scalar gfl/pdf takes Python's default."""
+    assert_grid_parity(grids, percentile, scalars={**SCALARS, name: float('nan')})
+
+
+@pytest.mark.parametrize('percentile', [5, 50, 90, 0, 100, float('nan')])
+def test_nan_geography_matches_python_at_percentiles(grids, percentile):
+    """A missing latitude, longitude or elevation (one full row each, so every modeled fuel 1..18
+    appears in each hole) gives the same 10 fields in both implementations at each percentile,
+    including a NaN percentile. For crowning fuels the masked regime CFB makes the adjusted ROS
+    NaN; fuels that cannot crown keep a finite regime CFB of 0."""
+    g = _copy(grids)
+    g['lat'][5, :] = np.nan
+    g['long'][6, :] = np.nan
+    g['elevation'][7, :] = np.nan
+    assert_grid_parity(g, percentile)
+
+
+@pytest.mark.parametrize('order', ['fortran', 'strided'])
+def test_input_memory_layout_does_not_change_results(grids, order):
+    """Results depend on the array's values, never its memory layout: Fortran-ordered and
+    non-contiguous inputs give exactly the same grid as C-ordered ones."""
+    expected = rust_grid(grids)
+    laid_out = {}
+    for k, v in grids.items():
+        if v.ndim != 2:
+            laid_out[k] = v
+        elif order == 'fortran':
+            laid_out[k] = np.asfortranarray(v)
+        else:
+            wide = np.zeros((v.shape[0], v.shape[1] * 2), dtype=v.dtype)
+            wide[:, ::2] = v
+            laid_out[k] = wide[:, ::2]
+    got = rust_grid(laid_out)
+    for name in FIELDS:
+        assert np.array_equal(got[name], expected[name], equal_nan=True), name
+
+
+@pytest.mark.parametrize('wx_date', [20231301, 20230230, 20230431, 20230229, 20231232, 20230001, 20230100, 0])
+def test_invalid_dates_raise_value_error(grids, wx_date):
+    """Python rejects impossible calendar dates with ValueError; the compiled pass must too (not
+    panic on a bad month, or silently accept day 30 of February)."""
+    with pytest.raises(ValueError):
+        rust_grid(grids, wx_date=wx_date)
+    with pytest.raises(ValueError):
+        python_reference(grids, wx_date=wx_date)
+
+
+@pytest.mark.parametrize('wx_date', [20240229, 20231231, 20230101])
+def test_edge_valid_dates_match_python(grids, wx_date):
+    assert_grid_parity(grids, 50, wx_date)
+
+
+def test_non_fuel_cells_are_nan(grids):
+    rs = rust_grid(grids)
+    non_fuel = ~((grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18))
+    assert non_fuel.sum() >= 5
+    for name in FIELDS:
+        assert np.isnan(rs[name][non_fuel]).all(), name
+
+
+def _big(g, reps=20):
+    """The module grid tiled to well over the 4,096-cell threshold for threaded runs."""
+    return {k: np.tile(v, (reps, 1)) for k, v in g.items()}
+
+
+def _rust_threads(g, **kwargs):
+    sc = SCALARS
+    res = rust_backend.run_fbp_grid(
+        g['fuel_type'], g['lat'], g['long'], g['elevation'], g['slope'], g['aspect'], g['pc'], g['gcf'],
+        g['ws'], g['wd'], sc['wx_date'], sc['ffmc'], sc['bui'], sc['pdf'], sc['gfl'], 90.0, **kwargs,
+    )
+    return {name: np.asarray(res[name]) for name in FIELDS}
+
+
+@pytest.mark.parametrize('threads', [0, 2, 4, 64])
+def test_threaded_run_is_bit_identical_to_default(grids, threads):
+    big = _big(grids)
+    assert big['fuel_type'].size >= 4096
+    serial = _rust_threads(big)
+    threaded = _rust_threads(big, threads=threads)
+    for name in FIELDS:
+        assert np.array_equal(serial[name], threaded[name], equal_nan=True), name
+
+
+def test_default_is_explicitly_single_threaded(grids):
+    big = _big(grids)
+    default = _rust_threads(big)
+    one = _rust_threads(big, threads=1)
+    for name in FIELDS:
+        assert np.array_equal(default[name], one[name], equal_nan=True), name
+
+
+@pytest.mark.parametrize('threads', [-1, -8])
+def test_negative_threads_raise_value_error(grids, threads):
+    with pytest.raises(ValueError, match='threads'):
+        _rust_threads(grids, threads=threads)
