@@ -92,21 +92,19 @@ fn nan_bui_leaves_wind_chain_intact() {
     );
 }
 
-/// (mutator, sfc expectation) for one NaN-input scenario.
-type NanCase = (fn(&mut FbpInput), Option<f64>);
+/// (mutator, sfc expectation; NaN means sfc must be NaN) for one NaN-input scenario.
+type NanCase = (fn(&mut FbpInput), f64);
 
 #[test]
 fn nan_weather_inputs_propagate_to_nan_spread() {
     // (mutator, sfc expectation): sfc is BUI/FFMC-driven per fuel, so it
     // pins that NaN reaches exactly the fields Python's masks let through.
     let cases: [NanCase; 4] = [
-        (|i| i.ws = f64::NAN, Some(2.913_604_549_006_544_5)),
-        (|i| i.ffmc = f64::NAN, Some(2.913_604_549_006_544_5)),
-        // sfc None: Python's masked pipeline leaks the fill value into sfc
-        // (prints 5.0) for NaN bui — an artifact, not science; the core
-        // reports NaN there. hros/hfi (what engines consume) match.
-        (|i| i.bui = f64::NAN, None),
-        (|i| i.slope_pct = f64::NAN, Some(2.913_604_549_006_544_5)),
+        (|i| i.ws = f64::NAN, 2.913_604_549_006_544_5),
+        (|i| i.ffmc = f64::NAN, 2.913_604_549_006_544_5),
+        // C-2 sfc is BUI-driven: a missing bui gives NaN sfc (Python agrees).
+        (|i| i.bui = f64::NAN, f64::NAN),
+        (|i| i.slope_pct = f64::NAN, 2.913_604_549_006_544_5),
     ];
     for (idx, (mutate, sfc)) in cases.iter().enumerate() {
         let mut input = base();
@@ -118,7 +116,10 @@ fn nan_weather_inputs_propagate_to_nan_spread() {
             r.hros
         );
         assert!(r.hfi.is_nan(), "case {idx}: hfi must be NaN, got {}", r.hfi);
-        if let Some(e) = sfc {
+        let e = *sfc;
+        if e.is_nan() {
+            assert!(r.sfc.is_nan(), "case {idx}: sfc must be NaN, got {}", r.sfc);
+        } else {
             assert!(
                 (r.sfc - e).abs() <= e.abs() * 1e-9,
                 "case {idx}: sfc expected {e}, got {}",
