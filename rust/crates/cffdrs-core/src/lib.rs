@@ -5,6 +5,13 @@
 //! equations without a Python runtime in the hot path. Validated against the
 //! same golden fixtures as the Python test suite
 //! (`tests/cffbps/data/golden/`).
+//!
+//! # Changes in 0.2.0
+//!
+//! `fbp::run_grid` and `fbp::BehaviourGrids` are replaced by
+//! [`grid::run_grid`], [`grid::GridInput`], [`grid::GridError`] and
+//! [`grid::BehaviourGrids`]; `run_grid` now returns a `Result` instead of
+//! panicking on bad input.
 
 #![forbid(unsafe_code)]
 
