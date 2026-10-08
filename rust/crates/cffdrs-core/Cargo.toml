@@ -1,6 +1,6 @@
 [package]
 name = "cffdrs-core"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 description = "Pure-Rust implementation of the CFFDRS FBP equations (scalar core + grid pass), mirroring the cffdrs Python package in this repository."
 license.workspace = true

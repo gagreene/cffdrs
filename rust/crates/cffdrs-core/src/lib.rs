@@ -13,6 +13,7 @@ mod crown;
 pub mod fbp;
 mod fmc;
 pub mod fuel;
+pub mod grid;
 mod growth;
 mod normalize;
 pub mod percentile;

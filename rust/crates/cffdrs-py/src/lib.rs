@@ -11,6 +11,7 @@
 // rustc once the workspace lint is enabled; same removal condition as above.
 #![allow(unsafe_op_in_unsafe_fn)]
 
+use cffdrs_core::grid::{run_grid, GridInput};
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -58,12 +59,6 @@ fn run_fbp_grid<'py>(
     grass_fuel_load: f64,
     percentile_growth: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    if !cffdrs_core::fbp::is_valid_wx_date(wx_date) {
-        return Err(PyValueError::new_err(format!(
-            "wx_date {wx_date} is not a valid YYYYMMDD calendar date"
-        )));
-    }
-
     let (nrows, ncols) = (fuel_type.shape()[0], fuel_type.shape()[1]);
     let expect = |name: &str, s: &[usize]| -> PyResult<()> {
         if s != [nrows, ncols] {
@@ -102,26 +97,27 @@ fn run_fbp_grid<'py>(
     let (pc_s, gc_s) = (row_major(&pct_conifer), row_major(&grass_curing));
     let (ws_s, wd_s) = (row_major(&ws), row_major(&wd));
 
-    let grids = py.allow_threads(|| {
-        cffdrs_core::fbp::run_grid(
-            &fuel,
-            &lat_s,
-            &long_s,
-            &elev_s,
-            &slope_s,
-            &aspect_s,
-            &pc_s,
-            &gc_s,
-            &ws_s,
-            &wd_s,
-            wx_date,
-            ffmc,
-            bui,
-            pct_dead_fir,
-            grass_fuel_load,
-            percentile_growth,
-        )
-    });
+    let input = GridInput {
+        fuel_type: &fuel,
+        lat: &lat_s,
+        long: &long_s,
+        elevation: &elev_s,
+        slope_pct: &slope_s,
+        aspect_deg: &aspect_s,
+        pct_conifer: &pc_s,
+        grass_curing: &gc_s,
+        ws: &ws_s,
+        wd: &wd_s,
+        wx_date,
+        ffmc,
+        bui,
+        pct_dead_fir,
+        grass_fuel_load,
+        percentile_growth,
+    };
+    let grids = py
+        .allow_threads(|| run_grid(&input))
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
     let out = PyDict::new_bound(py);
     for (name, v) in [
