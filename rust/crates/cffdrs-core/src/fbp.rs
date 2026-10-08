@@ -26,7 +26,7 @@ use crate::surface::{calc_sfc, SurfaceFuel};
 /// Scalar inputs for one cell, matching `FBP.initialize` in the Python
 /// package. NaN in any numeric field means a missing/masked value and
 /// propagates to the dependent outputs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FbpInput {
     /// CFFBPS numeric fuel code (1..18 modeled; 19/20 non-fuel).
     pub fuel_type: i32,
@@ -81,6 +81,57 @@ pub struct FbpInput {
     pub hros_override: Option<f64>,
 }
 
+impl FbpInput {
+    /// A cell with the Python package's `initialize` defaults: `pc` 50, `pdf` 35,
+    /// `gfl` 0.35, `gcf` 80, `percentile_growth` 50, no overrides. The environment
+    /// inputs (`lat`, `long`, `elevation`, `slope_pct`, `aspect_deg`, `ws`, `wd`,
+    /// `ffmc`, `bui`) start as NaN, i.e. missing, and must be set by the caller.
+    ///
+    /// Note that `PartialEq` follows `f64`: an input holding NaN is not equal to
+    /// itself.
+    ///
+    /// ```
+    /// use cffdrs_core::fbp::{run, FbpInput};
+    ///
+    /// let mut input = FbpInput::new(2, 20230615);
+    /// input.lat = 55.0;
+    /// input.long = -115.0;
+    /// input.elevation = 500.0;
+    /// input.ws = 20.0;
+    /// input.wd = 270.0;
+    /// input.ffmc = 90.0;
+    /// input.bui = 60.0;
+    /// input.slope_pct = 0.0;
+    /// input.aspect_deg = 0.0;
+    /// assert!(run(&input).hros > 0.0);
+    /// ```
+    #[must_use]
+    pub fn new(fuel_type: i32, wx_date: i64) -> Self {
+        Self {
+            fuel_type,
+            wx_date,
+            lat: f64::NAN,
+            long: f64::NAN,
+            elevation: f64::NAN,
+            slope_pct: f64::NAN,
+            aspect_deg: f64::NAN,
+            ws: f64::NAN,
+            wd: f64::NAN,
+            ffmc: f64::NAN,
+            bui: f64::NAN,
+            pc: 50.0,
+            pdf: 35.0,
+            gfl: 0.35,
+            gcf: 80.0,
+            percentile_growth: 50.0,
+            d0_override: None,
+            dj_override: None,
+            fmc_override: None,
+            hros_override: None,
+        }
+    }
+}
+
 /// Everything the scalar pass computes: the snapshot's 54 quantities.
 /// All f64, including code-like values (`fire_type`, `fi_class`), so golden
 /// comparison is uniform; consumers cast as needed.
@@ -90,7 +141,7 @@ pub struct FbpInput {
 /// for the exact name table). A NaN field means the quantity is missing or
 /// masked for that cell (for example a non-fuel cell, or a NaN input that
 /// propagated); it is not an error.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct FbpResult {
     // wind/slope vectoring
     /// Observed wind speed as used by the chain (after input normalisation), km/h.

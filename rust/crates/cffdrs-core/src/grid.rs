@@ -13,7 +13,7 @@ use crate::fuel::FuelType;
 /// (checked by [`run_grid`]). Any memory layout works as long as every slice
 /// uses the same one. A NaN value is a missing/masked cell input and
 /// propagates to that cell's outputs.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GridInput<'a> {
     /// CFFBPS fuel codes per cell (1..=18 modeled, 19 non-fuel, 20 water). Its length defines the grid size.
     pub fuel_type: &'a [i32],
