@@ -360,9 +360,9 @@ impl FbpResult {
 /// -99 and `fmc` is finite; `fire_type` is 0 (1 for code 0), not NaN. Only
 /// [`grid::run_grid`](crate::grid::run_grid) forces every output to NaN for a
 /// non-modeled cell. An invalid `wx_date` is treated as missing (NaN foliar
-/// moisture, so NaN `rso` for codes 1..=13 and, at any percentile other than
-/// 50, NaN percentile-adjusted `hros`/`bros`); use [`is_valid_wx_date`] to
-/// check it first.
+/// moisture, so NaN `rso` for codes 1..=13 and, for crowning fuels at any
+/// percentile other than 50, NaN percentile-adjusted `hros`/`bros`); use
+/// [`is_valid_wx_date`] to check it first.
 ///
 /// # Panics
 ///
