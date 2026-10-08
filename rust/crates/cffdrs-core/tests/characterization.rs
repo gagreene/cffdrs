@@ -3,10 +3,15 @@
 //! Runs `run()` over a deterministic set of 7,200 inputs and records or compares
 //! all 54 outputs of each as raw `f64` bits (NaN canonicalised). Record a baseline
 //! on the SAME machine and toolchain before refactoring, then compare after each
-//! step:
+//! step.
+//!
+//! Record (once, before refactoring):
 //!
 //!     CFFDRS_BASELINE_RECORD=1 \
 //!       cargo test --manifest-path rust/Cargo.toml -p cffdrs-core --test characterization -- --ignored
+//!
+//! Compare (after each step):
+//!
 //!     cargo test --manifest-path rust/Cargo.toml -p cffdrs-core --test characterization -- --ignored
 //!
 //! The baseline is `rust/target/characterization-baseline.txt` (the workspace

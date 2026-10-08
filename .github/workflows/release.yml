@@ -27,7 +27,26 @@ jobs:
           uv run pytest -q
           uv run ruff check src/
           uv run mypy
-          cargo test --manifest-path rust/Cargo.toml
+      - name: Rust format, lint, docs and tests
+        run: |
+          cargo fmt --manifest-path rust/Cargo.toml --all --check
+          cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --all-features -- -D warnings
+          RUSTDOCFLAGS="-D warnings" cargo doc --manifest-path rust/Cargo.toml --workspace --no-deps
+          cargo test --manifest-path rust/Cargo.toml --workspace
+
+  # The MSRV is declared once, as rust-version in rust/Cargo.toml; read it from
+  # there so this job cannot drift from the manifest.
+  rust-msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the declared MSRV
+        id: msrv
+        run: echo "version=$(grep -m1 '^rust-version' rust/Cargo.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - run: cargo check --manifest-path rust/Cargo.toml --workspace --all-targets --locked
 
   build-sdist:
     runs-on: ubuntu-latest
