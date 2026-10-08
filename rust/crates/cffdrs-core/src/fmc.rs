@@ -139,3 +139,38 @@ pub(crate) fn injected_fmc(fmc: f64) -> Fmc {
         fme: 0.0,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn march_first_counts_the_leap_day() {
+        assert_eq!(day_of_year(20_240_301), 61.0); // 2024 is a leap year
+        assert_eq!(day_of_year(20_230_301), 60.0);
+        assert_eq!(day_of_year(19_000_301), 60.0); // century, not leap
+        assert_eq!(day_of_year(20_000_301), 61.0); // 400-year century, leap
+    }
+
+    #[test]
+    fn december_31_is_the_last_day() {
+        assert_eq!(day_of_year(20_241_231), 366.0);
+        assert_eq!(day_of_year(20_231_231), 365.0);
+    }
+
+    #[test]
+    fn extreme_dates_are_invalid_without_panicking() {
+        assert!(!is_valid_wx_date(i64::MIN));
+        assert!(!is_valid_wx_date(i64::MAX));
+        assert!(day_of_year(i64::MIN).is_nan());
+        assert!(day_of_year(i64::MAX).is_nan());
+    }
+
+    #[test]
+    fn february_29_only_in_leap_years() {
+        assert!(is_valid_wx_date(20_240_229));
+        assert!(!is_valid_wx_date(20_230_229));
+        assert!(!is_valid_wx_date(19_000_229));
+        assert_eq!(day_of_year(20_240_229), 60.0);
+    }
+}

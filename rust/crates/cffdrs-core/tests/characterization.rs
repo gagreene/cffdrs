@@ -14,6 +14,10 @@
 //!
 //!     cargo test --manifest-path rust/Cargo.toml -p cffdrs-core --test characterization -- --ignored
 //!
+//! Record mode is enabled only when `CFFDRS_BASELINE_RECORD` is exactly `1`; any
+//! other value (including `0` or empty) compares, so it cannot overwrite the
+//! baseline by accident.
+//!
 //! The baseline is `rust/target/characterization-baseline.txt` (the workspace
 //! `target/` directory, git-ignored), resolved from `CARGO_MANIFEST_DIR` because
 //! Cargo runs integration tests from the package directory. Set `CFFDRS_BASELINE`
@@ -205,7 +209,9 @@ fn outputs_match_the_recorded_baseline() {
     assert_eq!(cases.len(), 25 * 48 * 6, "input set changed");
     let rows: Vec<Vec<u64>> = cases.iter().map(|(_, _, i)| row(i)).collect();
 
-    if env::var("CFFDRS_BASELINE_RECORD").is_ok() {
+    // Only the exact value "1" records: `=0`, an empty value or any other
+    // value compares, so a stray variable cannot overwrite the baseline.
+    if env::var("CFFDRS_BASELINE_RECORD").as_deref() == Ok("1") {
         let text: String = rows
             .iter()
             .map(|r| {
@@ -232,7 +238,11 @@ fn outputs_match_the_recorded_baseline() {
     {
         let before: Vec<u64> = line
             .split(' ')
-            .map(|h| u64::from_str_radix(h, 16).unwrap())
+            .map(|h| {
+                u64::from_str_radix(h, 16).unwrap_or_else(|e| {
+                    panic!("baseline run {n}: {h:?} is not a 16-digit hex value: {e}")
+                })
+            })
             .collect();
         assert_eq!(
             before.len(),
