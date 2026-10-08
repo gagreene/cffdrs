@@ -7,6 +7,9 @@
 // fires in macro-generated code, so an attribute on the function does not reach
 // it; drop this allow when pyo3 is upgraded past the affected releases.
 #![allow(clippy::useless_conversion)]
+// pyo3 0.22 macro expansion also trips `unsafe_op_in_unsafe_fn` (E0133) on newer
+// rustc once the workspace lint is enabled; same removal condition as above.
+#![allow(unsafe_op_in_unsafe_fn)]
 
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;

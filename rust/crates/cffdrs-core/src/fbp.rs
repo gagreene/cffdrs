@@ -908,6 +908,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
 /// Per-window behaviour grids for a fire-growth engine, one weather step.
 /// `lb_ratio` is deliberately absent: length-to-breadth is an engine-side
 /// quantity (derived from `wsv`), not part of this package's spec.
+#[derive(Debug, Clone, PartialEq)]
 pub struct BehaviourGrids {
     pub hros: Vec<f64>,
     pub bros: Vec<f64>,

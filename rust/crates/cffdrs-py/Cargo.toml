@@ -1,9 +1,14 @@
 [package]
 name = "cffdrs-py"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 description = "Python bindings (cffdrs._rust) over cffdrs-core."
-license = "MIT"
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
 
 [lib]
 name = "_rust"

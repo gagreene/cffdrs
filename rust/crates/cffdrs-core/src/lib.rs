@@ -6,6 +6,8 @@
 //! same golden fixtures as the Python test suite
 //! (`tests/cffbps/data/golden/`).
 
+#![forbid(unsafe_code)]
+
 pub mod fbp;
 pub mod percentile;
 pub mod quantile;
