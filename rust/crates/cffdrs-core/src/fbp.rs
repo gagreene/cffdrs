@@ -13,7 +13,8 @@
 pub use crate::fmc::is_valid_wx_date;
 use crate::fmc::{calc_fmc, injected_fmc};
 use crate::fuel::{CrownFuel, FuelType, RosParams};
-use crate::normalize::{invert_wind_aspect, normalize};
+use crate::normalize::{invert_wind_aspect, normalize, Normalized};
+use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
 
 /// Scalar inputs, matching `FBP.initialize` in the Python package.
 #[derive(Debug, Clone)]
@@ -204,99 +205,6 @@ impl FbpResult {
 // constants.py
 
 // ---------------------------------------------------------------------------
-// slope_wind.py
-
-struct SlopeWindIsi {
-    wse1: f64,
-    wse2: f64,
-    wse: f64,
-    wsx: f64,
-    wsy: f64,
-    wsv: f64,
-    raz: f64,
-    f_w: f64,
-    bfw: f64,
-    isi: f64,
-    bisi: f64,
-}
-
-/// `slope_wind.calc_slope_wind_isi`
-fn calc_slope_wind_isi(isf: f64, f_f: f64, wd: f64, aspect: f64, ws: f64) -> SlopeWindIsi {
-    let wse1 = (1.0 / 0.05039) * (isf / (0.208 * f_f)).ln();
-    let wse2 = if isf.is_nan() {
-        // masked isf keeps its mask through the where() — never the cap
-        f64::NAN
-    } else if isf < 0.999 * 2.496 * f_f {
-        28.0 - (1.0 / 0.0818) * (1.0 - isf / (2.496 * f_f)).ln()
-    } else {
-        112.45 // cap maximum WSE
-    };
-    let wse = if wse1 <= 40.0 { wse1 } else { wse2 };
-
-    let (sin_wd, cos_wd) = (wd.to_radians().sin(), wd.to_radians().cos());
-    let (sin_asp, cos_asp) = (aspect.to_radians().sin(), aspect.to_radians().cos());
-    let wsx = ws * sin_wd + wse * sin_asp;
-    let wsy = ws * cos_wd + wse * cos_asp;
-    let wsv = (wsx * wsx + wsy * wsy).sqrt();
-
-    let acos_val = (wsy / wsv).clamp(-1.0, 1.0);
-    let angle_deg = acos_val.acos().to_degrees();
-    let mut raz = if wsx < 0.0 {
-        360.0 - angle_deg
-    } else {
-        angle_deg
-    };
-    // wsv == 0: azimuth undefined, spread circular — substitute 0 to keep raz
-    // finite for downstream consumers (matches the Python fix). NaN wsv is a
-    // masked cell in Python (`where(wsv > 0, raz, 0)` keeps the mask), so
-    // NaN must pass through, not become 0.
-    // (`wsv <= 0.0` is false for NaN, so a NaN wsv is left untouched.)
-    if wsv <= 0.0 {
-        raz = 0.0;
-    }
-
-    let f_w = if wsv > 40.0 {
-        12.0 * (1.0 - (-0.0818 * (wsv - 28.0)).exp())
-    } else {
-        (0.05039 * wsv).exp()
-    };
-    let bfw = (-0.05039 * wsv).exp();
-    SlopeWindIsi {
-        wse1,
-        wse2,
-        wse,
-        wsx,
-        wsy,
-        wsv,
-        raz,
-        f_w,
-        bfw,
-        isi: 0.208 * f_f * f_w,
-        bisi: 0.208 * f_f * bfw,
-    }
-}
-
-/// One fuel's `a * (1 - exp(-b * x))^c` spread curve.
-fn ros_curve(a: f64, b: f64, c: f64, x: f64) -> f64 {
-    a * (1.0 - (-b * x).exp()).powf(c)
-}
-
-/// The `isf >= 0.01` numerator guard shared by every ISF branch.
-/// NaN must PROPAGATE: in the Python package the numerator arrives masked
-/// (NaN inputs are masked by `_coerce`), and `mask.where` keeps the mask no
-/// matter which branch is selected — the observable ISF is NaN. A plain
-/// `if` would silently take the finite fallback branch here.
-fn isf_core(numer: f64, b: f64) -> f64 {
-    if numer.is_nan() {
-        f64::NAN
-    } else if numer >= 0.01 {
-        numer.ln() / -b
-    } else {
-        0.01_f64.ln() / -b
-    }
-}
-
-// ---------------------------------------------------------------------------
 // the scalar chain — facade.runFBP order
 
 /// Run the scalar FBP chain for one cell. Mirror of the Python package's
@@ -309,27 +217,17 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let abs_long = input.long.abs();
     let elevation = input.elevation;
     let n = normalize(input);
-    let (ws, ffmc, bui, pc, pdf, gfl, gcf, slope) =
-        (n.ws, n.ffmc, n.bui, n.pc, n.pdf, n.gfl, n.gcf, n.slope);
 
     // --- invert_wind_aspect
     let (wd, aspect) = invert_wind_aspect(n.wd, n.aspect);
+    let n = Normalized { wd, aspect, ..n };
+    let (ws, ffmc, bui, pc, pdf, gfl) = (n.ws, n.ffmc, n.bui, n.pc, n.pdf, n.gfl);
 
     // --- calc_sf
-    // where(slope < 70, exp(...), 10): NaN slope stays masked in Python —
-    // propagate it rather than taking the finite cap branch.
-    let sf = if slope.is_nan() {
-        f64::NAN
-    } else if slope < 70.0 {
-        (3.533 * (slope / 100.0).powf(1.2)).exp()
-    } else {
-        10.0
-    };
+    let sf = calc_sf(n.slope);
 
     // --- calc_isz
-    let m = (250.0 * (59.5 / 101.0) * (101.0 - ffmc)) / (59.5 + ffmc);
-    let f_f = (91.9 * (-0.1386 * m).exp()) * (1.0 + m.powf(5.31) / (4.93 * 1.0e7));
-    let isz = 0.208 * f_f;
+    let Isz { m, f_f, isz } = calc_isz(n.ffmc);
 
     // --- calc_fmc (or the setParams({'fmc': ...}) injection in its place:
     // calcFMC never runs, so latn/d0/dj/nd/fme keep their zero templates —
@@ -347,6 +245,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
     };
 
     // --- calc_isi_rsi_be
+    let params = ft.ros_params();
     let RosParams {
         a,
         b,
@@ -354,97 +253,18 @@ pub fn run(input: &FbpInput) -> FbpResult {
         q,
         bui0,
         be_max,
-    } = ft.ros_params();
-    let c2 = FuelType::C2.ros_params();
-    let d1 = FuelType::D1.ros_params();
-    let m12 = matches!(ft, FuelType::M1 | FuelType::M2);
-    let m34 = matches!(ft, FuelType::M3 | FuelType::M4);
-    let o1 = matches!(ft, FuelType::O1a | FuelType::O1b);
-
-    let cf = if gcf.is_nan() {
-        f64::NAN
-    } else if gcf < 58.8 {
-        0.005 * ((0.061 * gcf).exp() - 1.0)
-    } else {
-        0.176 + 0.02 * (gcf - 58.8)
-    };
-
-    let rsz_core = ros_curve(a, b, c, isz);
-    let rsz_c2 = ros_curve(c2.a, c2.b, c2.c, isz);
-    let rsz_d1 = ros_curve(d1.a, d1.b, d1.c, isz);
-    let rsz = match ft {
-        FuelType::M1 => (pc / 100.0) * rsz_c2 + (1.0 - pc / 100.0) * rsz_d1,
-        FuelType::M2 => (pc / 100.0) * rsz_c2 + 0.2 * (1.0 - pc / 100.0) * rsz_d1,
-        FuelType::O1a | FuelType::O1b => rsz_core * cf,
-        _ => rsz_core,
-    };
-
-    let rsf_c2 = rsz_c2 * sf;
-    let rsf_d1 = rsz_d1 * sf;
-    let rsf = rsz * sf;
-
-    let isf_c2_core = isf_core(1.0 - (rsf_c2 / c2.a).powf(1.0 / c2.c), c2.b);
-    let isf_d1_core = isf_core(1.0 - (rsf_d1 / d1.a).powf(1.0 / d1.c), d1.b);
-    let isf_m34_core = isf_core(1.0 - (rsf / a).powf(1.0 / c), b);
-    let isf = if m12 {
-        (pc / 100.0) * isf_c2_core + (1.0 - pc / 100.0) * isf_d1_core
-    } else if m34 {
-        (pdf / 100.0) * isf_m34_core + (1.0 - pdf / 100.0) * isf_d1_core
-    } else {
-        let numer = if o1 {
-            1.0 - (rsf / (a * cf)).powf(1.0 / c)
-        } else {
-            1.0 - (rsf / a).powf(1.0 / c)
-        };
-        isf_core(numer, b)
-    };
-
-    let sw = calc_slope_wind_isi(isf, f_f, wd, aspect, ws);
+    } = params;
+    let SpreadIndices {
+        rsz,
+        rsf,
+        isf,
+        sw,
+        rsi,
+        brsi,
+        be,
+    } = calc_isi_rsi_be(ft, &params, &n, f_f, isz, sf);
     let isi = sw.isi;
     let bisi = sw.bisi;
-
-    let rsi_c2 = ros_curve(c2.a, c2.b, c2.c, isi);
-    let rsi_d1 = ros_curve(d1.a, d1.b, d1.c, isi);
-    let rsi = match ft {
-        FuelType::M3 => (pdf / 100.0) * ros_curve(a, b, c, isi) + (1.0 - pdf / 100.0) * rsi_d1,
-        FuelType::M4 => {
-            (pdf / 100.0) * ros_curve(a, b, c, isi) + 0.2 * (1.0 - pdf / 100.0) * rsi_d1
-        }
-        FuelType::M1 => (pc / 100.0) * rsi_c2 + (1.0 - pc / 100.0) * rsi_d1,
-        FuelType::M2 => (pc / 100.0) * rsi_c2 + 0.2 * (1.0 - pc / 100.0) * rsi_d1,
-        FuelType::O1a | FuelType::O1b => ros_curve(a, b, c, isi) * cf,
-        _ => ros_curve(a, b, c, isi),
-    };
-    let brsi_c2 = ros_curve(c2.a, c2.b, c2.c, bisi);
-    let brsi_d1 = ros_curve(d1.a, d1.b, d1.c, bisi);
-    let brsi = match ft {
-        FuelType::M3 => (pdf / 100.0) * ros_curve(a, b, c, bisi) + (1.0 - pdf / 100.0) * brsi_d1,
-        FuelType::M4 => {
-            (pdf / 100.0) * ros_curve(a, b, c, bisi) + 0.2 * (1.0 - pdf / 100.0) * brsi_d1
-        }
-        FuelType::M2 => (pc / 100.0) * brsi_c2 + 0.2 * (1.0 - pc / 100.0) * brsi_d1,
-        FuelType::M1 => (pc / 100.0) * brsi_c2 + (1.0 - pc / 100.0) * brsi_d1,
-        FuelType::O1a | FuelType::O1b => ros_curve(a, b, c, bisi) * cf,
-        _ => ros_curve(a, b, c, bisi),
-    };
-
-    let be = {
-        // Python: where((bui==0)|~isfinite(bui), 0, ...) — but a NaN bui
-        // arrives MASKED there (inputs._coerce masks NaN), so the isfinite
-        // branch only ever catches literal infinities; the masked NaN rides
-        // through and the observable spread outputs (hros/hfi) are NaN.
-        // Mirror the observables: NaN bui => NaN be; infinite bui => 0.
-        let raw = if bui.is_nan() {
-            f64::NAN
-        } else if bui == 0.0 || bui.is_infinite() {
-            0.0
-        } else if bui0 == 0.0 || !bui0.is_finite() {
-            1.0
-        } else {
-            (50.0 * q.ln() * (1.0 / bui - 1.0 / bui0)).exp()
-        };
-        raw.clamp(0.0, be_max)
-    };
 
     // --- calc_ros
     let mut hros = rsi * be;

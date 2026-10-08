@@ -3,6 +3,7 @@
 use crate::fbp::FbpInput;
 
 /// The clamped / defaulted scalar inputs the rest of the chain reads.
+#[derive(Clone, Copy)]
 pub(crate) struct Normalized {
     pub slope: f64,
     pub aspect: f64,
