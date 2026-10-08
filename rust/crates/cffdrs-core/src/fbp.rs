@@ -145,66 +145,74 @@ pub struct FbpResult {
 }
 
 impl FbpResult {
-    /// Value by its Python-package output name (the names `getParams`
-    /// accepts, e.g. "hros", "fF", "fire_type"). None for unknown names.
+    /// Every output paired with its Python-package name (the names
+    /// `FBP.getParams` accepts, e.g. "hros", "fF", "fire_type"), in a fixed
+    /// order. This table is the single place the names are defined.
+    pub fn named_values(&self) -> [(&'static str, f64); 54] {
+        [
+            ("ws", self.ws),
+            ("wd", self.wd),
+            ("wse", self.wse),
+            ("wse1", self.wse1),
+            ("wse2", self.wse2),
+            ("wsx", self.wsx),
+            ("wsy", self.wsy),
+            ("wsv", self.wsv),
+            ("raz", self.raz),
+            ("m", self.m),
+            ("fF", self.f_f),
+            ("fW", self.f_w),
+            ("ffmc", self.ffmc),
+            ("isi", self.isi),
+            ("bui", self.bui),
+            ("a", self.a),
+            ("b", self.b),
+            ("c", self.c),
+            ("q", self.q),
+            ("bui0", self.bui0),
+            ("be", self.be),
+            ("be_max", self.be_max),
+            ("sf", self.sf),
+            ("rsz", self.rsz),
+            ("rsf", self.rsf),
+            ("isf", self.isf),
+            ("rsi", self.rsi),
+            ("latn", self.latn),
+            ("dj", self.dj),
+            ("d0", self.d0),
+            ("nd", self.nd),
+            ("fmc", self.fmc),
+            ("fme", self.fme),
+            ("ffc", self.ffc),
+            ("wfc", self.wfc),
+            ("sfc", self.sfc),
+            ("cfl", self.cfl),
+            ("cfc", self.cfc),
+            ("tfc", self.tfc),
+            ("cbh", self.cbh),
+            ("csfi", self.csfi),
+            ("rso", self.rso),
+            ("cfb", self.cfb),
+            ("fire_type", self.fire_type),
+            ("hros", self.hros),
+            ("sros", self.sros),
+            ("cros", self.cros),
+            ("bfw", self.bfw),
+            ("bisi", self.bisi),
+            ("bros", self.bros),
+            ("hfi", self.hfi),
+            ("fi_class", self.fi_class),
+            ("accel", self.accel),
+            ("fuel_type", self.fuel_type),
+        ]
+    }
+
+    /// Value by its Python-package output name; `None` for an unknown name.
     pub fn get(&self, name: &str) -> Option<f64> {
-        Some(match name {
-            "ws" => self.ws,
-            "wd" => self.wd,
-            "wse" => self.wse,
-            "wse1" => self.wse1,
-            "wse2" => self.wse2,
-            "wsx" => self.wsx,
-            "wsy" => self.wsy,
-            "wsv" => self.wsv,
-            "raz" => self.raz,
-            "m" => self.m,
-            "fF" => self.f_f,
-            "fW" => self.f_w,
-            "ffmc" => self.ffmc,
-            "isi" => self.isi,
-            "bui" => self.bui,
-            "a" => self.a,
-            "b" => self.b,
-            "c" => self.c,
-            "q" => self.q,
-            "bui0" => self.bui0,
-            "be" => self.be,
-            "be_max" => self.be_max,
-            "sf" => self.sf,
-            "rsz" => self.rsz,
-            "rsf" => self.rsf,
-            "isf" => self.isf,
-            "rsi" => self.rsi,
-            "latn" => self.latn,
-            "dj" => self.dj,
-            "d0" => self.d0,
-            "nd" => self.nd,
-            "fmc" => self.fmc,
-            "fme" => self.fme,
-            "ffc" => self.ffc,
-            "wfc" => self.wfc,
-            "sfc" => self.sfc,
-            "cfl" => self.cfl,
-            "cfc" => self.cfc,
-            "tfc" => self.tfc,
-            "cbh" => self.cbh,
-            "csfi" => self.csfi,
-            "rso" => self.rso,
-            "cfb" => self.cfb,
-            "fire_type" => self.fire_type,
-            "hros" => self.hros,
-            "sros" => self.sros,
-            "cros" => self.cros,
-            "bfw" => self.bfw,
-            "bisi" => self.bisi,
-            "bros" => self.bros,
-            "hfi" => self.hfi,
-            "fi_class" => self.fi_class,
-            "accel" => self.accel,
-            "fuel_type" => self.fuel_type,
-            _ => return None,
-        })
+        self.named_values()
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v)
     }
 }
 
@@ -488,4 +496,38 @@ pub fn run_grid(
         out.accel[i] = r.accel;
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn field_name_table_is_complete_and_unique() {
+        let names: Vec<&str> = FbpResult::default()
+            .named_values()
+            .iter()
+            .map(|(n, _)| *n)
+            .collect();
+        assert_eq!(names.len(), 54);
+        let unique: HashSet<&str> = names.iter().copied().collect();
+        assert_eq!(unique.len(), 54, "duplicate output names");
+    }
+
+    #[test]
+    fn get_resolves_names_to_fields() {
+        let r = FbpResult {
+            f_f: 1.5,
+            f_w: 2.5,
+            be_max: 3.5,
+            fuel_type: 7.0,
+            ..FbpResult::default()
+        };
+        assert_eq!(r.get("fF"), Some(r.f_f));
+        assert_eq!(r.get("fW"), Some(r.f_w));
+        assert_eq!(r.get("be_max"), Some(r.be_max));
+        assert_eq!(r.get("fuel_type"), Some(r.fuel_type));
+        assert_eq!(r.get("nope"), None);
+    }
 }

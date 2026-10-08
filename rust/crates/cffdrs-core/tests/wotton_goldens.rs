@@ -5,7 +5,7 @@
 //! `tools/gen_fbp_goldens.py` when the Python spec changes; this suite
 //! then holds the Rust core to it.
 
-use cffdrs_core::fbp::{run, FbpInput};
+use cffdrs_core::fbp::{run, FbpInput, FbpResult};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -175,4 +175,35 @@ fn scalar_core_matches_wotton_snapshot() {
     }
     // 20 cases x 54 quantities — make silent shrinkage impossible
     assert!(checked >= 1000, "only {checked} golden quantities checked");
+}
+
+#[test]
+fn field_name_table_matches_snapshot_outputs() {
+    let snapshot: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(repo_path(
+            "tests/cffbps/data/golden/wotton2009_scalar_snapshot.json",
+        ))
+        .expect("golden snapshot"),
+    )
+    .expect("valid json");
+    let listed: Vec<&str> = snapshot["outputs"]
+        .as_array()
+        .expect("outputs list")
+        .iter()
+        .map(|v| v.as_str().expect("output name"))
+        .collect();
+
+    let result = FbpResult::default();
+    for name in &listed {
+        assert!(
+            result.get(name).is_some(),
+            "snapshot output {name:?} does not resolve via get()"
+        );
+    }
+    for (name, _) in result.named_values() {
+        assert!(
+            listed.contains(&name),
+            "named_values() entry {name:?} is not in the snapshot outputs"
+        );
+    }
 }
