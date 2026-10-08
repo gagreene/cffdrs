@@ -11,6 +11,7 @@
 //! the same file the Python suite validates against.
 
 use crate::fuel::{CrownFuel, FuelType, RosParams};
+use crate::normalize::{invert_wind_aspect, normalize};
 
 /// Scalar inputs, matching `FBP.initialize` in the Python package.
 #[derive(Debug, Clone)]
@@ -421,40 +422,12 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let lat = input.lat;
     let abs_long = input.long.abs();
     let elevation = input.elevation;
-    // `where(x < 0, 0, x)` / `clip(x, 0, None)` semantics: negatives clamp
-    // to 0 but NaN PASSES THROUGH (NaN < 0 is false) — nodata weather must
-    // surface as NaN behaviour, not as calm wind. f64::max would launder
-    // NaN to 0.0 here.
-    let clamp0 = |x: f64| if x < 0.0 { 0.0 } else { x };
-    let slope = clamp0(input.slope_pct);
-    let mut aspect = input.aspect_deg;
-    if aspect < 0.0 {
-        aspect = 270.0; // negative aspect treated as flat terrain
-    }
-    let ws = clamp0(input.ws);
-    let mut wd = input.wd;
-    let ffmc = clamp0(input.ffmc);
-    let bui = clamp0(input.bui);
-    // pc/pdf/gfl/gcf: the Python _coerce defaults (50/35/0.35/80) apply ONLY
-    // to NaN SCALARS (a wholly-missing input); per-cell NaN in the grid pass
-    // stays masked and surfaces as NaN behaviour. This core is the grid
-    // pass, so NaN propagates; callers with scalar inputs apply the scalar
-    // defaults before broadcasting.
-    let pc = clamp0(input.pc);
-    let pdf = clamp0(input.pdf);
-    let gfl = clamp0(input.gfl);
-    let mut gcf = input.gcf;
-    if gcf == 0.0 {
-        gcf = 0.1;
-    }
+    let n = normalize(input);
+    let (ws, ffmc, bui, pc, pdf, gfl, gcf, slope) =
+        (n.ws, n.ffmc, n.bui, n.pc, n.pdf, n.gfl, n.gcf, n.slope);
 
     // --- invert_wind_aspect
-    wd = if wd > 180.0 { wd - 180.0 } else { wd + 180.0 };
-    aspect = if aspect > 180.0 {
-        aspect - 180.0
-    } else {
-        aspect + 180.0
-    };
+    let (wd, aspect) = invert_wind_aspect(n.wd, n.aspect);
 
     // --- calc_sf
     // where(slope < 70, exp(...), 10): NaN slope stays masked in Python —

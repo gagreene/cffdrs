@@ -10,5 +10,6 @@
 
 pub mod fbp;
 pub mod fuel;
+mod normalize;
 pub mod percentile;
 pub mod quantile;
