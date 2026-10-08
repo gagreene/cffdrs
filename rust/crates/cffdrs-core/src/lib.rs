@@ -37,6 +37,18 @@
 //!   a percent change: 50 is the unadjusted ROS. See [`percentile`].
 //! - Units: wind in km/h, angles in compass degrees, ROS in m/min, fuel
 //!   consumption in kg/m^2, intensity in kW/m, `wx_date` as `YYYYMMDD`.
+//! - [`VERSION`] is this crate's version string; the Python binding exposes it
+//!   as `cffdrs._rust.__core_version__`.
+//!
+//! # API stability
+//!
+//! The output types [`fuel::FuelType`], [`fbp::FbpResult`] and
+//! [`grid::BehaviourGrids`] are `#[non_exhaustive]`, so variants or fields can
+//! be added without a breaking release: match `FuelType` with a wildcard arm
+//! and read result fields rather than destructuring them exhaustively
+//! (`FbpResult::default()` still works). The input types [`fbp::FbpInput`] and
+//! [`grid::GridInput`] stay constructible by struct literal on purpose;
+//! [`fbp::FbpInput::new`] is the forward-compatible constructor.
 //!
 //! # Changes in 0.2.0
 //!
@@ -70,6 +82,10 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 
+/// This crate's version (`CARGO_PKG_VERSION` of `cffdrs-core`), for example
+/// to report which core a binding or engine was built against.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 mod consumption;
 mod crown;
 pub mod fbp;
@@ -83,3 +99,12 @@ mod quantile;
 mod ros;
 mod slope_wind;
 mod surface;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn version_is_the_core_crate_version() {
+        assert_ne!(super::VERSION, "");
+        assert!(super::VERSION.starts_with("0."), "{}", super::VERSION);
+    }
+}

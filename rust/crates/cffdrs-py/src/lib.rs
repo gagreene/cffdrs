@@ -142,7 +142,7 @@ fn run_fbp_grid<'py>(
 /// The compiled backend exposed as `cffdrs._rust` by the mixed Python/Rust wheel.
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("__core_version__", env!("CARGO_PKG_VERSION"))?;
+    m.add("__core_version__", cffdrs_core::VERSION)?;
     m.add_function(wrap_pyfunction!(run_fbp_grid, m)?)?;
     Ok(())
 }

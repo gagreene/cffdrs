@@ -1,9 +1,12 @@
 //! CFFBPS fuel types and their per-fuel parameter tables.
 
 /// CFFBPS fuel type (mirrors the numeric codes in the Python `constants`
-/// module). Codes 1-18 are modeled fuels; 19 and 20 are non-fuel and
-/// water; any other code is carried as `Unknown` so behaviour is unchanged.
+/// module). Codes 1-18 are modeled fuels; 19 is non-fuel and 20 is water;
+/// any other code is carried as `Unknown` so behaviour is unchanged.
+///
+/// The enum is `#[non_exhaustive]`: match it with a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum FuelType {
     /// C-1 Spruce-lichen woodland (code 1).
     C1,
@@ -166,6 +169,24 @@ impl FuelType {
             self,
             Self::D1 | Self::D2 | Self::O1a | Self::O1b | Self::S1 | Self::S2 | Self::S3
         )
+    }
+
+    // The two predicates below are deliberately threshold comparisons on the
+    // code, not variant sets: an unknown NEGATIVE code (`Unknown(-1)`) keeps
+    // taking the "modeled" path, as the original `code < 14` / `code < 19`
+    // did (decision D3). The characterization oracle pins that behaviour.
+
+    /// Fuels that get a crown fire initiation threshold (CSFI): every code
+    /// below 14 (C-1..M-4, plus unknown negative codes, see above).
+    pub(crate) const fn has_crown_initiation(self) -> bool {
+        self.code() < 14
+    }
+
+    /// Fuels that get a fire type class: every code below 19 (the modeled
+    /// fuels, plus unknown negative codes, see above); non-fuel, water and
+    /// codes above 20 do not.
+    pub(crate) const fn is_fuel(self) -> bool {
+        self.code() < 19
     }
 
     /// Surface-regime fuels for percentile growth (C-2..C-7).
@@ -376,11 +397,20 @@ mod tests {
 
     #[test]
     fn code_comparisons_match_old_thresholds() {
-        // fbp.rs keeps `ft < 14` (csfi) and `ft < 19` (fire type) on the code.
+        // crown.rs used to compare `ft.code() < 14` (csfi) and
+        // `ft.code() < 19` (fire type); the named predicates must give the
+        // same answer for every code, unknown negative codes included.
         for code in -3..=25 {
             let ft = FuelType::from_code(code);
             assert_eq!(ft.code() < 14, code < 14);
             assert_eq!(ft.code() < 19, code < 19);
+            assert_eq!(ft.has_crown_initiation(), code < 14, "csfi {code}");
+            assert_eq!(ft.is_fuel(), code < 19, "fire type {code}");
+        }
+        for code in [i32::MIN, i32::MIN + 1, i32::MAX] {
+            let ft = FuelType::from_code(code);
+            assert_eq!(ft.has_crown_initiation(), code < 14, "csfi {code}");
+            assert_eq!(ft.is_fuel(), code < 19, "fire type {code}");
         }
     }
 

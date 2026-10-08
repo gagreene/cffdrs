@@ -111,7 +111,7 @@ pub(crate) fn calc_slope_wind_isi(
 }
 
 /// One fuel's `a * (1 - exp(-b * x))^c` spread curve.
-pub(crate) fn ros_curve(a: f64, b: f64, c: f64, x: f64) -> f64 {
+fn ros_curve(a: f64, b: f64, c: f64, x: f64) -> f64 {
     a * (1.0 - (-b * x).exp()).powf(c)
 }
 

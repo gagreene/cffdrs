@@ -3,7 +3,7 @@
 //! Mirrors `src/cffdrs/cffbps/` (the reference implementation) function by
 //! function: `inputs._verify_inputs` normalization, then the facade's
 //! `runFBP()` chain in the same order, with the same fuel-code conventions
-//! (1..18 modeled, 19/20 non-fuel) and the same NaN semantics (masked cells
+//! (1..18 modeled, 19 non-fuel, 20 water) and the same NaN semantics (masked cells
 //! surface as NaN).
 //!
 //! Every quantity in [`FbpResult`] is asserted against the shared golden
@@ -19,6 +19,7 @@ use crate::fmc::{calc_fmc, injected_fmc};
 use crate::fuel::{CrownFuel, FuelType, RosParams};
 use crate::growth::calc_accel_param;
 use crate::normalize::{invert_wind_aspect, normalize, Normalized};
+use crate::percentile::{percentile_ros, percentile_tinv, wind_decay};
 use crate::ros::{calc_c6_blend, calc_ros, Ros};
 use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
 use crate::surface::{calc_sfc, SurfaceFuel};
@@ -28,7 +29,7 @@ use crate::surface::{calc_sfc, SurfaceFuel};
 /// propagates to the dependent outputs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FbpInput {
-    /// CFFBPS numeric fuel code (1..18 modeled; 19/20 non-fuel).
+    /// CFFBPS numeric fuel code (1..18 modeled; 19 non-fuel; 20 water).
     pub fuel_type: i32,
     /// Date as YYYYMMDD (drives day-of-year and foliar moisture).
     pub wx_date: i64,
@@ -141,7 +142,15 @@ impl FbpInput {
 /// for the exact name table). A NaN field means the quantity is missing or
 /// masked for that cell (for example a non-fuel cell, or a NaN input that
 /// propagated); it is not an error.
+///
+/// The struct is `#[non_exhaustive]`: read its fields, or start from
+/// `FbpResult::default()`, rather than building or destructuring it
+/// exhaustively.
+///
+/// Note that `PartialEq` follows `f64`: a result holding NaN is not equal to
+/// itself.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub struct FbpResult {
     // wind/slope vectoring
     /// Observed wind speed as used by the chain (after input normalisation), km/h.
@@ -344,7 +353,7 @@ impl FbpResult {
 /// `FBP.initialize(...)` + `runFBP()` for a single-point input.
 ///
 /// A NaN input is a missing/masked cell and propagates to the outputs that
-/// depend on it. Fuel codes outside 1..=18 (non-fuel, water, unknown) yield
+/// depend on it. Fuel codes outside 1..=18 (19 non-fuel, 20 water, unknown) yield
 /// NaN behaviour rather than an error; an invalid `wx_date` is treated as
 /// missing (NaN foliar moisture), use [`is_valid_wx_date`] to check it first.
 ///
@@ -481,15 +490,9 @@ pub fn run(input: &FbpInput) -> FbpResult {
     // --- calc_ros_percentile_growth: 50 is an exact no-op; NaN propagates
     let hros_before_percentile = hros;
     if input.percentile_growth != 50.0 {
-        let tinv = crate::percentile::percentile_tinv(input.percentile_growth);
-        hros = crate::percentile::percentile_ros(ft, hros, percentile_cfb, tinv, 1.0);
-        bros = crate::percentile::percentile_ros(
-            ft,
-            bros,
-            percentile_bros_cfb,
-            tinv,
-            crate::percentile::wind_decay(sw.wsv),
-        );
+        let tinv = percentile_tinv(input.percentile_growth);
+        hros = percentile_ros(ft, hros, percentile_cfb, tinv, 1.0);
+        bros = percentile_ros(ft, bros, percentile_bros_cfb, tinv, wind_decay(sw.wsv));
     }
 
     // --- final CFB from the percentile-adjusted head ROS (NaN rule in final_cfb)

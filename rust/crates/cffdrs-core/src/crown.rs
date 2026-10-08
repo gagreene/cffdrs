@@ -5,7 +5,9 @@ use crate::fuel::FuelType;
 
 /// `calc_csfi`: critical surface fire intensity.
 pub(crate) fn calc_csfi(ft: FuelType, cbh: f64, fmc: f64) -> f64 {
-    if ft.code() < 14 {
+    // Unknown negative codes take this branch on purpose (decision D3, see
+    // `FuelType::has_crown_initiation`); the oracle pins it.
+    if ft.has_crown_initiation() {
         (0.01 * cbh * (460.0 + 25.9 * fmc)).powf(1.5)
     } else {
         0.0
@@ -62,7 +64,9 @@ pub(crate) fn final_cfb(ft: FuelType, hros: f64, hros_before_percentile: f64, rs
 
 /// `calc_fire_type`: 1 surface, 2 passive crown, 3 active crown.
 pub(crate) fn calc_fire_type(ft: FuelType, cfb: f64) -> f64 {
-    if ft.code() < 19 {
+    // Unknown negative codes take this branch on purpose (decision D3, see
+    // `FuelType::is_fuel`); the oracle pins it.
+    if ft.is_fuel() {
         if cfb.is_nan() {
             0.0 // masked cell: grid-truth observable is 0, not a class
         } else if cfb <= 0.1 {
