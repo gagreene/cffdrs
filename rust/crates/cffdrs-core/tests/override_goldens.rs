@@ -3,7 +3,7 @@
 //! quantities from an engine-supplied ROS:
 //!
 //!   initialize -> invertWindAspect -> calcSF -> calcISZ -> setParams(fmc)
-//!   -> calcISI_RSI_BE -> calcSFC -> getCBH_CFL -> calcROS -> setParams(hros)
+//!   -> `calcISI_RSI_BE` -> calcSFC -> `getCBH_CFL` -> calcROS -> setParams(hros)
 //!   -> calcCSFI -> calcRSO -> calcC6BlendCFB -> calcC6BlendCFC -> calcC6CROS
 //!   -> calcC6HROS -> calcPercentileCFB -> calcRosPercentileGrowth -> calcCFB
 //!   -> calcFireType -> calcCFC -> calcTFC -> calcHFI -> calcFireIntensityClass
@@ -17,7 +17,7 @@
 //!   recomputed from the blended hros (case 2: hros 1.378 is far below rso, so
 //!   cfb is 0 and the cell is a surface fire); other crowning fuels use the
 //!   injected hros.
-//! - hfi = 0 yields fi_class -99 (case 5).
+//! - hfi = 0 yields `fi_class` -99 (case 5).
 
 use cffdrs_core::fbp::{run, FbpInput};
 
@@ -43,16 +43,16 @@ const CASES: [Case; 5] = [
         fmc_override: 97.5,
         hros_override: 4.0,
         expected: [
-            847.5258291304367,
-            0.9696189203386331,
-            0.5019165512987145,
+            847.525_829_130_436_7,
+            0.969_618_920_338_633_1,
+            0.501_916_551_298_714_5,
             2.0,
-            0.4015332410389716,
+            0.401_533_241_038_971_6,
             4.0,
-            3.315137790045516,
-            3978.1653480546192,
+            3.315_137_790_045_516,
+            3_978.165_348_054_619_2,
             4.0,
-            2.9136045490065445,
+            2.913_604_549_006_544_5,
             97.5,
         ],
     },
@@ -65,16 +65,16 @@ const CASES: [Case; 5] = [
         fmc_override: 97.5,
         hros_override: 60.0,
         expected: [
-            847.5258291304367,
-            0.9696189203386331,
-            0.9999987306272135,
+            847.525_829_130_436_7,
+            0.969_618_920_338_633_1,
+            0.999_998_730_627_213_5,
             3.0,
-            0.7999989845017708,
+            0.799_998_984_501_770_8,
             60.0,
-            3.7136035335083153,
-            66844.86360314967,
+            3.713_603_533_508_315_3,
+            66_844.863_603_149_67,
             6.0,
-            2.9136045490065445,
+            2.913_604_549_006_544_5,
             97.5,
         ],
     },
@@ -87,16 +87,16 @@ const CASES: [Case; 5] = [
         fmc_override: 105.0,
         hros_override: 10.0,
         expected: [
-            3320.360999080089,
-            5.030716309746868,
+            3_320.360_999_080_089,
+            5.030_716_309_746_868,
             0.0,
             1.0,
             0.0,
-            1.3782364289505988,
-            2.2000584639388134,
-            909.660216246471,
+            1.378_236_428_950_598_8,
+            2.200_058_463_938_813_4,
+            909.660_216_246_471,
             3.0,
-            2.2000584639388134,
+            2.200_058_463_938_813_4,
             105.0,
         ],
     },
@@ -121,16 +121,16 @@ const CASES: [Case; 5] = [
         fmc_override: 99.0,
         hros_override: 0.0,
         expected: [
-            2444.111969224106,
-            4.234514865780585,
+            2_444.111_969_224_106,
+            4.234_514_865_780_585,
             0.0,
             1.0,
             0.0,
             0.0,
-            1.9239606320078113,
+            1.923_960_632_007_811_3,
             0.0,
             -99.0,
-            1.9239606320078113,
+            1.923_960_632_007_811_3,
             99.0,
         ],
     },
@@ -141,7 +141,7 @@ fn override_chain_matches_python_sequence() {
     for (i, case) in CASES.iter().enumerate() {
         let result = run(&FbpInput {
             fuel_type: case.fuel_type,
-            wx_date: 20230615,
+            wx_date: 20_230_615,
             lat: 55.0,
             long: -110.0,
             elevation: 500.0,

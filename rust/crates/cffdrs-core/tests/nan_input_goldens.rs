@@ -11,7 +11,7 @@ use cffdrs_core::fbp::{run, FbpInput};
 fn base() -> FbpInput {
     FbpInput {
         fuel_type: 2,
-        wx_date: 20230615,
+        wx_date: 20_230_615,
         lat: 55.0,
         long: -110.0,
         elevation: 500.0,
@@ -81,12 +81,12 @@ fn nan_bui_leaves_wind_chain_intact() {
     let r = run(&input);
     assert!(r.hros.is_nan() && r.bros.is_nan() && r.hfi.is_nan());
     assert!(
-        (r.wsv - 20.251831110187).abs() < 1e-9,
+        (r.wsv - 20.251_831_110_187).abs() < 1e-9,
         "wsv finite: got {}",
         r.wsv
     );
     assert!(
-        (r.raz - 170.954944453942).abs() < 1e-9,
+        (r.raz - 170.954_944_453_942).abs() < 1e-9,
         "raz finite: got {}",
         r.raz
     );
@@ -100,13 +100,13 @@ fn nan_weather_inputs_propagate_to_nan_spread() {
     // (mutator, sfc expectation): sfc is BUI/FFMC-driven per fuel, so it
     // pins that NaN reaches exactly the fields Python's masks let through.
     let cases: [NanCase; 4] = [
-        (|i| i.ws = f64::NAN, Some(2.9136045490065445)),
-        (|i| i.ffmc = f64::NAN, Some(2.9136045490065445)),
+        (|i| i.ws = f64::NAN, Some(2.913_604_549_006_544_5)),
+        (|i| i.ffmc = f64::NAN, Some(2.913_604_549_006_544_5)),
         // sfc None: Python's masked pipeline leaks the fill value into sfc
         // (prints 5.0) for NaN bui — an artifact, not science; the core
         // reports NaN there. hros/hfi (what engines consume) match.
         (|i| i.bui = f64::NAN, None),
-        (|i| i.slope_pct = f64::NAN, Some(2.9136045490065445)),
+        (|i| i.slope_pct = f64::NAN, Some(2.913_604_549_006_544_5)),
     ];
     for (idx, (mutate, sfc)) in cases.iter().enumerate() {
         let mut input = base();

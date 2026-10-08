@@ -5,9 +5,9 @@
 //! on the SAME machine and toolchain before refactoring, then compare after each
 //! step:
 //!
-//!   CFFDRS_BASELINE_RECORD=1 \
+//!     CFFDRS_BASELINE_RECORD=1 \
+//!       cargo test --manifest-path rust/Cargo.toml -p cffdrs-core --test characterization -- --ignored
 //!     cargo test --manifest-path rust/Cargo.toml -p cffdrs-core --test characterization -- --ignored
-//!   cargo test --manifest-path rust/Cargo.toml -p cffdrs-core --test characterization -- --ignored
 //!
 //! The baseline is `rust/target/characterization-baseline.txt` (the workspace
 //! `target/` directory, git-ignored), resolved from `CARGO_MANIFEST_DIR` because
@@ -94,6 +94,8 @@ fn bits(x: f64) -> u64 {
 }
 
 struct Lcg(u64);
+// Top 53 bits of the LCG state scaled to [0, 1): exact in f64.
+#[allow(clippy::cast_precision_loss)]
 impl Lcg {
     fn unit(&mut self) -> f64 {
         self.0 = self

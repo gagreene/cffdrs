@@ -58,7 +58,7 @@ pub(crate) fn calc_c6_blend(sros: f64, blend_cfb: f64, cfl: f64, isi: f64, fme: 
     let cros = if blend_cfc == 0.0 {
         0.0
     } else {
-        60.0 * (1.0 - (-0.0497 * isi).exp()) * (fme / 0.778237)
+        60.0 * (1.0 - (-0.0497 * isi).exp()) * (fme / 0.778_237)
     };
     let hros = sros + blend_cfb * (cros - sros);
     C6Blend { cros, hros }

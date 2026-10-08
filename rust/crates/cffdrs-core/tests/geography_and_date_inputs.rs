@@ -10,7 +10,7 @@ use cffdrs_core::fbp::{is_valid_wx_date, run, FbpInput};
 fn c6() -> FbpInput {
     FbpInput {
         fuel_type: 6,
-        wx_date: 20230615,
+        wx_date: 20_230_615,
         lat: 55.0,
         long: -110.0,
         elevation: 500.0,
@@ -77,12 +77,25 @@ fn injected_dates_fully_determine_fmc_despite_missing_elevation() {
 
 #[test]
 fn calendar_validation() {
-    for ok in [20230615, 20240229, 20231231, 20230101, 20000229, 20230228] {
+    for ok in [
+        20_230_615, 20_240_229, 20_231_231, 20_230_101, 20_000_229, 20_230_228,
+    ] {
         assert!(is_valid_wx_date(ok), "{ok} should be valid");
     }
     for bad in [
-        20231301, 20230230, 20230431, 20230229, 20231232, 20230001, 20230100, 19000229, 0, -1,
-        2023615, 123456789, 20230632,
+        20_231_301,
+        20_230_230,
+        20_230_431,
+        20_230_229,
+        20_231_232,
+        20_230_001,
+        20_230_100,
+        19_000_229,
+        0,
+        -1,
+        2_023_615,
+        123_456_789,
+        20_230_632,
     ] {
         assert!(!is_valid_wx_date(bad), "{bad} should be invalid");
     }

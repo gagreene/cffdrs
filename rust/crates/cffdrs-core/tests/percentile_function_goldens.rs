@@ -24,6 +24,8 @@ fn percentile_ros_matches_python_function() {
     let rows = snapshot["rows"].as_array().expect("rows");
     assert!(rows.len() >= 700, "snapshot shrank: {} rows", rows.len());
     for row in rows {
+        // Fuel codes in the snapshot are small integers.
+        #[allow(clippy::cast_possible_truncation)]
         let fuel = row["fuel_type"].as_i64().unwrap() as i32;
         let (cfb, pct) = (
             row["regime_cfb"].as_f64().unwrap(),

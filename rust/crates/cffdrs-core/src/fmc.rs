@@ -7,10 +7,16 @@ fn is_leap_year(y: i64) -> bool {
 /// Days in each month of a non-leap year.
 const MONTH_DAYS: [i64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
+/// Days elapsed before the first of each month in a non-leap year.
+const CUM_DAYS: [i64; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
 /// Whether `wx_date` is a real `YYYYMMDD` calendar date (year 1-9999), as
 /// `datetime.strptime(str(wx_date), '%Y%m%d')` requires. Callers should check
 /// this once before a grid pass; the core itself treats an invalid date as
 /// missing (NaN) rather than panicking.
+// `mth` is range-checked to 1..=12 just above, so the index cast cannot go negative.
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+#[must_use]
 pub fn is_valid_wx_date(wx_date: i64) -> bool {
     if !(10_000_101..=99_991_231).contains(&wx_date) {
         return false;
@@ -27,6 +33,12 @@ pub fn is_valid_wx_date(wx_date: i64) -> bool {
 
 /// Day of year from YYYYMMDD — `datetime.strptime(...).timetuple().tm_yday`.
 /// NaN for an invalid date.
+// `mth` is 1..=12 after the validity check; `doy` is at most 366, exact in f64.
+#[allow(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss
+)]
 fn day_of_year(wx_date: i64) -> f64 {
     if !is_valid_wx_date(wx_date) {
         return f64::NAN;
@@ -34,14 +46,15 @@ fn day_of_year(wx_date: i64) -> f64 {
     let y = wx_date / 10_000;
     let mth = (wx_date / 100 % 100) as usize;
     let d = wx_date % 100;
-    const CUM: [i64; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-    let mut doy = CUM[mth - 1] + d;
+    let mut doy = CUM_DAYS[mth - 1] + d;
     if mth > 2 && is_leap_year(y) {
         doy += 1;
     }
     doy as f64
 }
 
+// Field names mirror the Python `calc_fmc` outputs (`fmc` included).
+#[allow(clippy::struct_field_names)]
 pub(crate) struct Fmc {
     pub latn: f64,
     pub d0: f64,

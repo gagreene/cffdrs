@@ -54,7 +54,7 @@ pub enum FuelType {
     Unknown(i32),
 }
 
-/// Surface ROS parameters (a, b, c, q, bui0, be_max) — `constants.rosParams`.
+/// Surface ROS parameters (a, b, c, q, bui0, `be_max`) — `constants.rosParams`.
 /// `None` entries in the Python table surface as NaN, matching numpy
 /// assignment semantics.
 #[derive(Debug, Clone, Copy)]
@@ -89,6 +89,7 @@ const fn rp(a: f64, b: f64, c: f64, q: f64, bui0: f64, be_max: f64) -> RosParams
 impl FuelType {
     /// Convert an integer fuel code to a `FuelType`. Total: codes outside
     /// 1..=20 become `Unknown(code)`.
+    #[must_use]
     pub const fn from_code(code: i32) -> Self {
         match code {
             1 => Self::C1,
@@ -116,6 +117,7 @@ impl FuelType {
     }
 
     /// The integer fuel code; the inverse of [`FuelType::from_code`].
+    #[must_use]
     pub const fn code(self) -> i32 {
         match self {
             Self::C1 => 1,
@@ -143,11 +145,13 @@ impl FuelType {
     }
 
     /// True for the modeled fuels (codes 1..=18).
+    #[must_use]
     pub const fn is_modeled(self) -> bool {
         matches!(self.code(), 1..=18)
     }
 
     /// True for open fuels (`constants.open_fuel_types`).
+    #[must_use]
     pub const fn is_open(self) -> bool {
         matches!(
             self,
@@ -156,6 +160,7 @@ impl FuelType {
     }
 
     /// True for fuels that never crown (`constants.non_crowning_fuels`).
+    #[must_use]
     pub const fn is_non_crowning(self) -> bool {
         matches!(
             self,
@@ -181,6 +186,9 @@ impl FuelType {
 
     /// Surface ROS parameters; codes without a table entry fall back to
     /// `(0, 0, 0, 0, 1, 1)`, as `ros_params.get(ftype, (0, 0, 0, 0, 1, 1))`.
+    // One row per fuel type, mirroring the Python table; identical rows stay
+    // separate so each fuel can be edited and audited independently.
+    #[allow(clippy::match_same_arms)]
     pub(crate) fn ros_params(self) -> RosParams {
         const NAN: f64 = f64::NAN;
         match self {
@@ -233,6 +241,9 @@ mod tests {
     // Verbatim copies of the pre-refactor integer logic from fbp.rs, kept as
     // the reference the enum must reproduce for every code.
 
+    // One row per fuel type, mirroring the Python table; identical rows stay
+    // separate so each fuel can be edited and audited independently.
+    #[allow(clippy::match_same_arms)]
     fn old_ros_params(fuel_type: i32) -> (f64, f64, f64, f64, f64, f64) {
         const NAN: f64 = f64::NAN;
         match fuel_type {
@@ -271,8 +282,7 @@ mod tests {
             6 => (7.0, 1.8),
             7 => (10.0, 0.5),
             8 | 9 | 14 | 15 | 16 | 17 | 18 => (0.0, 0.0),
-            10 | 11 => (6.0, 0.8),
-            12 | 13 => (6.0, 0.8),
+            10..=13 => (6.0, 0.8),
             _ => (NAN, NAN),
         }
     }

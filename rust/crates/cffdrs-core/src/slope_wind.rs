@@ -18,6 +18,8 @@ pub(crate) fn calc_sf(slope: f64) -> f64 {
     }
 }
 
+// Field names mirror the Python `calc_isz` outputs (`isz` included).
+#[allow(clippy::struct_field_names)]
 pub(crate) struct Isz {
     pub m: f64,
     pub f_f: f64,
@@ -140,6 +142,8 @@ pub(crate) struct SpreadIndices {
 
 /// `calc_isi_rsi_be`: ROS at zero wind/slope, slope-equivalent ISF, the
 /// slope/wind ISI, RSI/BRSI and the buildup effect.
+// Mirrors Python `calc_isi_rsi_be` branch for branch.
+#[allow(clippy::too_many_lines)]
 pub(crate) fn calc_isi_rsi_be(
     ft: FuelType,
     params: &RosParams,

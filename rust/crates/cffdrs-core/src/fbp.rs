@@ -213,8 +213,9 @@ pub struct FbpResult {
 
 impl FbpResult {
     /// Every output paired with its Python-package name (the names
-    /// `FBP.getParams` accepts, e.g. "hros", "fF", "fire_type"), in a fixed
+    /// `FBP.getParams` accepts, e.g. `hros`, `fF`, `fire_type`), in a fixed
     /// order. This table is the single place the names are defined.
+    #[must_use]
     pub fn named_values(&self) -> [(&'static str, f64); 54] {
         [
             ("ws", self.ws),
@@ -276,6 +277,7 @@ impl FbpResult {
 
     /// Value by its Python-package output name (see
     /// [`FbpResult::named_values`]); `None` for an unknown name.
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<f64> {
         self.named_values()
             .into_iter()
@@ -333,6 +335,10 @@ impl FbpResult {
 /// assert!([1.0, 2.0, 3.0].contains(&result.fire_type));
 /// assert_eq!(result.get("hros"), Some(result.hros));
 /// ```
+// One straight-line pass that mirrors the Python `FBP` pipeline stage by stage;
+// splitting it would obscure that correspondence.
+#[allow(clippy::too_many_lines)]
+#[must_use]
 pub fn run(input: &FbpInput) -> FbpResult {
     let ft = FuelType::from_code(input.fuel_type);
 
@@ -344,7 +350,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
 
     // --- invert_wind_aspect
     let (wd, aspect) = invert_wind_aspect(n.wd, n.aspect);
-    let n = Normalized { wd, aspect, ..n };
+    let n = Normalized { aspect, wd, ..n };
     let (ws, ffmc, bui, pc, pdf) = (n.ws, n.ffmc, n.bui, n.pc, n.pdf);
 
     // --- calc_sf
@@ -514,7 +520,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
         hfi,
         fi_class,
         accel,
-        fuel_type: ft.code() as f64,
+        fuel_type: f64::from(ft.code()),
     }
 }
 

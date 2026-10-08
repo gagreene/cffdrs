@@ -30,6 +30,7 @@ const T_DF: f64 = 9_999_999.0;
 /// Wind-speed decay `k(w)` applied to the backing-fire noise term. `wsv` is
 /// the net effective wind speed in km/h; NaN gives NaN. Mirrors the wind decay
 /// in the Python `growth` module.
+#[must_use]
 pub fn wind_decay(wsv: f64) -> f64 {
     if wsv < 40.0 {
         (-0.10078 * wsv).exp()
@@ -41,6 +42,7 @@ pub fn wind_decay(wsv: f64) -> f64 {
 /// Student-t quantile for a percentile in 0-100, capped to
 /// `[MIN_PERCENTILE, MAX_PERCENTILE]`. NaN stays NaN. 50 gives exactly 0.0.
 /// [`crate::fbp::run`] skips the adjustment entirely at percentile 50.
+#[must_use]
 pub fn percentile_tinv(percentile_growth: f64) -> f64 {
     let capped = if percentile_growth.is_nan() {
         f64::NAN
@@ -57,6 +59,7 @@ pub fn percentile_tinv(percentile_growth: f64) -> f64 {
 /// `calc_ros_percentile_growth` in the Python package. Never panics. At
 /// percentile 50 the surface regime is exact, but the crown formula is not
 /// guaranteed bit-exact; `run` skips the call at 50 for that reason.
+#[must_use]
 pub fn percentile_ros(
     fuel_type: FuelType,
     ros: f64,
@@ -123,7 +126,7 @@ mod tests {
         let tinv = percentile_tinv(5.0);
         let mut prev = -1.0;
         for i in 0..=2000 {
-            let ros = i as f64 * 0.005;
+            let ros = f64::from(i) * 0.005;
             let out = percentile_ros(FuelType::from_code(2), ros, 0.9, tinv, 1.0);
             assert!(out >= prev - 1e-12, "ros={ros}: {out} < {prev}");
             prev = out;

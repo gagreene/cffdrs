@@ -1,6 +1,4 @@
 //! Fixture loading shared by the golden test binaries.
-// Each test binary compiles this module separately and uses only some helpers.
-#![allow(dead_code)]
 
 use cffdrs_core::fbp::FbpInput;
 use std::collections::HashMap;
@@ -13,6 +11,8 @@ pub fn repo_path(rel: &str) -> PathBuf {
         .join(rel)
 }
 
+// One field per CSV column, so the length tracks the fixture schema.
+#[allow(clippy::too_many_lines)]
 pub fn parse_inputs() -> HashMap<i64, FbpInput> {
     let text = std::fs::read_to_string(repo_path(
         "tests/cffbps/data/Inputs_for_Test_Cases_Wotton2009.csv",

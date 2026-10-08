@@ -14,6 +14,8 @@ const GC: [f64; 2] = [60.0, 80.0];
 const WS: [f64; 2] = [15.0, 30.0];
 const WD: [f64; 2] = [270.0, 90.0];
 
+type Setter = for<'a> fn(&mut GridInput<'a>, &'a [f64]);
+
 fn input<'a>() -> GridInput<'a> {
     GridInput {
         fuel_type: &FUEL,
@@ -26,7 +28,7 @@ fn input<'a>() -> GridInput<'a> {
         grass_curing: &GC,
         ws: &WS,
         wd: &WD,
-        wx_date: 20230715,
+        wx_date: 20_230_715,
         ffmc: 90.0,
         bui: 60.0,
         pct_dead_fir: 30.0,
@@ -57,7 +59,6 @@ fn fields(g: &BehaviourGrids) -> [(&'static str, &Vec<f64>); 10] {
 #[test]
 fn mismatched_length_is_reported_for_each_slice() {
     let short = [1.0_f64; 1];
-    type Setter = for<'a> fn(&mut GridInput<'a>, &'a [f64]);
     let cases: [(&str, Setter); 9] = [
         ("lat", |i, s| i.lat = s),
         ("long", |i, s| i.long = s),
@@ -87,8 +88,8 @@ fn mismatched_length_is_reported_for_each_slice() {
 #[test]
 fn invalid_date_is_rejected() {
     let mut inp = input();
-    inp.wx_date = 20230230;
-    assert_eq!(run_grid(&inp), Err(GridError::InvalidDate(20230230)));
+    inp.wx_date = 20_230_230;
+    assert_eq!(run_grid(&inp), Err(GridError::InvalidDate(20_230_230)));
 }
 
 #[test]
@@ -181,7 +182,7 @@ fn error_display_text() {
     };
     assert_eq!(e.to_string(), "lat has 3 values but fuel_type has 4");
     assert_eq!(
-        GridError::InvalidDate(20230230).to_string(),
+        GridError::InvalidDate(20_230_230).to_string(),
         "wx_date 20230230 is not a valid YYYYMMDD calendar date"
     );
     let _: &dyn std::error::Error = &e;
