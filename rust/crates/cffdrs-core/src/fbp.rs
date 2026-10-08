@@ -10,6 +10,7 @@
 //! snapshot (`tests/cffbps/data/golden/wotton2009_scalar_snapshot.json`) —
 //! the same file the Python suite validates against.
 
+use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc};
 use crate::crown::{
     calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
 };
@@ -333,25 +334,11 @@ pub fn run(input: &FbpInput) -> FbpResult {
     // golden harness, not here.
 
     // --- calc_tfc / calc_hfi
-    let tfc = sfc + cfc;
-    let hfi = 300.0 * hros * tfc;
+    let tfc = calc_tfc(sfc, cfc);
+    let hfi = calc_hfi(hros, tfc);
 
     // --- calc_fire_intensity_class
-    let fi_class = if hfi > 10000.0 {
-        6.0
-    } else if hfi > 4000.0 {
-        5.0
-    } else if hfi > 2000.0 {
-        4.0
-    } else if hfi > 500.0 {
-        3.0
-    } else if hfi > 10.0 {
-        2.0
-    } else if hfi > 0.0 {
-        1.0
-    } else {
-        -99.0
-    };
+    let fi_class = calc_fire_intensity_class(hfi);
 
     FbpResult {
         ws,

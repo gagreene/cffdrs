@@ -8,6 +8,7 @@
 
 #![forbid(unsafe_code)]
 
+mod consumption;
 mod crown;
 pub mod fbp;
 mod fmc;
