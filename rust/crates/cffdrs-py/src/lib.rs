@@ -13,6 +13,12 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+/// Copy a 2-D array into an owned `Vec` in logical row-major order, whatever
+/// its memory layout (C, Fortran or strided).
+fn row_major<T: numpy::Element + Copy>(array: &PyReadonlyArray2<'_, T>) -> Vec<T> {
+    array.as_array().iter().copied().collect()
+}
+
 /// The CFFBPS grid pass for one weather step: per-cell fuel/terrain/wind
 /// grids plus scalar ffmc/bui/date. Returns a dict of 2-D float64 arrays
 /// (`hros, bros, raz, wsv, hfi, rso, sros, sfc, fmc, accel`); cells with
@@ -21,6 +27,13 @@ use pyo3::types::PyDict;
 /// `percentile_growth` is a percentile (0-100) of the ROS distribution, not a
 /// percent change: 50 is the unadjusted ROS, values outside (0.001, 99.999) are
 /// capped, and NaN propagates, matching the Python package.
+///
+/// Input contract: arrays may have any memory layout (C, Fortran or strided);
+/// they are copied to row-major buffers before the GIL is released, so other
+/// threads may safely mutate the caller's arrays during the run. `wx_date` must
+/// be a real `YYYYMMDD` calendar date or a `ValueError` is raised. A NaN
+/// latitude, longitude or elevation masks that cell's foliar moisture (and any
+/// crown behaviour that depends on it), as in the Python package.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn run_fbp_grid<'py>(
@@ -42,6 +55,12 @@ fn run_fbp_grid<'py>(
     grass_fuel_load: f64,
     percentile_growth: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
+    if !cffdrs_core::fbp::is_valid_wx_date(wx_date) {
+        return Err(PyValueError::new_err(format!(
+            "wx_date {wx_date} is not a valid YYYYMMDD calendar date"
+        )));
+    }
+
     let (nrows, ncols) = (fuel_type.shape()[0], fuel_type.shape()[1]);
     let expect = |name: &str, s: &[usize]| -> PyResult<()> {
         if s != [nrows, ncols] {
@@ -65,28 +84,33 @@ fn run_fbp_grid<'py>(
         expect(name, arr.shape())?;
     }
 
-    let fuel = fuel_type.as_slice()?;
-    let (lat_s, long_s) = (lat.as_slice()?, long.as_slice()?);
+    // Snapshot every input into an owned, row-major buffer before the GIL is
+    // released. Reading `as_slice()` would hand Rust the array's physical memory
+    // order (wrong for Fortran-ordered inputs, an error for strided views), and
+    // would leave caller-owned memory borrowed while other Python threads can
+    // still mutate it; rust-numpy's borrow tracking does not cover that.
+    let fuel = row_major(&fuel_type);
+    let (lat_s, long_s) = (row_major(&lat), row_major(&long));
     let (elev_s, slope_s, aspect_s) = (
-        elevation.as_slice()?,
-        slope_pct.as_slice()?,
-        aspect_deg.as_slice()?,
+        row_major(&elevation),
+        row_major(&slope_pct),
+        row_major(&aspect_deg),
     );
-    let (pc_s, gc_s) = (pct_conifer.as_slice()?, grass_curing.as_slice()?);
-    let (ws_s, wd_s) = (ws.as_slice()?, wd.as_slice()?);
+    let (pc_s, gc_s) = (row_major(&pct_conifer), row_major(&grass_curing));
+    let (ws_s, wd_s) = (row_major(&ws), row_major(&wd));
 
     let grids = py.allow_threads(|| {
         cffdrs_core::fbp::run_grid(
-            fuel,
-            lat_s,
-            long_s,
-            elev_s,
-            slope_s,
-            aspect_s,
-            pc_s,
-            gc_s,
-            ws_s,
-            wd_s,
+            &fuel,
+            &lat_s,
+            &long_s,
+            &elev_s,
+            &slope_s,
+            &aspect_s,
+            &pc_s,
+            &gc_s,
+            &ws_s,
+            &wd_s,
             wx_date,
             ffmc,
             bui,

@@ -60,11 +60,11 @@ def grids():
 SCALARS = dict(wx_date=20230615, ffmc=91.2, bui=76.4, pdf=42.0, gfl=0.41)
 
 
-def python_reference(g, percentile=50):
+def python_reference(g, percentile=50, wx_date=None):
     fbp = FBP()
     fbp.initialize(
         fuel_type=g['fuel_type'].astype(np.float64),
-        wx_date=SCALARS['wx_date'],
+        wx_date=SCALARS['wx_date'] if wx_date is None else wx_date,
         lat=g['lat'], long=g['long'], elevation=g['elevation'],
         slope=g['slope'], aspect=g['aspect'],
         ws=g['ws'], wd=g['wd'],
@@ -81,22 +81,22 @@ def python_reference(g, percentile=50):
     return out
 
 
-def rust_grid(g, percentile=50.0):
+def rust_grid(g, percentile=50.0, wx_date=None):
     res = rust_backend.run_fbp_grid(
         g['fuel_type'],
         g['lat'], g['long'], g['elevation'],
         g['slope'], g['aspect'],
         g['pc'], g['gcf'],
         g['ws'], g['wd'],
-        SCALARS['wx_date'], SCALARS['ffmc'], SCALARS['bui'],
+        SCALARS['wx_date'] if wx_date is None else wx_date, SCALARS['ffmc'], SCALARS['bui'],
         SCALARS['pdf'], SCALARS['gfl'], percentile,
     )
     return {name: np.asarray(res[name]) for name in FIELDS}
 
 
-def assert_grid_parity(grids, percentile):
-    py = python_reference(grids, percentile)
-    rs = rust_grid(grids, float(percentile))
+def assert_grid_parity(grids, percentile, wx_date=None):
+    py = python_reference(grids, percentile, wx_date)
+    rs = rust_grid(grids, float(percentile), wx_date)
     modeled = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18)
     for name in FIELDS:
         a, b = py[name], rs[name]
@@ -133,6 +133,55 @@ def test_percentile_growth_changes_results(grids):
 def test_nan_percentile_matches_python(grids):
     """NaN is not capped: both implementations propagate it identically."""
     assert_grid_parity(grids, float('nan'))
+
+
+def _copy(g):
+    return {k: v.copy() for k, v in g.items()}
+
+
+def test_nan_geography_matches_python(grids):
+    """A missing latitude, longitude or elevation is a masked cell in Python and must not become a
+    valid foliar moisture (and so valid crown behaviour) in the compiled pass."""
+    g = _copy(grids)
+    g['lat'][5, 0:6] = np.nan
+    g['long'][6, 0:6] = np.nan
+    g['elevation'][7, 0:6] = np.nan
+    assert_grid_parity(g, 50)
+
+
+@pytest.mark.parametrize('order', ['fortran', 'strided'])
+def test_input_memory_layout_does_not_change_results(grids, order):
+    """Results depend on the array's values, never its memory layout: Fortran-ordered and
+    non-contiguous inputs give exactly the same grid as C-ordered ones."""
+    expected = rust_grid(grids)
+    laid_out = {}
+    for k, v in grids.items():
+        if v.ndim != 2:
+            laid_out[k] = v
+        elif order == 'fortran':
+            laid_out[k] = np.asfortranarray(v)
+        else:
+            wide = np.zeros((v.shape[0], v.shape[1] * 2), dtype=v.dtype)
+            wide[:, ::2] = v
+            laid_out[k] = wide[:, ::2]
+    got = rust_grid(laid_out)
+    for name in FIELDS:
+        assert np.array_equal(got[name], expected[name], equal_nan=True), name
+
+
+@pytest.mark.parametrize('wx_date', [20231301, 20230230, 20230431, 20230229, 20231232, 20230001, 20230100, 0])
+def test_invalid_dates_raise_value_error(grids, wx_date):
+    """Python rejects impossible calendar dates with ValueError; the compiled pass must too (not
+    panic on a bad month, or silently accept day 30 of February)."""
+    with pytest.raises(ValueError):
+        rust_grid(grids, wx_date=wx_date)
+    with pytest.raises(ValueError):
+        python_reference(grids, wx_date=wx_date)
+
+
+@pytest.mark.parametrize('wx_date', [20240229, 20231231, 20230101])
+def test_edge_valid_dates_match_python(grids, wx_date):
+    assert_grid_parity(grids, 50, wx_date)
 
 
 def test_non_fuel_cells_are_nan(grids):
