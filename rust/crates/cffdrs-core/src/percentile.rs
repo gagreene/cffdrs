@@ -39,8 +39,8 @@ pub fn wind_decay(wsv: f64) -> f64 {
 }
 
 /// Student-t quantile for a percentile in 0-100, capped to
-/// `[MIN_PERCENTILE, MAX_PERCENTILE]`. NaN stays NaN. 50 gives exactly 0.0,
-/// which leaves the ROS unchanged.
+/// `[MIN_PERCENTILE, MAX_PERCENTILE]`. NaN stays NaN. 50 gives exactly 0.0.
+/// [`crate::fbp::run`] skips the adjustment entirely at percentile 50.
 pub fn percentile_tinv(percentile_growth: f64) -> f64 {
     let capped = if percentile_growth.is_nan() {
         f64::NAN
@@ -54,7 +54,9 @@ pub fn percentile_tinv(percentile_growth: f64) -> f64 {
 /// CFB; `noise_scale` is 1.0 for head fire and `wind_decay(wsv)` for backing.
 /// `ros` is in m/min and `tinv` comes from [`percentile_tinv`]. Fuels outside
 /// the percentile model's scope are returned unchanged; NaN propagates. Mirrors
-/// `calc_ros_percentile_growth` in the Python package. Never panics.
+/// `calc_ros_percentile_growth` in the Python package. Never panics. At
+/// percentile 50 the surface regime is exact, but the crown formula is not
+/// guaranteed bit-exact; `run` skips the call at 50 for that reason.
 pub fn percentile_ros(
     fuel_type: FuelType,
     ros: f64,

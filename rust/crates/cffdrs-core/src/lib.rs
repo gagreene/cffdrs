@@ -13,10 +13,10 @@
 //! | Module | Responsibility | Python counterpart |
 //! |---|---|---|
 //! | [`fbp`] | [`fbp::FbpInput`], [`fbp::FbpResult`], [`fbp::run`] composing the stages | `facade.runFBP` |
-//! | [`grid`] | [`grid::GridInput`], [`grid::GridError`], [`grid::BehaviourGrids`], [`grid::run_grid`] | grid driver |
+//! | [`grid`] | [`grid::GridInput`], [`grid::GridError`], [`grid::BehaviourGrids`], [`grid::run_grid`] | `cffdrs._rust.run_fbp_grid` (compiled grid pass); `fbpMultiprocessArray` in `parallel.py` |
 //! | [`fuel`] | [`fuel::FuelType`] | `constants.py` |
 //! | [`percentile`] | percentile growth model | `equations/growth.py` |
-//! | [`quantile`] | Student-t / normal quantile used by the percentile model | scipy `t.ppf` |
+//! | `quantile` (private) | internal Student-t / normal quantile used by the percentile model | scipy `t.ppf` |
 //!
 //! The remaining modules are private implementation stages: input
 //! normalisation (`inputs.py`), foliar moisture (`equations/fmc.py`), slope and
@@ -79,7 +79,7 @@ pub mod grid;
 mod growth;
 mod normalize;
 pub mod percentile;
-pub mod quantile;
+mod quantile;
 mod ros;
 mod slope_wind;
 mod surface;

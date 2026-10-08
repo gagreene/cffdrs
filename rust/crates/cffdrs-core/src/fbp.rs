@@ -93,21 +93,21 @@ pub struct FbpInput {
 #[derive(Debug, Clone, Default)]
 pub struct FbpResult {
     // wind/slope vectoring
-    /// Wind speed after normalisation, km/h.
+    /// Observed wind speed as used by the chain (after input normalisation), km/h.
     pub ws: f64,
-    /// Wind direction after normalisation, compass degrees.
+    /// Wind direction as used by the slope/wind step: the supplied direction inverted by 180 degrees, compass degrees.
     pub wd: f64,
-    /// Wind-slope effect on ISI: net effective wind speed, km/h.
+    /// Slope-equivalent wind speed (the wind speed whose effect equals the slope effect), km/h.
     pub wse: f64,
-    /// Slope-equivalent wind speed, first term, km/h.
+    /// Original slope-equivalent wind speed, used where WSE1 <= 40, km/h.
     pub wse1: f64,
-    /// Slope-equivalent wind speed, second term, km/h.
+    /// Revised slope-equivalent wind speed, used where WSE1 > 40, km/h.
     pub wse2: f64,
-    /// Eastward component of the net wind vector, km/h.
+    /// Net vectorized wind speed in the x (east) direction, km/h.
     pub wsx: f64,
-    /// Northward component of the net wind vector, km/h.
+    /// Net vectorized wind speed in the y (north) direction, km/h.
     pub wsy: f64,
-    /// Net effective wind speed (wind plus slope), km/h.
+    /// Net vectorized (wind plus slope) wind speed, km/h.
     pub wsv: f64,
     /// Net spread direction (rate-of-spread azimuth), compass degrees.
     pub raz: f64,
@@ -120,7 +120,7 @@ pub struct FbpResult {
     pub f_w: f64,
     /// Fine Fuel Moisture Code as used.
     pub ffmc: f64,
-    /// Initial Spread Index.
+    /// Final ISI, accounting for wind and slope.
     pub isi: f64,
     /// Buildup Index as used.
     pub bui: f64,
@@ -131,7 +131,7 @@ pub struct FbpResult {
     pub b: f64,
     /// Surface ROS parameter `c`.
     pub c: f64,
-    /// Buildup effect parameter `q`.
+    /// Proportion of maximum rate of spread at BUI equal to 50 (`q`).
     pub q: f64,
     /// Average BUI for the fuel type, `BUI0`.
     pub bui0: f64,
@@ -185,7 +185,7 @@ pub struct FbpResult {
     pub rso: f64,
     /// Crown fraction burned (0-1).
     pub cfb: f64,
-    /// Fire type code as a float: 1 surface, 2 intermittent crown, 3 active crown.
+    /// Fire type code as a float: 1 surface, 2 intermittent crown, 3 active crown, 0 non-fuel or masked.
     pub fire_type: f64,
     // spread rates
     /// Head fire rate of spread, m/min.
@@ -203,7 +203,7 @@ pub struct FbpResult {
     // intensity / class / growth
     /// Head fire intensity, kW/m.
     pub hfi: f64,
-    /// Fire intensity class code as a float.
+    /// Fire intensity class, 1-6 by HFI thresholds; -99 when HFI <= 0 or masked.
     pub fi_class: f64,
     /// Acceleration parameter for fire growth.
     pub accel: f64,
