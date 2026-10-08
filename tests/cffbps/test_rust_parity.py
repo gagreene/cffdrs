@@ -161,14 +161,16 @@ def test_nan_scalar_matches_python(grids, name, percentile):
     assert_grid_parity(grids, percentile, scalars={**SCALARS, name: float('nan')})
 
 
-@pytest.mark.parametrize('percentile', [5, 50, 90, 0, 100])
+@pytest.mark.parametrize('percentile', [5, 50, 90, 0, 100, float('nan')])
 def test_nan_geography_matches_python_at_percentiles(grids, percentile):
-    """A missing latitude, longitude or elevation masks the percentile regime CFB, so the adjusted
-    ROS (and everything derived from it) is NaN in both implementations, for every fuel."""
+    """A missing latitude, longitude or elevation (one full row each, so every modeled fuel 1..18
+    appears in each hole) gives the same 10 fields in both implementations at each percentile,
+    including a NaN percentile. For crowning fuels the masked regime CFB makes the adjusted ROS
+    NaN; fuels that cannot crown keep a finite regime CFB of 0."""
     g = _copy(grids)
-    g['lat'][5, 0:6] = np.nan
-    g['long'][6, 0:6] = np.nan
-    g['elevation'][7, 0:6] = np.nan
+    g['lat'][5, :] = np.nan
+    g['long'][6, :] = np.nan
+    g['elevation'][7, :] = np.nan
     assert_grid_parity(g, percentile)
 
 
