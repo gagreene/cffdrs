@@ -14,6 +14,11 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+/// Default percent dead balsam fir for a NaN scalar, as in the Python package.
+const PCT_DEAD_FIR_DEFAULT: f64 = 35.0;
+/// Default grass fuel load (kg/m^2) for a NaN scalar, as in the Python package.
+const GRASS_FUEL_LOAD_DEFAULT: f64 = 0.35;
+
 /// Copy a 2-D array into an owned `Vec` in logical row-major order, whatever
 /// its memory layout (C, Fortran or strided).
 fn row_major<T: numpy::Element + Copy>(array: &PyReadonlyArray2<'_, T>) -> Vec<T> {
@@ -35,6 +40,12 @@ fn row_major<T: numpy::Element + Copy>(array: &PyReadonlyArray2<'_, T>) -> Vec<T
 /// be a real `YYYYMMDD` calendar date or a `ValueError` is raised. A NaN
 /// latitude, longitude or elevation masks that cell's foliar moisture (and any
 /// crown behaviour that depends on it), as in the Python package.
+///
+/// Scalar defaults: a NaN `pct_dead_fir` is replaced by 35.0 and a NaN
+/// `grass_fuel_load` by 0.35 before the grid is built, exactly as the Python
+/// package's `initialize` treats a NaN scalar `pdf` / `gfl`. The per-cell
+/// arrays `pct_conifer` and `grass_curing` get no default: a NaN cell there is
+/// a missing input and propagates as NaN.
 // `PyReadonlyArray2` is pyo3's by-value extraction type for numpy arguments; it
 // is a cheap borrow guard, not a payload, so taking it by value is intentional.
 #[pyfunction]
@@ -95,6 +106,18 @@ fn run_fbp_grid<'py>(
     );
     let (pc_s, gc_s) = (row_major(&pct_conifer), row_major(&grass_curing));
     let (ws_s, wd_s) = (row_major(&ws), row_major(&wd));
+
+    // Python's `_coerce` defaults for a NaN scalar pdf / gfl (inputs.py).
+    let pct_dead_fir = if pct_dead_fir.is_nan() {
+        PCT_DEAD_FIR_DEFAULT
+    } else {
+        pct_dead_fir
+    };
+    let grass_fuel_load = if grass_fuel_load.is_nan() {
+        GRASS_FUEL_LOAD_DEFAULT
+    } else {
+        grass_fuel_load
+    };
 
     let input = GridInput {
         fuel_type: &fuel,

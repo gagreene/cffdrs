@@ -115,3 +115,9 @@ def _parity(missing, percentile):
 @pytest.mark.parametrize('missing', ['bui', 'ffmc', 'lat'])
 def test_missing_input_matches_rust(missing, percentile):
     _parity(missing, percentile)
+
+
+@pytest.mark.parametrize('missing', ['gfl', 'pdf'])
+def test_nan_scalar_default_matches_rust(missing):
+    """A NaN scalar gfl/pdf takes Python's default (0.35 / 35) in both implementations."""
+    _parity(missing, 50)
