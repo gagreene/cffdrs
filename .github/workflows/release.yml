@@ -46,7 +46,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-13, macos-latest, windows-latest]
+        # macos-15-intel builds the x86_64 wheel (macos-13 was retired in Dec 2025);
+        # macos-latest builds the arm64 wheel.
+        os: [ubuntu-latest, macos-15-intel, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
@@ -68,8 +70,45 @@ jobs:
           name: distributions-${{ matrix.os }}-py${{ matrix.python-version }}
           path: dist/*
 
+  # Install each built wheel into a clean virtual environment outside the
+  # checkout and exercise it, so a wheel that builds but cannot import or run
+  # (missing extension, wrong tag, broken binding) blocks publication.
+  test-wheels:
+    needs: build-wheels
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15-intel, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/smoke_test_wheel.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: ${{ runner.temp }}/dist
+      - name: Install the wheel into a clean virtual environment
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          if [ "$RUNNER_OS" = "Windows" ]; then PY="$RUNNER_TEMP/venv/Scripts/python.exe"; else PY="$RUNNER_TEMP/venv/bin/python"; fi
+          "$PY" -m pip install "$RUNNER_TEMP"/dist/*.whl
+          echo "VENV_PY=$PY" >> "$GITHUB_ENV"
+      - name: Smoke-test the installed wheel
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          cp "$GITHUB_WORKSPACE/tools/smoke_test_wheel.py" .
+          "$VENV_PY" -I smoke_test_wheel.py
+
   check-distributions:
-    needs: [build-sdist, build-wheels]
+    needs: [build-sdist, build-wheels, test-wheels]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
