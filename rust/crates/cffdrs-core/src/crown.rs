@@ -14,9 +14,12 @@ pub(crate) fn calc_csfi(ft: FuelType, cbh: f64, fmc: f64) -> f64 {
     }
 }
 
-/// `calc_rso`: critical surface spread rate for crowning.
+/// `calc_rso`: critical surface spread rate for crowning. A NaN `sfc` (a
+/// missing input upstream) gives NaN, as Python's masked `where` does.
 pub(crate) fn calc_rso(sfc: f64, csfi: f64) -> f64 {
-    if sfc > 0.0 {
+    if sfc.is_nan() {
+        f64::NAN
+    } else if sfc > 0.0 {
         csfi / (300.0 * sfc)
     } else {
         0.0
@@ -51,11 +54,12 @@ pub(crate) fn directional_cfb(ft: FuelType, ros: f64, rso: f64) -> f64 {
 }
 
 /// Final CFB from the percentile-adjusted head ROS. A NaN that appears
-/// only at the percentile step (NaN percentile) is an unmasked non-finite
-/// value in Python, which the CFB sanitiser zeroes; a NaN that was already
-/// there is a masked cell and stays NaN.
+/// only at the percentile step from a NaN percentile is an unmasked
+/// non-finite value in Python, which the CFB sanitiser zeroes. A NaN that was
+/// already there, or that comes from a missing `rso` (a masked regime CFB
+/// masks the percentile result), is a masked cell and stays NaN.
 pub(crate) fn final_cfb(ft: FuelType, hros: f64, hros_before_percentile: f64, rso: f64) -> f64 {
-    if hros.is_nan() && !hros_before_percentile.is_nan() {
+    if hros.is_nan() && !hros_before_percentile.is_nan() && !rso.is_nan() {
         0.0
     } else {
         directional_cfb(ft, hros, rso)
@@ -104,6 +108,25 @@ mod tests {
         assert_eq!(calc_fire_type(ft, 0.8999), 2.0);
         assert_eq!(calc_fire_type(ft, 0.9), 3.0);
         assert_eq!(calc_fire_type(ft, 1.0), 3.0);
+    }
+
+    #[test]
+    fn rso_propagates_missing_sfc() {
+        // Python: mask.where(sfc > 0, ...) keeps a masked sfc masked
+        assert!(calc_rso(f64::NAN, 500.0).is_nan());
+        assert_eq!(calc_rso(0.0, 500.0), 0.0);
+        assert_eq!(calc_rso(2.0, 600.0), 1.0);
+    }
+
+    #[test]
+    fn final_cfb_keeps_a_missing_rso_missing_after_the_percentile_step() {
+        // A NaN hros after the percentile step is masked in Python when the
+        // regime CFB was masked (missing rso): the final CFB stays NaN for
+        // crowning fuels and 0 for fuels that cannot crown.
+        assert!(final_cfb(FuelType::C2, f64::NAN, 10.0, f64::NAN).is_nan());
+        assert_eq!(final_cfb(FuelType::D1, f64::NAN, 10.0, f64::NAN), 0.0);
+        // A NaN percentile with a finite rso is an unmasked NaN: zeroed.
+        assert_eq!(final_cfb(FuelType::C2, f64::NAN, 10.0, 2.0), 0.0);
     }
 
     #[test]

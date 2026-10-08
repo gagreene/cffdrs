@@ -55,7 +55,9 @@ pub fn percentile_tinv(percentile_growth: f64) -> f64 {
 /// Adjust one directional ROS. `regime_cfb` is that direction's pre-percentile
 /// CFB; `noise_scale` is 1.0 for head fire and `wind_decay(wsv)` for backing.
 /// `ros` is in m/min and `tinv` comes from [`percentile_tinv`]. Fuels outside
-/// the percentile model's scope are returned unchanged; NaN propagates. Mirrors
+/// the percentile model's scope are returned unchanged; NaN propagates, and a
+/// NaN `regime_cfb` (a missing input upstream) gives NaN for every fuel, as
+/// Python's masked regime `where` does. Mirrors
 /// `calc_ros_percentile_growth` in the Python package. Never panics. At
 /// percentile 50 the surface regime is exact, but the crown formula is not
 /// guaranteed bit-exact; `run` skips the call at 50 for that reason.
@@ -67,7 +69,9 @@ pub fn percentile_ros(
     tinv: f64,
     noise_scale: f64,
 ) -> f64 {
-    if regime_cfb < 0.1 {
+    if regime_cfb.is_nan() {
+        f64::NAN
+    } else if regime_cfb < 0.1 {
         if fuel_type.has_surface_regime() {
             ros * (tinv * SURFACE_SIGMA * noise_scale).exp()
         } else {
@@ -117,6 +121,24 @@ mod tests {
         assert!(tinv.is_nan());
         assert!(percentile_ros(FuelType::from_code(2), 7.5, 0.0, tinv, 1.0).is_nan());
         assert!(percentile_ros(FuelType::from_code(2), 7.5, 0.9, tinv, 1.0).is_nan());
+    }
+
+    #[test]
+    fn nan_regime_cfb_propagates_for_every_fuel() {
+        // A NaN regime CFB is a masked cell in Python, whose `where` on the
+        // regime masks the result whatever the fuel's percentile scope.
+        let tinv = percentile_tinv(90.0);
+        for code in 1..=20 {
+            let ft = FuelType::from_code(code);
+            assert!(
+                percentile_ros(ft, 5.0, f64::NAN, tinv, 1.0).is_nan(),
+                "head fuel {code}"
+            );
+            assert!(
+                percentile_ros(ft, 5.0, f64::NAN, tinv, wind_decay(10.0)).is_nan(),
+                "back fuel {code}"
+            );
+        }
     }
 
     #[test]
