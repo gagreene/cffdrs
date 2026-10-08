@@ -1,7 +1,14 @@
 name: Release
 
-# Publishing uses PyPI Trusted Publishing (OIDC); no API tokens are stored in
-# the repository. Manual runs publish to TestPyPI, while v* tags publish to PyPI.
+# PUBLISHING IS CURRENTLY DISABLED. Both publish jobs below are switched off with
+# `if: false`, so a v* tag or a manual run only builds and tests the wheels; nothing
+# is uploaded to PyPI or TestPyPI. To enable publishing, create the `testpypi` /
+# `pypi` environments, register the trusted publishers on (Test)PyPI, and restore
+# each job's original condition (noted beside it).
+#
+# When enabled, publishing uses PyPI Trusted Publishing (OIDC); no API tokens are
+# stored in the repository. Manual runs publish to TestPyPI, while v* tags publish
+# to PyPI.
 
 on:
   workflow_dispatch:
@@ -142,7 +149,8 @@ jobs:
           path: dist/*
 
   publish-testpypi:
-    if: github.event_name == 'workflow_dispatch'
+    # Disabled. Original condition: github.event_name == 'workflow_dispatch'
+    if: false
     needs: [build-and-test, rust-msrv, check-distributions]
     runs-on: ubuntu-latest
     environment: testpypi
@@ -158,7 +166,8 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Disabled. Original condition: startsWith(github.ref, 'refs/tags/v')
+    if: false
     needs: [build-and-test, rust-msrv, check-distributions]
     runs-on: ubuntu-latest
     environment: pypi
