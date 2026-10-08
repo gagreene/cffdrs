@@ -215,3 +215,41 @@ def test_non_fuel_cells_are_nan(grids):
     assert non_fuel.sum() >= 5
     for name in FIELDS:
         assert np.isnan(rs[name][non_fuel]).all(), name
+
+
+def _big(g, reps=20):
+    """The module grid tiled to well over the 4,096-cell threshold for threaded runs."""
+    return {k: np.tile(v, (reps, 1)) for k, v in g.items()}
+
+
+def _rust_threads(g, **kwargs):
+    sc = SCALARS
+    res = rust_backend.run_fbp_grid(
+        g['fuel_type'], g['lat'], g['long'], g['elevation'], g['slope'], g['aspect'], g['pc'], g['gcf'],
+        g['ws'], g['wd'], sc['wx_date'], sc['ffmc'], sc['bui'], sc['pdf'], sc['gfl'], 90.0, **kwargs,
+    )
+    return {name: np.asarray(res[name]) for name in FIELDS}
+
+
+@pytest.mark.parametrize('threads', [0, 2, 4, 64])
+def test_threaded_run_is_bit_identical_to_default(grids, threads):
+    big = _big(grids)
+    assert big['fuel_type'].size >= 4096
+    serial = _rust_threads(big)
+    threaded = _rust_threads(big, threads=threads)
+    for name in FIELDS:
+        assert np.array_equal(serial[name], threaded[name], equal_nan=True), name
+
+
+def test_default_is_explicitly_single_threaded(grids):
+    big = _big(grids)
+    default = _rust_threads(big)
+    one = _rust_threads(big, threads=1)
+    for name in FIELDS:
+        assert np.array_equal(default[name], one[name], equal_nan=True), name
+
+
+@pytest.mark.parametrize('threads', [-1, -8])
+def test_negative_threads_raise_value_error(grids, threads):
+    with pytest.raises(ValueError, match='threads'):
+        _rust_threads(grids, threads=threads)

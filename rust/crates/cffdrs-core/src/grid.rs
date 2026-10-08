@@ -2,6 +2,7 @@
 //! step, producing the behaviour grids a fire-growth engine consumes.
 
 use std::fmt;
+use std::sync::Mutex;
 
 use crate::fbp::{run, FbpInput};
 use crate::fmc::is_valid_wx_date;
@@ -226,6 +227,34 @@ impl GridInput<'_> {
 /// assert_eq!(run_grid(&bad).unwrap_err(), GridError::InvalidDate(20_231_345));
 /// ```
 pub fn run_grid(input: &GridInput<'_>) -> Result<BehaviourGrids, GridError> {
+    run_grid_with_threads(input, 1)
+}
+
+/// [`run_grid`] with an explicit number of worker threads.
+///
+/// `threads == 1` computes on the calling thread, exactly like [`run_grid`].
+/// `threads == 0` means "all available cores"; any other value is the number
+/// of threads to use (capped by the number of work chunks). Grids with fewer
+/// than 4,096 cells always run on the calling thread, because thread start-up
+/// costs more than it saves.
+///
+/// Every cell is computed by the same [`crate::fbp::run`] into its own output
+/// slot, so the result is identical for every `threads` value; threading only
+/// changes how long the call takes and how many cores it occupies. The library
+/// never starts threads unless asked: a caller that runs many grids at once
+/// should keep `threads == 1` and parallelise across grids instead.
+///
+/// # Errors
+///
+/// The same as [`run_grid`].
+///
+/// # Panics
+///
+/// Never panics on bad input; it panics only if a worker thread panics.
+pub fn run_grid_with_threads(
+    input: &GridInput<'_>,
+    threads: usize,
+) -> Result<BehaviourGrids, GridError> {
     input.validate()?;
     let n = input.fuel_type.len();
     let mut out = BehaviourGrids {
@@ -240,21 +269,85 @@ pub fn run_grid(input: &GridInput<'_>) -> Result<BehaviourGrids, GridError> {
         fmc: vec![f64::NAN; n],
         accel: vec![f64::NAN; n],
     };
-    for i in 0..n {
+    let threads = if threads == 0 {
+        std::thread::available_parallelism().map_or(1, usize::from)
+    } else {
+        threads
+    };
+    if threads <= 1 || n < MIN_PARALLEL_CELLS {
+        fill_chunk(input, 0, &mut out_slices(&mut out));
+        return Ok(out);
+    }
+    // Many small chunks handed out one at a time keep threads busy when fuel
+    // types cost different amounts (non-modeled cells are nearly free).
+    let chunk_len = n.div_ceil(threads * 8).max(1);
+    let mut rest = out_slices(&mut out);
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    while start < n {
+        let len = chunk_len.min(n - start);
+        let part: [&mut [f64]; 10] = std::array::from_fn(|k| {
+            let s = std::mem::take(&mut rest[k]);
+            let (head, tail) = s.split_at_mut(len);
+            rest[k] = tail;
+            head
+        });
+        chunks.push((start, part));
+        start += len;
+    }
+    let queue = Mutex::new(chunks.into_iter());
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| loop {
+                let next = queue.lock().expect("queue poisoned").next();
+                match next {
+                    Some((chunk_start, mut part)) => fill_chunk(input, chunk_start, &mut part),
+                    None => break,
+                }
+            });
+        }
+    });
+    Ok(out)
+}
+
+/// Below this many cells the thread start-up cost outweighs the gain.
+const MIN_PARALLEL_CELLS: usize = 4096;
+
+/// Mutable views of the ten output grids, in `fill_chunk`'s field order.
+fn out_slices(out: &mut BehaviourGrids) -> [&mut [f64]; 10] {
+    [
+        &mut out.hros,
+        &mut out.bros,
+        &mut out.raz,
+        &mut out.wsv,
+        &mut out.hfi,
+        &mut out.rso,
+        &mut out.sros,
+        &mut out.sfc,
+        &mut out.fmc,
+        &mut out.accel,
+    ]
+}
+
+/// Computes cells `start..start + part[0].len()` into the output slices
+/// (`hros, bros, raz, wsv, hfi, rso, sros, sfc, fmc, accel`). Non-modeled
+/// cells keep the NaN they were initialised with.
+fn fill_chunk(input: &GridInput<'_>, start: usize, part: &mut [&mut [f64]; 10]) {
+    for j in 0..part[0].len() {
+        let i = start + j;
         if !FuelType::from_code(input.fuel_type[i]).is_modeled() {
             continue;
         }
         let r = run(&input.cell(i));
-        out.hros[i] = r.hros;
-        out.bros[i] = r.bros;
-        out.raz[i] = r.raz;
-        out.wsv[i] = r.wsv;
-        out.hfi[i] = r.hfi;
-        out.rso[i] = r.rso;
-        out.sros[i] = r.sros;
-        out.sfc[i] = r.sfc;
-        out.fmc[i] = r.fmc;
-        out.accel[i] = r.accel;
+        part[0][j] = r.hros;
+        part[1][j] = r.bros;
+        part[2][j] = r.raz;
+        part[3][j] = r.wsv;
+        part[4][j] = r.hfi;
+        part[5][j] = r.rso;
+        part[6][j] = r.sros;
+        part[7][j] = r.sfc;
+        part[8][j] = r.fmc;
+        part[9][j] = r.accel;
     }
-    Ok(out)
 }

@@ -8,7 +8,7 @@
 // it; drop this allow when pyo3 is upgraded past the affected releases.
 #![allow(clippy::useless_conversion)]
 
-use cffdrs_core::grid::{run_grid, GridInput};
+use cffdrs_core::grid::{run_grid_with_threads, GridInput};
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -41,6 +41,12 @@ fn row_major<T: numpy::Element + Copy>(array: &PyReadonlyArray2<'_, T>) -> Vec<T
 /// latitude, longitude or elevation masks that cell's foliar moisture (and any
 /// crown behaviour that depends on it), as in the Python package.
 ///
+/// Threads: `threads=1` (the default) computes on the calling thread, so a
+/// caller that runs many grids at once (for example one fire per worker) is not
+/// surprised by extra threads. `threads=0` uses every available core and any
+/// other positive value uses that many; results are identical for every value.
+/// Grids under 4,096 cells always run serially.
+///
 /// Scalar defaults: a NaN `pct_dead_fir` is replaced by 35.0 and a NaN
 /// `grass_fuel_load` by 0.35 before the grid is built, exactly as the Python
 /// package's `initialize` treats a NaN scalar `pdf` / `gfl`. The per-cell
@@ -49,6 +55,11 @@ fn row_major<T: numpy::Element + Copy>(array: &PyReadonlyArray2<'_, T>) -> Vec<T
 // `PyReadonlyArray2` is pyo3's by-value extraction type for numpy arguments; it
 // is a cheap borrow guard, not a payload, so taking it by value is intentional.
 #[pyfunction]
+#[pyo3(signature = (
+    fuel_type, lat, long, elevation, slope_pct, aspect_deg, pct_conifer,
+    grass_curing, ws, wd, wx_date, ffmc, bui, pct_dead_fir, grass_fuel_load,
+    percentile_growth, threads = 1
+))]
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn run_fbp_grid<'py>(
     py: Python<'py>,
@@ -68,7 +79,13 @@ fn run_fbp_grid<'py>(
     pct_dead_fir: f64,
     grass_fuel_load: f64,
     percentile_growth: f64,
+    threads: i64,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let threads = usize::try_from(threads).map_err(|_| {
+        PyValueError::new_err(format!(
+            "threads must be 0 (all cores) or a positive count, got {threads}"
+        ))
+    })?;
     let (nrows, ncols) = (fuel_type.shape()[0], fuel_type.shape()[1]);
     let expect = |name: &str, s: &[usize]| -> PyResult<()> {
         if s != [nrows, ncols] {
@@ -138,7 +155,7 @@ fn run_fbp_grid<'py>(
         percentile_growth,
     };
     let grids = py
-        .allow_threads(|| run_grid(&input))
+        .allow_threads(|| run_grid_with_threads(&input, threads))
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
     let out = PyDict::new_bound(py);
