@@ -57,6 +57,9 @@
 //! [`grid::BehaviourGrids`]; `run_grid` now returns a `Result` instead of
 //! panicking on bad input.
 //!
+//! `cffdrs-py` keeps its own version (it versions the Python distribution) and
+//! does not move to 0.2.0 with this crate.
+//!
 //! # Developing
 //!
 //! Two local tools support refactoring without changing numbers. Neither runs

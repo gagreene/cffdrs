@@ -1,5 +1,8 @@
 [package]
 name = "cffdrs-py"
+# Deliberately not bumped with cffdrs-core 0.2.0: this line is the Python
+# distribution version (the release workflow's tag check reads it), and the
+# Python API did not break.
 version = "0.1.0"
 edition.workspace = true
 description = "Python bindings (cffdrs._rust) over cffdrs-core."

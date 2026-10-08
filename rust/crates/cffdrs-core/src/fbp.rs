@@ -353,9 +353,14 @@ impl FbpResult {
 /// `FBP.initialize(...)` + `runFBP()` for a single-point input.
 ///
 /// A NaN input is a missing/masked cell and propagates to the outputs that
-/// depend on it. Fuel codes outside 1..=18 (19 non-fuel, 20 water, unknown) yield
-/// NaN behaviour rather than an error; an invalid `wx_date` is treated as
-/// missing (NaN foliar moisture), use [`is_valid_wx_date`] to check it first.
+/// depend on it. Fuel codes outside 1..=18 (19 non-fuel, 20 water, unknown) are
+/// not an error, and `run` does not force them to NaN: it applies the table
+/// fallbacks. For such a code (checked for 0, 19, 20 and 99) `sfc`, `tfc` and
+/// `hfi` are NaN, while `hros`, `bros` and `cfb` are 0, `fi_class` is -99 and
+/// `fmc` is finite; `fire_type` is 0 (1 for code 0), not NaN. Only
+/// [`grid::run_grid`](crate::grid::run_grid) forces every output to NaN for a
+/// non-modeled cell. An invalid `wx_date` is treated as missing (NaN foliar
+/// moisture), use [`is_valid_wx_date`] to check it first.
 ///
 /// # Panics
 ///
