@@ -75,7 +75,7 @@ def python_reference(g, percentile=50, wx_date=None):
     )
     result = fbp.runFBP()
     out = {}
-    for name, arr in zip(FIELDS, result):
+    for name, arr in zip(FIELDS, result, strict=True):
         a = np.ma.asarray(arr).astype(np.float64)
         out[name] = a.filled(np.nan)
     return out

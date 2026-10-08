@@ -51,7 +51,7 @@ def run_python(g, percentile):
         pdf=SCALARS["pdf"], gfl=SCALARS["gfl"], gcf=g["gcf"],
         out_request=FIELDS, percentile_growth=percentile,
     )
-    return {n: np.ma.asarray(a).astype(np.float64).filled(np.nan) for n, a in zip(FIELDS, fbp.runFBP())}
+    return {n: np.ma.asarray(a).astype(np.float64).filled(np.nan) for n, a in zip(FIELDS, fbp.runFBP(), strict=True)}
 
 
 def run_rust(g, percentile, wx_date=None):
