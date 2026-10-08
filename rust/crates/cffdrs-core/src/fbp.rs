@@ -1,4 +1,4 @@
-//! The CFFBPS scalar core and grid pass.
+//! The CFFBPS scalar core: one cell in, all 54 outputs out.
 //!
 //! Mirrors `src/cffdrs/cffbps/` (the reference implementation) function by
 //! function: `inputs._verify_inputs` normalization, then the facade's
@@ -23,15 +23,20 @@ use crate::ros::{calc_c6_blend, calc_ros, Ros};
 use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
 use crate::surface::{calc_sfc, SurfaceFuel};
 
-/// Scalar inputs, matching `FBP.initialize` in the Python package.
+/// Scalar inputs for one cell, matching `FBP.initialize` in the Python
+/// package. NaN in any numeric field means a missing/masked value and
+/// propagates to the dependent outputs.
 #[derive(Debug, Clone)]
 pub struct FbpInput {
     /// CFFBPS numeric fuel code (1..18 modeled; 19/20 non-fuel).
     pub fuel_type: i32,
     /// Date as YYYYMMDD (drives day-of-year and foliar moisture).
     pub wx_date: i64,
+    /// Latitude, decimal degrees (north positive); drives foliar moisture.
     pub lat: f64,
+    /// Longitude, decimal degrees (west negative); only its magnitude is used.
     pub long: f64,
+    /// Elevation above sea level, metres; drives foliar moisture.
     pub elevation: f64,
     /// Ground slope in percent.
     pub slope_pct: f64,
@@ -41,7 +46,9 @@ pub struct FbpInput {
     pub ws: f64,
     /// Wind direction, compass degrees.
     pub wd: f64,
+    /// Fine Fuel Moisture Code (dimensionless, 0-101).
     pub ffmc: f64,
+    /// Buildup Index (dimensionless, >= 0).
     pub bui: f64,
     /// Percent conifer (M-1/M-2).
     pub pc: f64,
@@ -77,70 +84,130 @@ pub struct FbpInput {
 /// Everything the scalar pass computes: the snapshot's 54 quantities.
 /// All f64, including code-like values (`fire_type`, `fi_class`), so golden
 /// comparison is uniform; consumers cast as needed.
+///
+/// Field names follow the Python package's `FBP.getParams` names, except that
+/// `fF` and `fW` are spelled `f_f` and `f_w` (see [`FbpResult::named_values`]
+/// for the exact name table). A NaN field means the quantity is missing or
+/// masked for that cell (for example a non-fuel cell, or a NaN input that
+/// propagated); it is not an error.
 #[derive(Debug, Clone, Default)]
 pub struct FbpResult {
     // wind/slope vectoring
+    /// Wind speed after normalisation, km/h.
     pub ws: f64,
+    /// Wind direction after normalisation, compass degrees.
     pub wd: f64,
+    /// Wind-slope effect on ISI: net effective wind speed, km/h.
     pub wse: f64,
+    /// Slope-equivalent wind speed, first term, km/h.
     pub wse1: f64,
+    /// Slope-equivalent wind speed, second term, km/h.
     pub wse2: f64,
+    /// Eastward component of the net wind vector, km/h.
     pub wsx: f64,
+    /// Northward component of the net wind vector, km/h.
     pub wsy: f64,
+    /// Net effective wind speed (wind plus slope), km/h.
     pub wsv: f64,
+    /// Net spread direction (rate-of-spread azimuth), compass degrees.
     pub raz: f64,
     // moisture / ISI chain
+    /// Fine fuel moisture content, percent.
     pub m: f64,
+    /// Fine fuel moisture function `fF` (key `"fF"`).
     pub f_f: f64,
+    /// Wind function `fW` (key `"fW"`).
     pub f_w: f64,
+    /// Fine Fuel Moisture Code as used.
     pub ffmc: f64,
+    /// Initial Spread Index.
     pub isi: f64,
+    /// Buildup Index as used.
     pub bui: f64,
     // fuel-type ROS parameterization
+    /// Surface ROS parameter `a`.
     pub a: f64,
+    /// Surface ROS parameter `b`.
     pub b: f64,
+    /// Surface ROS parameter `c`.
     pub c: f64,
+    /// Buildup effect parameter `q`.
     pub q: f64,
+    /// Average BUI for the fuel type, `BUI0`.
     pub bui0: f64,
+    /// Buildup effect on spread rate.
     pub be: f64,
+    /// Maximum buildup effect, `BE_max`.
     pub be_max: f64,
     // slope-adjusted spread chain
+    /// Slope factor.
     pub sf: f64,
+    /// Surface ROS at zero wind on flat ground, m/min.
     pub rsz: f64,
+    /// Surface ROS with the slope effect at zero wind, m/min.
     pub rsf: f64,
+    /// ISI with the slope effect at zero wind.
     pub isf: f64,
+    /// Initial spread rate without buildup effect, m/min.
     pub rsi: f64,
     // foliar moisture
+    /// Normalised latitude used for the foliar moisture date calculation.
     pub latn: f64,
+    /// Julian date of the fire (day of year).
     pub dj: f64,
+    /// Julian date of minimum foliar moisture content.
     pub d0: f64,
+    /// Days from the date of minimum foliar moisture.
     pub nd: f64,
+    /// Foliar moisture content, percent.
     pub fmc: f64,
+    /// Foliar moisture effect (crown ROS term).
     pub fme: f64,
     // consumption
+    /// Forest-floor fuel consumption, kg/m^2.
     pub ffc: f64,
+    /// Woody fuel consumption, kg/m^2.
     pub wfc: f64,
+    /// Surface fuel consumption, kg/m^2.
     pub sfc: f64,
+    /// Crown fuel load, kg/m^2.
     pub cfl: f64,
+    /// Crown fuel consumption, kg/m^2.
     pub cfc: f64,
+    /// Total fuel consumption, kg/m^2.
     pub tfc: f64,
+    /// Crown base height, m.
     pub cbh: f64,
     // crowning
+    /// Critical surface fire intensity, kW/m.
     pub csfi: f64,
+    /// Critical surface ROS for crowning, m/min.
     pub rso: f64,
+    /// Crown fraction burned (0-1).
     pub cfb: f64,
+    /// Fire type code as a float: 1 surface, 2 intermittent crown, 3 active crown.
     pub fire_type: f64,
     // spread rates
+    /// Head fire rate of spread, m/min.
     pub hros: f64,
+    /// Surface head fire rate of spread, m/min.
     pub sros: f64,
+    /// Active crown fire rate of spread, m/min.
     pub cros: f64,
+    /// Backing fire wind function.
     pub bfw: f64,
+    /// Backing fire ISI.
     pub bisi: f64,
+    /// Backing fire rate of spread, m/min.
     pub bros: f64,
     // intensity / class / growth
+    /// Head fire intensity, kW/m.
     pub hfi: f64,
+    /// Fire intensity class code as a float.
     pub fi_class: f64,
+    /// Acceleration parameter for fire growth.
     pub accel: f64,
+    /// Fuel type code, as a float.
     pub fuel_type: f64,
 }
 
@@ -207,7 +274,8 @@ impl FbpResult {
         ]
     }
 
-    /// Value by its Python-package output name; `None` for an unknown name.
+    /// Value by its Python-package output name (see
+    /// [`FbpResult::named_values`]); `None` for an unknown name.
     pub fn get(&self, name: &str) -> Option<f64> {
         self.named_values()
             .into_iter()
@@ -221,6 +289,50 @@ impl FbpResult {
 
 /// Run the scalar FBP chain for one cell. Mirror of the Python package's
 /// `FBP.initialize(...)` + `runFBP()` for a single-point input.
+///
+/// A NaN input is a missing/masked cell and propagates to the outputs that
+/// depend on it. Fuel codes outside 1..=18 (non-fuel, water, unknown) yield
+/// NaN behaviour rather than an error; an invalid `wx_date` is treated as
+/// missing (NaN foliar moisture), use [`is_valid_wx_date`] to check it first.
+///
+/// # Panics
+///
+/// Never panics, for any input including NaN, infinities and out-of-range
+/// values. It returns no `Result` because there is no error path: bad data
+/// surfaces as NaN.
+///
+/// # Examples
+///
+/// ```
+/// use cffdrs_core::fbp::{run, FbpInput};
+///
+/// let input = FbpInput {
+///     fuel_type: 2, // C-2 boreal spruce
+///     wx_date: 20_230_615,
+///     lat: 52.0,
+///     long: -115.0,
+///     elevation: 800.0,
+///     slope_pct: 10.0,
+///     aspect_deg: 180.0,
+///     ws: 20.0,
+///     wd: 270.0,
+///     ffmc: 90.0,
+///     bui: 80.0,
+///     pc: 0.0,
+///     pdf: 0.0,
+///     gfl: 0.0,
+///     gcf: 0.0,
+///     percentile_growth: 50.0,
+///     d0_override: None,
+///     dj_override: None,
+///     fmc_override: None,
+///     hros_override: None,
+/// };
+/// let result = run(&input);
+/// assert!(result.hros > 0.0);
+/// assert!([1.0, 2.0, 3.0].contains(&result.fire_type));
+/// assert_eq!(result.get("hros"), Some(result.hros));
+/// ```
 pub fn run(input: &FbpInput) -> FbpResult {
     let ft = FuelType::from_code(input.fuel_type);
 

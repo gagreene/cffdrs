@@ -18,14 +18,18 @@ const SURFACE_SIGMA: f64 = 0.923;
 const CROWN_SIGMA: f64 = 1.637;
 const CROWN_DELTA: f64 = 0.6;
 
-/// Percentiles outside this range are capped so 0 and 100 give finite ROS.
+/// Lower percentile cap: percentiles outside
+/// `[MIN_PERCENTILE, MAX_PERCENTILE]` are capped so 0 and 100 give finite ROS.
 pub const MIN_PERCENTILE: f64 = 0.001;
+/// Upper percentile cap; see [`MIN_PERCENTILE`].
 pub const MAX_PERCENTILE: f64 = 99.999;
 
 /// Degrees of freedom used by the Python reference's Student-t quantile.
 const T_DF: f64 = 9_999_999.0;
 
-/// Wind-speed decay `k(w)` applied to the backing-fire noise term.
+/// Wind-speed decay `k(w)` applied to the backing-fire noise term. `wsv` is
+/// the net effective wind speed in km/h; NaN gives NaN. Mirrors the wind decay
+/// in the Python `growth` module.
 pub fn wind_decay(wsv: f64) -> f64 {
     if wsv < 40.0 {
         (-0.10078 * wsv).exp()
@@ -35,7 +39,8 @@ pub fn wind_decay(wsv: f64) -> f64 {
 }
 
 /// Student-t quantile for a percentile in 0-100, capped to
-/// `[MIN_PERCENTILE, MAX_PERCENTILE]`. NaN stays NaN.
+/// `[MIN_PERCENTILE, MAX_PERCENTILE]`. NaN stays NaN. 50 gives exactly 0.0,
+/// which leaves the ROS unchanged.
 pub fn percentile_tinv(percentile_growth: f64) -> f64 {
     let capped = if percentile_growth.is_nan() {
         f64::NAN
@@ -47,6 +52,9 @@ pub fn percentile_tinv(percentile_growth: f64) -> f64 {
 
 /// Adjust one directional ROS. `regime_cfb` is that direction's pre-percentile
 /// CFB; `noise_scale` is 1.0 for head fire and `wind_decay(wsv)` for backing.
+/// `ros` is in m/min and `tinv` comes from [`percentile_tinv`]. Fuels outside
+/// the percentile model's scope are returned unchanged; NaN propagates. Mirrors
+/// `calc_ros_percentile_growth` in the Python package. Never panics.
 pub fn percentile_ros(
     fuel_type: FuelType,
     ros: f64,

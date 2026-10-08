@@ -7,35 +7,60 @@ use crate::fbp::{run, FbpInput};
 use crate::fmc::is_valid_wx_date;
 use crate::fuel::FuelType;
 
-/// Per-cell input grids (all the same length) plus the scalars of one weather step.
+/// Per-cell input grids plus the scalars of one weather step.
+///
+/// All slice fields are per-cell and must have the same length as `fuel_type`
+/// (checked by [`run_grid`]). Any memory layout works as long as every slice
+/// uses the same one. A NaN value is a missing/masked cell input and
+/// propagates to that cell's outputs.
 #[derive(Debug, Clone, Copy)]
 pub struct GridInput<'a> {
+    /// CFFBPS fuel codes per cell (1..=18 modeled, 19 non-fuel, 20 water). Its length defines the grid size.
     pub fuel_type: &'a [i32],
+    /// Latitude per cell, decimal degrees (north positive).
     pub lat: &'a [f64],
+    /// Longitude per cell, decimal degrees (west negative).
     pub long: &'a [f64],
+    /// Elevation per cell, metres.
     pub elevation: &'a [f64],
+    /// Ground slope per cell, percent.
     pub slope_pct: &'a [f64],
+    /// Aspect (downhill direction) per cell, compass degrees.
     pub aspect_deg: &'a [f64],
+    /// Percent conifer per cell (0-100; used by M-1/M-2).
     pub pct_conifer: &'a [f64],
+    /// Grass curing factor per cell, percent (0-100; used by O-1a/O-1b).
     pub grass_curing: &'a [f64],
+    /// 10-m open wind speed per cell, km/h.
     pub ws: &'a [f64],
+    /// Wind direction per cell, compass degrees.
     pub wd: &'a [f64],
+    /// Weather date as `YYYYMMDD`, shared by all cells; must be a real calendar date.
     pub wx_date: i64,
+    /// Fine Fuel Moisture Code shared by all cells (0-101).
     pub ffmc: f64,
+    /// Buildup Index shared by all cells (>= 0).
     pub bui: f64,
+    /// Percent dead balsam fir shared by all cells (0-100; used by M-3/M-4).
     pub pct_dead_fir: f64,
+    /// Grass fuel load shared by all cells, kg/m^2 (O-1a/O-1b).
     pub grass_fuel_load: f64,
+    /// Percentile (0-100) of the ROS distribution, not a percent change; 50 is the unadjusted ROS. Values outside (0.001, 99.999) are capped; NaN propagates.
     pub percentile_growth: f64,
 }
 
-/// Why a grid run was rejected before any cell was computed.
+/// Why a grid run was rejected before any cell was computed (returned by
+/// [`run_grid`]; the type is `#[non_exhaustive]`, so match with a wildcard arm).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum GridError {
     /// A per-cell slice has a different length than `fuel_type`.
     LengthMismatch {
+        /// Name of the offending [`GridInput`] field (for example `"lat"`).
         name: &'static str,
+        /// The length required, i.e. that of `fuel_type`.
         expected: usize,
+        /// The length actually supplied for `name`.
         found: usize,
     },
     /// `wx_date` is not a real `YYYYMMDD` calendar date.
@@ -64,15 +89,25 @@ impl std::error::Error for GridError {}
 /// quantity (derived from `wsv`), not part of this package's spec.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BehaviourGrids {
+    /// Head fire rate of spread, m/min. NaN where the cell is not a modeled fuel.
     pub hros: Vec<f64>,
+    /// Backing fire rate of spread, m/min. NaN where the cell is not a modeled fuel.
     pub bros: Vec<f64>,
+    /// Net spread direction, compass degrees. NaN where the cell is not a modeled fuel.
     pub raz: Vec<f64>,
+    /// Net effective wind speed, km/h. NaN where the cell is not a modeled fuel.
     pub wsv: Vec<f64>,
+    /// Head fire intensity, kW/m. NaN where the cell is not a modeled fuel.
     pub hfi: Vec<f64>,
+    /// Critical surface ROS for crowning, m/min. NaN where the cell is not a modeled fuel.
     pub rso: Vec<f64>,
+    /// Surface head fire rate of spread, m/min. NaN where the cell is not a modeled fuel.
     pub sros: Vec<f64>,
+    /// Surface fuel consumption, kg/m^2. NaN where the cell is not a modeled fuel.
     pub sfc: Vec<f64>,
+    /// Foliar moisture content, percent. NaN where the cell is not a modeled fuel.
     pub fmc: Vec<f64>,
+    /// Acceleration parameter for fire growth. NaN where the cell is not a modeled fuel.
     pub accel: Vec<f64>,
 }
 
@@ -133,7 +168,56 @@ impl GridInput<'_> {
 
 /// The grid pass: per-cell fuel/terrain plus per-cell wind, scalar ffmc/bui/
 /// date. One call per weather step; non-modeled cells (codes outside 1..18)
-/// yield NaN behaviour, which engines exclude via their burnable masks.
+/// yield NaN behaviour, which engines exclude via their burnable masks. A NaN
+/// input in a modeled cell is a missing/masked value and propagates to that
+/// cell's outputs only.
+///
+/// Computes each cell with [`crate::fbp::run`] and keeps the ten outputs of
+/// [`BehaviourGrids`]; the Python counterpart is `cffdrs._rust.run_fbp_grid`.
+///
+/// # Errors
+///
+/// Returns [`GridError::InvalidDate`] if `wx_date` is not a real `YYYYMMDD`
+/// calendar date, and [`GridError::LengthMismatch`] if any per-cell slice
+/// differs in length from `fuel_type`. Both checks run before any cell is
+/// computed.
+///
+/// # Panics
+///
+/// Never panics: bad input is reported through the `Err` variants above.
+///
+/// # Examples
+///
+/// ```
+/// use cffdrs_core::grid::{run_grid, GridError, GridInput};
+///
+/// let input = GridInput {
+///     fuel_type: &[2, 19], // C-2 and a non-fuel cell
+///     lat: &[52.0, 52.0],
+///     long: &[-115.0, -115.0],
+///     elevation: &[800.0, 800.0],
+///     slope_pct: &[10.0, 0.0],
+///     aspect_deg: &[180.0, 0.0],
+///     pct_conifer: &[0.0, 0.0],
+///     grass_curing: &[0.0, 0.0],
+///     ws: &[20.0, 20.0],
+///     wd: &[270.0, 270.0],
+///     wx_date: 20_230_615,
+///     ffmc: 90.0,
+///     bui: 80.0,
+///     pct_dead_fir: 0.0,
+///     grass_fuel_load: 0.0,
+///     percentile_growth: 50.0,
+/// };
+/// let grids = run_grid(&input).unwrap();
+/// assert_eq!(grids.hros.len(), 2);
+/// assert!(grids.hros[0] > 0.0);
+/// assert!(grids.hros[1].is_nan()); // non-fuel cell: NaN behaviour
+///
+/// // An impossible date is rejected up front.
+/// let bad = GridInput { wx_date: 20_231_345, ..input };
+/// assert_eq!(run_grid(&bad).unwrap_err(), GridError::InvalidDate(20_231_345));
+/// ```
 pub fn run_grid(input: &GridInput<'_>) -> Result<BehaviourGrids, GridError> {
     input.validate()?;
     let n = input.fuel_type.len();

@@ -1,32 +1,56 @@
 //! CFFBPS fuel types and their per-fuel parameter tables.
 
-/// CFFBPS fuel type. Codes 1-18 are modeled fuels; 19 and 20 are non-fuel and
+/// CFFBPS fuel type (mirrors the numeric codes in the Python `constants`
+/// module). Codes 1-18 are modeled fuels; 19 and 20 are non-fuel and
 /// water; any other code is carried as `Unknown` so behaviour is unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FuelType {
+    /// C-1 Spruce-lichen woodland (code 1).
     C1,
+    /// C-2 Boreal spruce (code 2).
     C2,
+    /// C-3 Mature jack or lodgepole pine (code 3).
     C3,
+    /// C-4 Immature jack or lodgepole pine (code 4).
     C4,
+    /// C-5 Red and white pine (code 5).
     C5,
+    /// C-6 Conifer plantation (code 6).
     C6,
+    /// C-7 Ponderosa pine / Douglas-fir (code 7).
     C7,
+    /// D-1 Leafless aspen (code 8).
     D1,
+    /// D-2 Green aspen (code 9).
     D2,
+    /// M-1 Boreal mixedwood, leafless (code 10).
     M1,
+    /// M-2 Boreal mixedwood, green (code 11).
     M2,
+    /// M-3 Dead balsam fir mixedwood, leafless (code 12).
     M3,
+    /// M-4 Dead balsam fir mixedwood, green (code 13).
     M4,
+    /// O-1a Matted grass (code 14).
     O1a,
+    /// O-1b Standing grass (code 15).
     O1b,
+    /// S-1 Jack or lodgepole pine slash (code 16).
     S1,
+    /// S-2 White spruce / balsam slash (code 17).
     S2,
+    /// S-3 Coastal cedar / hemlock / Douglas-fir slash (code 18).
     S3,
     /// Non-fuel (code 19).
     NonFuel,
     /// Water (code 20).
     Water,
     /// Any code outside 1..=20, preserved verbatim.
+    ///
+    /// Build this variant through [`FuelType::from_code`] rather than by hand:
+    /// `from_code` is the canonical constructor, so a hand-built
+    /// `Unknown(5)` (a valid code that has its own variant) is non-canonical
+    /// and would not compare equal to [`FuelType::C5`].
     Unknown(i32),
 }
 
