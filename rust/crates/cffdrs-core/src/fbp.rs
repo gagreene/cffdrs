@@ -14,6 +14,7 @@ pub use crate::fmc::is_valid_wx_date;
 use crate::fmc::{calc_fmc, injected_fmc};
 use crate::fuel::{CrownFuel, FuelType, RosParams};
 use crate::normalize::{invert_wind_aspect, normalize, Normalized};
+use crate::ros::{calc_c6_blend, calc_ros, Ros};
 use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
 use crate::surface::{calc_sfc, SurfaceFuel};
 
@@ -265,28 +266,11 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let bisi = sw.bisi;
 
     // --- calc_ros
-    let mut hros = rsi * be;
-    let mut bros = brsi * be;
-    let mut sros = 0.0;
-    if ft == FuelType::C6 {
-        sros = rsi * be;
-    }
-    if ft == FuelType::D2 {
-        // D2 correction: zero out if BUI < 70, then scale by 0.2
-        if bui < 70.0 {
-            hros = 0.0;
-            bros = 0.0;
-        } else {
-            hros *= 0.2;
-            bros *= 0.2;
-        }
-    }
-    // setParams({'hros': ...}) injection point: replaces hros after calcROS,
-    // before calcCSFI onward. bros/sros keep their computed values (the C-6
-    // blend reads sros and may overwrite the injected hros).
-    if let Some(v) = input.hros_override {
-        hros = v;
-    }
+    let Ros {
+        mut hros,
+        mut bros,
+        sros,
+    } = calc_ros(ft, rsi, brsi, be, bui, input.hros_override);
 
     // --- calc_sfc
     let SurfaceFuel { sfc, ffc, wfc } = calc_sfc(ft, &n);
@@ -332,13 +316,9 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let mut cros = 0.0;
     if ft == FuelType::C6 {
         let blend_cfb = cfb_from_ros(sros);
-        let blend_cfc = blend_cfb * cfl;
-        cros = if blend_cfc == 0.0 {
-            0.0
-        } else {
-            60.0 * (1.0 - (-0.0497 * isi).exp()) * (fmc.fme / 0.778237)
-        };
-        hros = sros + blend_cfb * (cros - sros);
+        let blend = calc_c6_blend(sros, blend_cfb, cfl, isi, fmc.fme);
+        cros = blend.cros;
+        hros = blend.hros;
     }
 
     // --- directional CFB used only to pick the percentile-growth regime

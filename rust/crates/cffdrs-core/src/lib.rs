@@ -14,5 +14,6 @@ pub mod fuel;
 mod normalize;
 pub mod percentile;
 pub mod quantile;
+mod ros;
 mod slope_wind;
 mod surface;
