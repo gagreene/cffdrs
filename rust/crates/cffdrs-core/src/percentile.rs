@@ -11,6 +11,7 @@
 //! the `cfb < 0.1` regime rule, the zero result for a negative crown radicand,
 //! the C-1..C-7 fuel scope, and the percentile cap.
 
+use crate::fuel::FuelType;
 use crate::quantile::t_quantile_large_df;
 
 const SURFACE_SIGMA: f64 = 0.923;
@@ -23,16 +24,6 @@ pub const MAX_PERCENTILE: f64 = 99.999;
 
 /// Degrees of freedom used by the Python reference's Student-t quantile.
 const T_DF: f64 = 9_999_999.0;
-
-/// Fuel codes adjusted in the surface regime (C-2..C-7).
-fn has_surface(fuel_type: i32) -> bool {
-    matches!(fuel_type, 2..=7)
-}
-
-/// Fuel codes adjusted in the crown regime (C-1..C-4, C-6, C-7).
-fn has_crown(fuel_type: i32) -> bool {
-    matches!(fuel_type, 1 | 2 | 3 | 4 | 6 | 7)
-}
 
 /// Wind-speed decay `k(w)` applied to the backing-fire noise term.
 pub fn wind_decay(wsv: f64) -> f64 {
@@ -57,19 +48,19 @@ pub fn percentile_tinv(percentile_growth: f64) -> f64 {
 /// Adjust one directional ROS. `regime_cfb` is that direction's pre-percentile
 /// CFB; `noise_scale` is 1.0 for head fire and `wind_decay(wsv)` for backing.
 pub fn percentile_ros(
-    fuel_type: i32,
+    fuel_type: FuelType,
     ros: f64,
     regime_cfb: f64,
     tinv: f64,
     noise_scale: f64,
 ) -> f64 {
     if regime_cfb < 0.1 {
-        if has_surface(fuel_type) {
+        if fuel_type.has_surface_regime() {
             ros * (tinv * SURFACE_SIGMA * noise_scale).exp()
         } else {
             ros
         }
-    } else if has_crown(fuel_type) {
+    } else if fuel_type.has_crown_regime() {
         let radicand = ros.powf(CROWN_DELTA) + tinv * CROWN_SIGMA * noise_scale;
         if radicand.is_nan() {
             f64::NAN
@@ -111,8 +102,8 @@ mod tests {
     fn nan_percentile_propagates() {
         let tinv = percentile_tinv(f64::NAN);
         assert!(tinv.is_nan());
-        assert!(percentile_ros(2, 7.5, 0.0, tinv, 1.0).is_nan());
-        assert!(percentile_ros(2, 7.5, 0.9, tinv, 1.0).is_nan());
+        assert!(percentile_ros(FuelType::from_code(2), 7.5, 0.0, tinv, 1.0).is_nan());
+        assert!(percentile_ros(FuelType::from_code(2), 7.5, 0.9, tinv, 1.0).is_nan());
     }
 
     #[test]
@@ -123,11 +114,14 @@ mod tests {
         let mut prev = -1.0;
         for i in 0..=2000 {
             let ros = i as f64 * 0.005;
-            let out = percentile_ros(2, ros, 0.9, tinv, 1.0);
+            let out = percentile_ros(FuelType::from_code(2), ros, 0.9, tinv, 1.0);
             assert!(out >= prev - 1e-12, "ros={ros}: {out} < {prev}");
             prev = out;
         }
-        assert_eq!(percentile_ros(2, 5.2, 0.9, tinv, 1.0), 0.0);
+        assert_eq!(
+            percentile_ros(FuelType::from_code(2), 5.2, 0.9, tinv, 1.0),
+            0.0
+        );
     }
 
     #[test]
@@ -136,7 +130,7 @@ mod tests {
         for fuel in [8, 12, 14, 19, 20] {
             for cfb in [0.0, 0.9] {
                 assert_eq!(
-                    percentile_ros(fuel, 5.0, cfb, tinv, 1.0),
+                    percentile_ros(FuelType::from_code(fuel), 5.0, cfb, tinv, 1.0),
                     5.0,
                     "fuel {fuel} cfb {cfb}"
                 );
@@ -147,9 +141,21 @@ mod tests {
     #[test]
     fn c1_is_crown_only_and_c5_is_surface_only() {
         let tinv = percentile_tinv(90.0);
-        assert_eq!(percentile_ros(1, 5.0, 0.0, tinv, 1.0), 5.0);
-        assert_ne!(percentile_ros(1, 5.0, 0.9, tinv, 1.0), 5.0);
-        assert_ne!(percentile_ros(5, 5.0, 0.0, tinv, 1.0), 5.0);
-        assert_eq!(percentile_ros(5, 5.0, 0.9, tinv, 1.0), 5.0);
+        assert_eq!(
+            percentile_ros(FuelType::from_code(1), 5.0, 0.0, tinv, 1.0),
+            5.0
+        );
+        assert_ne!(
+            percentile_ros(FuelType::from_code(1), 5.0, 0.9, tinv, 1.0),
+            5.0
+        );
+        assert_ne!(
+            percentile_ros(FuelType::from_code(5), 5.0, 0.0, tinv, 1.0),
+            5.0
+        );
+        assert_eq!(
+            percentile_ros(FuelType::from_code(5), 5.0, 0.9, tinv, 1.0),
+            5.0
+        );
     }
 }

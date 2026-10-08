@@ -9,5 +9,6 @@
 #![forbid(unsafe_code)]
 
 pub mod fbp;
+pub mod fuel;
 pub mod percentile;
 pub mod quantile;

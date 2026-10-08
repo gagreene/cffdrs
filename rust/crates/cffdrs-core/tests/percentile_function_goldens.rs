@@ -3,6 +3,7 @@
 //! percentile_ros_function_snapshot.json`). Regenerate with
 //! `tools/gen_fbp_goldens.py` when the Python spec changes.
 
+use cffdrs_core::fuel::FuelType;
 use cffdrs_core::percentile::{percentile_ros, percentile_tinv, wind_decay};
 use std::path::PathBuf;
 
@@ -30,8 +31,8 @@ fn percentile_ros_matches_python_function() {
         );
         let (ros, wsv) = (row["ros"].as_f64().unwrap(), row["wsv"].as_f64().unwrap());
         let tinv = percentile_tinv(pct);
-        let head = percentile_ros(fuel, ros, cfb, tinv, 1.0);
-        let back = percentile_ros(fuel, ros, cfb, tinv, wind_decay(wsv));
+        let head = percentile_ros(FuelType::from_code(fuel), ros, cfb, tinv, 1.0);
+        let back = percentile_ros(FuelType::from_code(fuel), ros, cfb, tinv, wind_decay(wsv));
         let (eh, eb) = (row["hros"].as_f64().unwrap(), row["bros"].as_f64().unwrap());
         assert!(
             close(head, eh),

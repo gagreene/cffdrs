@@ -10,6 +10,8 @@
 //! snapshot (`tests/cffbps/data/golden/wotton2009_scalar_snapshot.json`) —
 //! the same file the Python suite validates against.
 
+use crate::fuel::{CrownFuel, FuelType, RosParams};
+
 /// Scalar inputs, matching `FBP.initialize` in the Python package.
 #[derive(Debug, Clone)]
 pub struct FbpInput {
@@ -197,67 +199,6 @@ impl FbpResult {
 
 // ---------------------------------------------------------------------------
 // constants.py
-
-/// Surface ROS parameters (a, b, c, q, bui0, be_max) — `constants.rosParams`.
-/// `None` entries in the Python table surface as NaN, matching numpy
-/// assignment semantics.
-fn ros_params(fuel_type: i32) -> (f64, f64, f64, f64, f64, f64) {
-    const NAN: f64 = f64::NAN;
-    match fuel_type {
-        1 => (90.0, 0.0649, 4.5, 0.9, 72.0, 1.076),
-        2 => (110.0, 0.0282, 1.5, 0.7, 64.0, 1.321),
-        3 => (110.0, 0.0444, 3.0, 0.75, 62.0, 1.261),
-        4 => (110.0, 0.0293, 1.5, 0.8, 66.0, 1.184),
-        5 => (30.0, 0.0697, 4.0, 0.8, 56.0, 1.220),
-        6 => (30.0, 0.08, 3.0, 0.8, 62.0, 1.197),
-        7 => (45.0, 0.0305, 2.0, 0.85, 106.0, 1.134),
-        8 => (30.0, 0.0232, 1.6, 0.9, 32.0, 1.179),
-        9 => (30.0, 0.0232, 1.6, 0.9, 32.0, 1.179),
-        10 => (NAN, NAN, NAN, 0.8, 50.0, 1.250),
-        11 => (NAN, NAN, NAN, 0.8, 50.0, 1.250),
-        12 => (120.0, 0.0572, 1.4, 0.8, 50.0, 1.250),
-        13 => (100.0, 0.0404, 1.48, 0.8, 50.0, 1.250),
-        14 => (190.0, 0.0310, 1.4, 1.0, NAN, 1.0),
-        15 => (250.0, 0.0350, 1.7, 1.0, NAN, 1.0),
-        16 => (75.0, 0.0297, 1.3, 0.75, 38.0, 1.460),
-        17 => (40.0, 0.0438, 1.7, 0.75, 63.0, 1.256),
-        18 => (55.0, 0.0829, 3.2, 0.75, 31.0, 1.590),
-        // ros_params.get(ftype, (0, 0, 0, 0, 1, 1)) fallback
-        _ => (0.0, 0.0, 0.0, 0.0, 1.0, 1.0),
-    }
-}
-
-/// (cbh, cfl) — `constants.fbpCBH_CFL_HT_LUT` (height column unused here).
-fn cbh_cfl(fuel_type: i32) -> (f64, f64) {
-    const NAN: f64 = f64::NAN;
-    match fuel_type {
-        1 => (2.0, 0.75),
-        2 => (3.0, 0.8),
-        3 => (8.0, 1.15),
-        4 => (4.0, 1.2),
-        5 => (18.0, 1.2),
-        6 => (7.0, 1.8),
-        7 => (10.0, 0.5),
-        8 | 9 | 14 | 15 | 16 | 17 | 18 => (0.0, 0.0),
-        10 | 11 => (6.0, 0.8),
-        12 | 13 => (6.0, 0.8),
-        _ => (NAN, NAN),
-    }
-}
-
-fn is_modeled(fuel_type: i32) -> bool {
-    (1..=18).contains(&fuel_type)
-}
-
-/// `constants.open_fuel_types`
-fn is_open_fuel(fuel_type: i32) -> bool {
-    matches!(fuel_type, 1 | 7 | 9 | 14 | 15 | 16 | 17 | 18)
-}
-
-/// `constants.non_crowning_fuels`
-fn is_non_crowning(fuel_type: i32) -> bool {
-    matches!(fuel_type, 8 | 9 | 14 | 15 | 16 | 17 | 18)
-}
 
 // ---------------------------------------------------------------------------
 // fmc.py
@@ -474,7 +415,7 @@ fn isf_core(numer: f64, b: f64) -> f64 {
 /// Run the scalar FBP chain for one cell. Mirror of the Python package's
 /// `FBP.initialize(...)` + `runFBP()` for a single-point input.
 pub fn run(input: &FbpInput) -> FbpResult {
-    let ft = input.fuel_type;
+    let ft = FuelType::from_code(input.fuel_type);
 
     // --- inputs._verify_inputs normalization
     let lat = input.lat;
@@ -554,12 +495,19 @@ pub fn run(input: &FbpInput) -> FbpResult {
     };
 
     // --- calc_isi_rsi_be
-    let (a, b, c, q, bui0, be_max) = ros_params(ft);
-    let c2 = ros_params(2);
-    let d1 = ros_params(8);
-    let m12 = ft == 10 || ft == 11;
-    let m34 = ft == 12 || ft == 13;
-    let o1 = ft == 14 || ft == 15;
+    let RosParams {
+        a,
+        b,
+        c,
+        q,
+        bui0,
+        be_max,
+    } = ft.ros_params();
+    let c2 = FuelType::C2.ros_params();
+    let d1 = FuelType::D1.ros_params();
+    let m12 = matches!(ft, FuelType::M1 | FuelType::M2);
+    let m34 = matches!(ft, FuelType::M3 | FuelType::M4);
+    let o1 = matches!(ft, FuelType::O1a | FuelType::O1b);
 
     let cf = if gcf.is_nan() {
         f64::NAN
@@ -570,12 +518,12 @@ pub fn run(input: &FbpInput) -> FbpResult {
     };
 
     let rsz_core = ros_curve(a, b, c, isz);
-    let rsz_c2 = ros_curve(c2.0, c2.1, c2.2, isz);
-    let rsz_d1 = ros_curve(d1.0, d1.1, d1.2, isz);
+    let rsz_c2 = ros_curve(c2.a, c2.b, c2.c, isz);
+    let rsz_d1 = ros_curve(d1.a, d1.b, d1.c, isz);
     let rsz = match ft {
-        10 => (pc / 100.0) * rsz_c2 + (1.0 - pc / 100.0) * rsz_d1,
-        11 => (pc / 100.0) * rsz_c2 + 0.2 * (1.0 - pc / 100.0) * rsz_d1,
-        14 | 15 => rsz_core * cf,
+        FuelType::M1 => (pc / 100.0) * rsz_c2 + (1.0 - pc / 100.0) * rsz_d1,
+        FuelType::M2 => (pc / 100.0) * rsz_c2 + 0.2 * (1.0 - pc / 100.0) * rsz_d1,
+        FuelType::O1a | FuelType::O1b => rsz_core * cf,
         _ => rsz_core,
     };
 
@@ -583,8 +531,8 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let rsf_d1 = rsz_d1 * sf;
     let rsf = rsz * sf;
 
-    let isf_c2_core = isf_core(1.0 - (rsf_c2 / c2.0).powf(1.0 / c2.2), c2.1);
-    let isf_d1_core = isf_core(1.0 - (rsf_d1 / d1.0).powf(1.0 / d1.2), d1.1);
+    let isf_c2_core = isf_core(1.0 - (rsf_c2 / c2.a).powf(1.0 / c2.c), c2.b);
+    let isf_d1_core = isf_core(1.0 - (rsf_d1 / d1.a).powf(1.0 / d1.c), d1.b);
     let isf_m34_core = isf_core(1.0 - (rsf / a).powf(1.0 / c), b);
     let isf = if m12 {
         (pc / 100.0) * isf_c2_core + (1.0 - pc / 100.0) * isf_d1_core
@@ -603,24 +551,28 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let isi = sw.isi;
     let bisi = sw.bisi;
 
-    let rsi_c2 = ros_curve(c2.0, c2.1, c2.2, isi);
-    let rsi_d1 = ros_curve(d1.0, d1.1, d1.2, isi);
+    let rsi_c2 = ros_curve(c2.a, c2.b, c2.c, isi);
+    let rsi_d1 = ros_curve(d1.a, d1.b, d1.c, isi);
     let rsi = match ft {
-        12 => (pdf / 100.0) * ros_curve(a, b, c, isi) + (1.0 - pdf / 100.0) * rsi_d1,
-        13 => (pdf / 100.0) * ros_curve(a, b, c, isi) + 0.2 * (1.0 - pdf / 100.0) * rsi_d1,
-        10 => (pc / 100.0) * rsi_c2 + (1.0 - pc / 100.0) * rsi_d1,
-        11 => (pc / 100.0) * rsi_c2 + 0.2 * (1.0 - pc / 100.0) * rsi_d1,
-        14 | 15 => ros_curve(a, b, c, isi) * cf,
+        FuelType::M3 => (pdf / 100.0) * ros_curve(a, b, c, isi) + (1.0 - pdf / 100.0) * rsi_d1,
+        FuelType::M4 => {
+            (pdf / 100.0) * ros_curve(a, b, c, isi) + 0.2 * (1.0 - pdf / 100.0) * rsi_d1
+        }
+        FuelType::M1 => (pc / 100.0) * rsi_c2 + (1.0 - pc / 100.0) * rsi_d1,
+        FuelType::M2 => (pc / 100.0) * rsi_c2 + 0.2 * (1.0 - pc / 100.0) * rsi_d1,
+        FuelType::O1a | FuelType::O1b => ros_curve(a, b, c, isi) * cf,
         _ => ros_curve(a, b, c, isi),
     };
-    let brsi_c2 = ros_curve(c2.0, c2.1, c2.2, bisi);
-    let brsi_d1 = ros_curve(d1.0, d1.1, d1.2, bisi);
+    let brsi_c2 = ros_curve(c2.a, c2.b, c2.c, bisi);
+    let brsi_d1 = ros_curve(d1.a, d1.b, d1.c, bisi);
     let brsi = match ft {
-        12 => (pdf / 100.0) * ros_curve(a, b, c, bisi) + (1.0 - pdf / 100.0) * brsi_d1,
-        13 => (pdf / 100.0) * ros_curve(a, b, c, bisi) + 0.2 * (1.0 - pdf / 100.0) * brsi_d1,
-        11 => (pc / 100.0) * brsi_c2 + 0.2 * (1.0 - pc / 100.0) * brsi_d1,
-        10 => (pc / 100.0) * brsi_c2 + (1.0 - pc / 100.0) * brsi_d1,
-        14 | 15 => ros_curve(a, b, c, bisi) * cf,
+        FuelType::M3 => (pdf / 100.0) * ros_curve(a, b, c, bisi) + (1.0 - pdf / 100.0) * brsi_d1,
+        FuelType::M4 => {
+            (pdf / 100.0) * ros_curve(a, b, c, bisi) + 0.2 * (1.0 - pdf / 100.0) * brsi_d1
+        }
+        FuelType::M2 => (pc / 100.0) * brsi_c2 + 0.2 * (1.0 - pc / 100.0) * brsi_d1,
+        FuelType::M1 => (pc / 100.0) * brsi_c2 + (1.0 - pc / 100.0) * brsi_d1,
+        FuelType::O1a | FuelType::O1b => ros_curve(a, b, c, bisi) * cf,
         _ => ros_curve(a, b, c, bisi),
     };
 
@@ -646,10 +598,10 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let mut hros = rsi * be;
     let mut bros = brsi * be;
     let mut sros = 0.0;
-    if ft == 6 {
+    if ft == FuelType::C6 {
         sros = rsi * be;
     }
-    if ft == 9 {
+    if ft == FuelType::D2 {
         // D2 correction: zero out if BUI < 70, then scale by 0.2
         if bui < 70.0 {
             hros = 0.0;
@@ -670,40 +622,40 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let mut ffc = f64::NAN;
     let mut wfc = f64::NAN;
     let sfc = match ft {
-        1 => {
+        FuelType::C1 => {
             if ffmc > 84.0 {
                 0.75 + 0.75 * (1.0 - (-0.23 * (ffmc - 84.0)).exp()).sqrt()
             } else {
                 0.75 - 0.75 * (1.0 - (0.23 * (ffmc - 84.0)).exp()).sqrt()
             }
         }
-        2 => 5.0 * (1.0 - (-0.0115 * bui).exp()),
-        3 | 4 => 5.0 * (1.0 - (-0.0164 * bui).exp()).powf(2.24),
-        5 | 6 => 5.0 * (1.0 - (-0.0149 * bui).exp()).powf(2.48),
-        7 => {
+        FuelType::C2 => 5.0 * (1.0 - (-0.0115 * bui).exp()),
+        FuelType::C3 | FuelType::C4 => 5.0 * (1.0 - (-0.0164 * bui).exp()).powf(2.24),
+        FuelType::C5 | FuelType::C6 => 5.0 * (1.0 - (-0.0149 * bui).exp()).powf(2.48),
+        FuelType::C7 => {
             ffc = (2.0 * (1.0 - (-0.104 * (ffmc - 70.0)).exp())).max(0.0);
             wfc = 1.5 * (1.0 - (-0.0201 * bui).exp());
             ffc + wfc
         }
-        8 | 9 => 1.5 * (1.0 - (-0.0183 * bui).exp()),
-        10 | 11 => {
+        FuelType::D1 | FuelType::D2 => 1.5 * (1.0 - (-0.0183 * bui).exp()),
+        FuelType::M1 | FuelType::M2 => {
             let c2_sfc = 5.0 * (1.0 - (-0.0115 * bui).exp());
             let d1_sfc = 1.5 * (1.0 - (-0.0183 * bui).exp());
             (pc / 100.0) * c2_sfc + ((100.0 - pc) / 100.0) * d1_sfc
         }
-        12 | 13 => 5.0 * (1.0 - (-0.0115 * bui).exp()),
-        14 | 15 => gfl,
-        16 => {
+        FuelType::M3 | FuelType::M4 => 5.0 * (1.0 - (-0.0115 * bui).exp()),
+        FuelType::O1a | FuelType::O1b => gfl,
+        FuelType::S1 => {
             ffc = 4.0 * (1.0 - (-0.025 * bui).exp());
             wfc = 4.0 * (1.0 - (-0.034 * bui).exp());
             ffc + wfc
         }
-        17 => {
+        FuelType::S2 => {
             ffc = 10.0 * (1.0 - (-0.013 * bui).exp());
             wfc = 6.0 * (1.0 - (-0.06 * bui).exp());
             ffc + wfc
         }
-        18 => {
+        FuelType::S3 => {
             ffc = 12.0 * (1.0 - (-0.0166 * bui).exp());
             wfc = 20.0 * (1.0 - (-0.021 * bui).exp());
             ffc + wfc
@@ -712,10 +664,10 @@ pub fn run(input: &FbpInput) -> FbpResult {
     };
 
     // --- getCBH_CFL
-    let (cbh, cfl) = cbh_cfl(ft);
+    let CrownFuel { cbh, cfl } = ft.crown_fuel();
 
     // --- calc_csfi / calc_rso
-    let csfi = if ft < 14 {
+    let csfi = if ft.code() < 14 {
         (0.01 * cbh * (460.0 + 25.9 * fmc.fmc)).powf(1.5)
     } else {
         0.0
@@ -738,7 +690,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
         }
         cfb.clamp(0.0, 1.0)
     };
-    let crowning = is_modeled(ft) && !is_non_crowning(ft);
+    let crowning = ft.is_modeled() && !ft.is_non_crowning();
     let directional_cfb = |ros: f64| -> f64 {
         if crowning {
             cfb_from_ros(ros)
@@ -750,7 +702,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
     // --- deterministic C-6 blend: SROS-derived CFB -> CFC -> CROS -> blended
     // HROS. This CFB is temporary; it is not the CFB used downstream.
     let mut cros = 0.0;
-    if ft == 6 {
+    if ft == FuelType::C6 {
         let blend_cfb = cfb_from_ros(sros);
         let blend_cfc = blend_cfb * cfl;
         cros = if blend_cfc == 0.0 {
@@ -790,16 +742,16 @@ pub fn run(input: &FbpInput) -> FbpResult {
     };
 
     // --- calc_accel_param
-    let accel = if is_open_fuel(ft) {
+    let accel = if ft.is_open() {
         0.115
-    } else if is_modeled(ft) {
+    } else if ft.is_modeled() {
         0.115 - 18.8 * cfb.powf(2.5) * (-8.0 * cfb).exp()
     } else {
         0.0
     };
 
     // --- calc_fire_type
-    let fire_type = if ft < 19 {
+    let fire_type = if ft.code() < 19 {
         if cfb.is_nan() {
             0.0 // masked cell: grid-truth observable is 0, not a class
         } else if cfb <= 0.1 {
@@ -815,8 +767,8 @@ pub fn run(input: &FbpInput) -> FbpResult {
 
     // --- calc_cfc
     let cfc = match ft {
-        10 | 11 => cfb * cfl * pc / 100.0,
-        12 | 13 => cfb * cfl * pdf / 100.0,
+        FuelType::M1 | FuelType::M2 => cfb * cfl * pc / 100.0,
+        FuelType::M3 | FuelType::M4 => cfb * cfl * pdf / 100.0,
         _ => cfb * cfl,
     };
 
@@ -901,7 +853,7 @@ pub fn run(input: &FbpInput) -> FbpResult {
         hfi,
         fi_class,
         accel,
-        fuel_type: ft as f64,
+        fuel_type: ft.code() as f64,
     }
 }
 
@@ -958,7 +910,7 @@ pub fn run_grid(
         accel: vec![f64::NAN; n],
     };
     for i in 0..n {
-        if !is_modeled(fuel_type[i]) {
+        if !FuelType::from_code(fuel_type[i]).is_modeled() {
             continue;
         }
         let r = run(&FbpInput {
