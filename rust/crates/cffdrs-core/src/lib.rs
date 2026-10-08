@@ -8,9 +8,11 @@
 
 #![forbid(unsafe_code)]
 
+mod crown;
 pub mod fbp;
 mod fmc;
 pub mod fuel;
+mod growth;
 mod normalize;
 pub mod percentile;
 pub mod quantile;

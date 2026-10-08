@@ -10,9 +10,13 @@
 //! snapshot (`tests/cffbps/data/golden/wotton2009_scalar_snapshot.json`) —
 //! the same file the Python suite validates against.
 
+use crate::crown::{
+    calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
+};
 pub use crate::fmc::is_valid_wx_date;
 use crate::fmc::{calc_fmc, injected_fmc};
 use crate::fuel::{CrownFuel, FuelType, RosParams};
+use crate::growth::calc_accel_param;
 use crate::normalize::{invert_wind_aspect, normalize, Normalized};
 use crate::ros::{calc_c6_blend, calc_ros, Ros};
 use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
@@ -279,51 +283,22 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let CrownFuel { cbh, cfl } = ft.crown_fuel();
 
     // --- calc_csfi / calc_rso
-    let csfi = if ft.code() < 14 {
-        (0.01 * cbh * (460.0 + 25.9 * fmc.fmc)).powf(1.5)
-    } else {
-        0.0
-    };
-    let rso = if sfc > 0.0 { csfi / (300.0 * sfc) } else { 0.0 };
-
-    // --- crown fraction burned. The equation is the same for every crowning
-    // fuel (including C-6); only the ROS it is applied to differs per step.
-    let cfb_from_ros = |ros: f64| -> f64 {
-        let delta = ros - rso;
-        let mut cfb = if delta < -3086.0 {
-            0.0
-        } else {
-            1.0 - (-0.23 * delta).exp()
-        };
-        if !cfb.is_finite() && !cfb.is_nan() {
-            // infinities zero out; NaN is a masked cell in Python and must
-            // stay NaN (grid-truth: cfb/accel are NaN at NaN-input cells)
-            cfb = 0.0;
-        }
-        cfb.clamp(0.0, 1.0)
-    };
-    let crowning = ft.is_modeled() && !ft.is_non_crowning();
-    let directional_cfb = |ros: f64| -> f64 {
-        if crowning {
-            cfb_from_ros(ros)
-        } else {
-            0.0
-        }
-    };
+    let csfi = calc_csfi(ft, cbh, fmc.fmc);
+    let rso = calc_rso(sfc, csfi);
 
     // --- deterministic C-6 blend: SROS-derived CFB -> CFC -> CROS -> blended
     // HROS. This CFB is temporary; it is not the CFB used downstream.
     let mut cros = 0.0;
     if ft == FuelType::C6 {
-        let blend_cfb = cfb_from_ros(sros);
+        let blend_cfb = cfb_from_ros(sros, rso);
         let blend = calc_c6_blend(sros, blend_cfb, cfl, isi, fmc.fme);
         cros = blend.cros;
         hros = blend.hros;
     }
 
     // --- directional CFB used only to pick the percentile-growth regime
-    let percentile_cfb = directional_cfb(hros);
-    let percentile_bros_cfb = directional_cfb(bros);
+    let percentile_cfb = directional_cfb(ft, hros, rso);
+    let percentile_bros_cfb = directional_cfb(ft, bros, rso);
 
     // --- calc_ros_percentile_growth: 50 is an exact no-op; NaN propagates
     let hros_before_percentile = hros;
@@ -339,46 +314,17 @@ pub fn run(input: &FbpInput) -> FbpResult {
         );
     }
 
-    // --- final CFB from the percentile-adjusted head ROS. A NaN that appears
-    // only at the percentile step (NaN percentile) is an unmasked non-finite
-    // value in Python, which the CFB sanitiser zeroes; a NaN that was already
-    // there is a masked cell and stays NaN.
-    let cfb = if hros.is_nan() && !hros_before_percentile.is_nan() {
-        0.0
-    } else {
-        directional_cfb(hros)
-    };
+    // --- final CFB from the percentile-adjusted head ROS (NaN rule in final_cfb)
+    let cfb = final_cfb(ft, hros, hros_before_percentile, rso);
 
     // --- calc_accel_param
-    let accel = if ft.is_open() {
-        0.115
-    } else if ft.is_modeled() {
-        0.115 - 18.8 * cfb.powf(2.5) * (-8.0 * cfb).exp()
-    } else {
-        0.0
-    };
+    let accel = calc_accel_param(ft, cfb);
 
     // --- calc_fire_type
-    let fire_type = if ft.code() < 19 {
-        if cfb.is_nan() {
-            0.0 // masked cell: grid-truth observable is 0, not a class
-        } else if cfb <= 0.1 {
-            1.0
-        } else if cfb < 0.9 {
-            2.0
-        } else {
-            3.0
-        }
-    } else {
-        0.0
-    };
+    let fire_type = calc_fire_type(ft, cfb);
 
     // --- calc_cfc
-    let cfc = match ft {
-        FuelType::M1 | FuelType::M2 => cfb * cfl * pc / 100.0,
-        FuelType::M3 | FuelType::M4 => cfb * cfl * pdf / 100.0,
-        _ => cfb * cfl,
-    };
+    let cfc = calc_cfc(ft, cfb, cfl, pc, pdf);
 
     // ffc/wfc stay NaN where the Python package masks them (fuels without
     // a fine/woody split): the GRID path surfaces masked cells as NaN.
