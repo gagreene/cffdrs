@@ -29,8 +29,9 @@ jobs:
           uv run mypy
       # fmt, clippy and doc checks run in ci.yml, so a new stable lint cannot
       # block a tagged release.
+      # cffdrs-py has no Rust tests and links against Python; pytest covers it.
       - name: Rust tests
-        run: cargo test --manifest-path rust/Cargo.toml --workspace
+        run: cargo test --manifest-path rust/Cargo.toml -p cffdrs-core
 
   # The MSRV is declared once, as rust-version in rust/Cargo.toml; read it from
   # there so this job cannot drift from the manifest.

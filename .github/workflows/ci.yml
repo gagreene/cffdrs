@@ -33,8 +33,9 @@ jobs:
         run: cargo clippy --manifest-path rust/Cargo.toml --workspace --all-targets --all-features -- -D warnings
       - name: Docs
         run: RUSTDOCFLAGS="-D warnings" cargo doc --manifest-path rust/Cargo.toml --workspace --no-deps
+      # cffdrs-py has no Rust tests and links against Python; pytest covers it.
       - name: Tests
-        run: cargo test --manifest-path rust/Cargo.toml --workspace
+        run: cargo test --manifest-path rust/Cargo.toml -p cffdrs-core
 
   # The MSRV is declared once, as rust-version in rust/Cargo.toml; read it from
   # there so this job cannot drift from the manifest.
