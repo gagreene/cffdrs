@@ -35,7 +35,7 @@ def build_scalar_snapshot() -> dict:
         result = fbp.runFBP()
         record = {"id": int(row["id"]), "fuel_type_code": str(row["fuel_type_code"])}
         record["outputs"] = {
-            name: wh.scalarize(value) for name, value in zip(outputs, result)
+            name: wh.scalarize(value) for name, value in zip(outputs, result, strict=True)
         }
         cases.append(record)
     return {"outputs": outputs, "cases": cases}
@@ -50,7 +50,7 @@ def build_array_snapshot() -> dict:
         "outputs": outputs,
         "wx_date": wh.RASTER_WX_DATE,
         "dj": wh.RASTER_DJ,
-        "arrays": {name: wh.arrayize(value) for name, value in zip(outputs, result)},
+        "arrays": {name: wh.arrayize(value) for name, value in zip(outputs, result, strict=True)},
     }
 
 
@@ -107,7 +107,7 @@ def build_percentile_pipeline_snapshot() -> dict:
             fbp.initialize(percentile_growth=percentile, **wh.row_to_kwargs(row, PERCENTILE_OUTPUTS))
             result = fbp.runFBP()
             record["percentiles"][str(percentile)] = {
-                name: wh.scalarize(value) for name, value in zip(PERCENTILE_OUTPUTS, result)
+                name: wh.scalarize(value) for name, value in zip(PERCENTILE_OUTPUTS, result, strict=True)
             }
         cases.append(record)
     return {"outputs": PERCENTILE_OUTPUTS, "percentiles": PERCENTILES, "cases": cases}
