@@ -7,9 +7,6 @@
 // fires in macro-generated code, so an attribute on the function does not reach
 // it; drop this allow when pyo3 is upgraded past the affected releases.
 #![allow(clippy::useless_conversion)]
-// pyo3 0.22 macro expansion also trips `unsafe_op_in_unsafe_fn` (E0133) on newer
-// rustc once the workspace lint is enabled; same removal condition as above.
-#![allow(unsafe_op_in_unsafe_fn)]
 
 use cffdrs_core::grid::{run_grid, GridInput};
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
@@ -38,8 +35,10 @@ fn row_major<T: numpy::Element + Copy>(array: &PyReadonlyArray2<'_, T>) -> Vec<T
 /// be a real `YYYYMMDD` calendar date or a `ValueError` is raised. A NaN
 /// latitude, longitude or elevation masks that cell's foliar moisture (and any
 /// crown behaviour that depends on it), as in the Python package.
+// `PyReadonlyArray2` is pyo3's by-value extraction type for numpy arguments; it
+// is a cheap borrow guard, not a payload, so taking it by value is intentional.
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn run_fbp_grid<'py>(
     py: Python<'py>,
     fuel_type: PyReadonlyArray2<'py, i32>,
