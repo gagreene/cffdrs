@@ -1,6 +1,6 @@
 """Manual GPU (CuPy) Wotton-2009 validation script — NOT collected by pytest.
 
-Depends on the experimental CuPy backend (``cffdrs.cffbps.cupy_backend``), which
+Depends on the experimental CuPy backend (``cffdrs.cffbps.cupy``), which
 requires the optional ``gpu`` extra and a CUDA-capable environment
 (``pip install cffdrs[gpu]``). The backend is frozen at the pre-refactor monolith
 and is not held to reference parity, so this script is exploratory only.
@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from cffdrs.cffbps.cupy_backend import FBP
+from cffdrs.cffbps.cupy import FBP
 
 # Fuel types
 fuel_type_lookup = {
@@ -65,7 +65,10 @@ for idx, row in df.iterrows():
         # ft_num = fuel_type_lookup.get(ft_str)
 
         # Collect input values (it doesn't understand NA, leave empty)
-        inputs = [None if (~np.isfinite(row[col]) | isinstance(row[col], type(pd.NA))) else row[col] for col in input_columns]
+        inputs = [
+            None if (~np.isfinite(row[col]) | isinstance(row[col], type(pd.NA))) else row[col]
+            for col in input_columns
+        ]
         inputs.append(output_request)
 
         # Initialize and run model
@@ -74,7 +77,7 @@ for idx, row in df.iterrows():
         output = fbp.runFBP()
 
         # Store result with ID
-        outputs.append(dict(zip(output_request, output), id=row['id']))
+        outputs.append(dict(zip(output_request, output, strict=False), id=row['id']))
 
     except Exception as e:
         print(f'Error in row {idx} (ID {row.get("id")}): {e}')

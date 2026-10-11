@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cffdrs.cffbps import FBP
+from cffdrs.cffbps.python import FBP
 
 SCENARIO = dict(
     lat=55.0, long=-110.0, elevation=500.0, slope=10.0, aspect=270.0, ws=20.0, wd=0.0,

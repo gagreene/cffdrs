@@ -3,7 +3,7 @@
 Converts the raw ``FBP.initialize`` arguments (scalars or ndarrays) into validated
 masked arrays and the reference arrays that shape every downstream output. Pure
 functions: they read only their arguments and the read-only tables in
-``cffbps.constants``, returning new values (no mutation of inputs).
+``cffdrs.cffbps.common.constants``, returning new values (no mutation of inputs).
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from numpy import ma as mask
 
 from . import constants
 from .constants import fbpFTCode_AlphaToNum_LUT
+from .fmc_inputs import coerce_override
 
 MaskedArray = mask.MaskedArray
 
@@ -148,19 +149,8 @@ def _coerce(name: str, value, default: float | None = None) -> MaskedArray:
     return mask.array([value], mask=np.isnan([value]))
 
 
-def verify_inputs(*,
-                  fuel_type: int | str | np.ndarray,
-                  wx_date: int,
-                  lat, long, elevation, slope, aspect, ws, wd, ffmc, bui,
-                  pc, pdf, gfl, gcf, d0, dj, out_request,
-                  convert_fuel_type_codes: bool) -> VerifiedInputs:
-    """Validate all inputs and coerce them to masked numpy arrays.
-
-    :return: :class:`VerifiedInputs` with the coerced fields plus ``ftypes``
-        (unique valid fuel-type codes present).
-    """
-    # ### VERIFY ALL INPUTS AND CONVERT TO MASKED NUMPY ARRAYS
-    # Verify fuel_type
+def prepare_fuel_type(fuel_type, convert_fuel_type_codes: bool):
+    """Validate a fuel-type input and return ``(masked int8 codes, unique valid modelled codes)``."""
     if not isinstance(fuel_type, (int, str, np.ndarray)):
         raise TypeError('fuel_type must be either int, string, or numpy ndarray data types')
     elif isinstance(fuel_type, np.ndarray):
@@ -169,9 +159,13 @@ def verify_inputs(*,
             # Convert using np.vectorize and replace unknown fuel types with invalid_value
             convert_to_numeric = np.vectorize(lambda x: fbpFTCode_AlphaToNum_LUT.get(x, invalid_value))
             fuel_type = convert_to_numeric(fuel_type).astype(np.int8)
-        if fuel_type.dtype != np.int8:
-            fuel_type = np.asarray(fuel_type, dtype=np.int8)
-        fuel_type = mask.array(fuel_type, mask=np.isnan(fuel_type))
+        arr = mask.asarray(fuel_type)
+        data, was_masked = mask.getdata(arr), mask.getmaskarray(arr)
+        valid = (data >= 1) & (data <= 20)
+        if data.dtype.kind == 'f':
+            valid &= data == np.floor(data)
+        fuel_type = mask.array(np.where(valid, data, 0).astype(np.int8),
+                               mask=was_masked | ~valid)
     elif isinstance(fuel_type, str):
         fuel_type = mask.array([fbpFTCode_AlphaToNum_LUT.get(fuel_type)],
                                mask=np.isnan([fbpFTCode_AlphaToNum_LUT.get(fuel_type)]))
@@ -190,8 +184,11 @@ def verify_inputs(*,
 
     # Get unique fuel types present in the dataset
     ftypes = [ftype for ftype in np.unique(fuel_type) if ftype in list(constants.rosParams.keys())]
+    return fuel_type, ftypes
 
-    # Verify wx_date
+
+def validate_wx_date(wx_date) -> int:
+    """Require ``wx_date`` to be an int formatted YYYYMMDD and return it."""
     if not isinstance(wx_date, int):
         raise TypeError('wx_date must be int data type')
     try:
@@ -199,44 +196,77 @@ def verify_inputs(*,
         dt.fromisoformat(f'{date_string[:4]}-{date_string[4:6]}-{date_string[6:]}')
     except ValueError:
         raise ValueError('wx_date must be formatted as: YYYYMMDD') from None
+    return wx_date
 
-    # Coerce every numeric input to a masked array (one shared helper; see _coerce)
+
+# Inputs that are normalised when they are set: name -> default substituted for a NaN scalar (or None)
+NORMALISED_INPUTS = {'slope': None, 'aspect': None, 'ws': None, 'ffmc': None, 'bui': None,
+                     'pc': 50, 'pdf': 35, 'gfl': 0.35, 'gcf': 80}
+
+
+def normalize_input(name: str, value) -> MaskedArray:
+    """Coerce one of the nine normalised inputs to a masked array and apply its rule.
+
+    Used by ``verify_inputs`` and by every route that changes an input after initialisation, so an
+    updated model equals one initialised with the same value. Rules: ``slope`` is limited below at 0;
+    a negative ``aspect`` becomes 270 (flat terrain); negative ``ws``, ``ffmc``, ``bui``, ``pc``, ``pdf``
+    and ``gfl`` become 0; ``gcf`` of 0 becomes 0.1. A NaN scalar ``pc``/``pdf``/``gfl``/``gcf`` takes its default.
+    """
+    if name not in NORMALISED_INPUTS:
+        raise ValueError(f'{name} is not a normalised input')
+    value = _coerce(name, value, default=NORMALISED_INPUTS[name])
+    if name == 'slope':
+        return mask.clip(value, 0, None)  # Limit the lower slope value to 0
+    if name == 'aspect':
+        return mask.where(value < 0, 270, value)  # Negative aspect represents "flat" terrain
+    if name == 'gcf':
+        return mask.where(value == 0, 0.1, value)  # Set to 0.1% if 0%
+    return mask.where(value < 0, 0, value)  # Set to 0 if negative
+
+
+def coerce_input(name: str, value, default: float | None = None) -> MaskedArray:
+    """Public form of the shared numeric-input coercion (see ``_coerce``)."""
+    return _coerce(name, value, default)
+
+
+def verify_inputs(*,
+                  fuel_type: int | str | np.ndarray,
+                  wx_date: int,
+                  lat, long, elevation, slope, aspect, ws, wd, ffmc, bui,
+                  pc, pdf, gfl, gcf, d0, dj, out_request,
+                  convert_fuel_type_codes: bool) -> VerifiedInputs:
+    """Validate all inputs and coerce them to masked numpy arrays.
+
+    :return: :class:`VerifiedInputs` with the coerced fields plus ``ftypes``
+        (unique valid fuel-type codes present).
+    """
+    # ### VERIFY ALL INPUTS AND CONVERT TO MASKED NUMPY ARRAYS
+    # Verify fuel_type
+    fuel_type, ftypes = prepare_fuel_type(fuel_type, convert_fuel_type_codes)
+
+    # Verify wx_date
+    validate_wx_date(wx_date)
+
+    # Coerce every numeric input to a masked array (one shared helper; see _coerce) and apply the
+    # normalisation rules (one shared helper; see normalize_input)
     lat = _coerce('lat', lat)
     long = np.absolute(_coerce('long', long))  # Get absolute longitude values
     elevation = _coerce('elevation', elevation)
-    slope = mask.clip(_coerce('slope', slope), 0, None)  # Limit the lower slope value to 0
-    aspect = _coerce('aspect', aspect)
-    # Set negative aspect values to 270 degrees (assuming they represent "flat" terrain)
-    aspect = mask.where(aspect < 0, 270, aspect)
-    ws = _coerce('ws', ws)
-    ws = mask.where(ws < 0, 0, ws)  # Set to 0 if negative
+    slope = normalize_input('slope', slope)
+    aspect = normalize_input('aspect', aspect)
+    ws = normalize_input('ws', ws)
     wd = _coerce('wd', wd)
-    ffmc = _coerce('ffmc', ffmc)
-    ffmc = mask.where(ffmc < 0, 0, ffmc)  # Set to 0 if negative
-    bui = _coerce('bui', bui)
-    bui = mask.where(bui < 0, 0, bui)  # Set to 0 if negative
-    pc = _coerce('pc', pc, default=50)  # Default to 50% if NaN
-    pc = mask.where(pc < 0, 0, pc)  # Set to 0 if negative
-    pdf = _coerce('pdf', pdf, default=35)  # Default to 35% if NaN
-    pdf = mask.where(pdf < 0, 0, pdf)  # Set to 0 if negative
-    gfl = _coerce('gfl', gfl, default=0.35)  # Default to 0.35 kg/m2 if NaN
-    gfl = mask.where(gfl < 0, 0, gfl)  # Set to 0 if negative
-    gcf = _coerce('gcf', gcf, default=80)  # Default to 80% if NaN
-    gcf = mask.where(gcf == 0, 0.1, gcf)  # Set to 0.1% if 0%
+    ffmc = normalize_input('ffmc', ffmc)
+    bui = normalize_input('bui', bui)
+    pc = normalize_input('pc', pc)
+    pdf = normalize_input('pdf', pdf)
+    gfl = normalize_input('gfl', gfl)
+    gcf = normalize_input('gcf', gcf)
 
-    # Verify d0
-    if d0 is not None:
-        if not isinstance(d0, int):
-            raise TypeError('d0 must be int data type')
-        else:
-            d0 = mask.array([d0], mask=np.isnan([d0]))
-
-    # Verify dj
-    if dj is not None:
-        if not isinstance(dj, int):
-            raise TypeError('dj must be int data type')
-        else:
-            dj = mask.array([dj], mask=np.isnan([dj]))
+    # Verify d0 and dj (scalars, arrays or masked arrays; NaN and masked cells are missing; no range limit on
+    # d0, dj is floored and clipped to the year at calculation time, see fmc_inputs)
+    d0 = coerce_override('d0', d0)
+    dj = coerce_override('dj', dj)
 
     # Verify out_request
     if not isinstance(out_request, (list, tuple, type(None))):
@@ -248,3 +278,35 @@ def verify_inputs(*,
         ws=ws, wd=wd, ffmc=ffmc, bui=bui,
         pc=pc, pdf=pdf, gfl=gfl, gcf=gcf, d0=d0, dj=dj,
     )
+
+
+class PreparedInputs(NamedTuple):
+    """Everything ``initialize`` needs from the raw arguments (shared by every backend)."""
+    verified: VerifiedInputs
+    return_array: bool
+    ref_array: MaskedArray
+    ref_int_array: MaskedArray
+
+
+REQUIRED_INPUTS = ('fuel_type', 'wx_date', 'lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui')
+
+
+def prepare_inputs(*, fuel_type, wx_date, lat, long, elevation, slope, aspect, ws, wd,
+                   ffmc, bui, pc, pdf, gfl, gcf, d0, dj, out_request,
+                   convert_fuel_type_codes) -> PreparedInputs:
+    """Check the required parameters, detect array input and validate/coerce every input.
+
+    :raises ValueError: listing every missing required parameter
+    """
+    given = dict(fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
+                 aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui)
+    missing = [name for name in REQUIRED_INPUTS if given[name] is None]
+    if missing:
+        raise ValueError(f'Missing required parameters: {missing}')
+    return_array, ref_array, ref_int_array = check_array(
+        [fuel_type, lat, long, elevation, slope, aspect, ws, wd, ffmc, bui, pc, pdf, gfl, gcf])
+    verified = verify_inputs(
+        fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
+        aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf, gfl=gfl, gcf=gcf,
+        d0=d0, dj=dj, out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes)
+    return PreparedInputs(verified, return_array, ref_array, ref_int_array)

@@ -1,6 +1,6 @@
 """Block-based multiprocessing driver for CFFBPS raster runs.
 
-Splits large input arrays into blocks and runs :class:`cffbps.facade.FBP` on each
+Splits large input arrays into blocks and runs :class:`cffdrs.cffbps.python.core.FBP` on each
 block in a worker pool. Kept separate from the pure equation modules because it
 owns process orchestration (not referentially transparent).
 """
@@ -13,7 +13,7 @@ from operator import itemgetter
 import numpy as np
 import psutil
 
-from .facade import FBP
+from .core import FBP
 
 
 def _estimate_optimal_block_size(array_shape, num_processors, memory_fraction=0.8):

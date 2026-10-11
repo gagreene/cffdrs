@@ -36,7 +36,7 @@ if HERE not in sys.path:
 
 import _wotton_helpers as wh  # noqa: E402
 
-from cffdrs.cffbps import FBP  # noqa: E402
+from cffdrs.cffbps.python import FBP  # noqa: E402
 
 # ── Published Wotton (2009) reference (authoritative external oracle) ──────────
 # Column indices in Reference_Results.xlsx for the "Wotton 2009" source of each metric.
@@ -126,7 +126,7 @@ def test_scalar_matches_published_wotton2009():
         cid = int(row["id"])
         fbp = FBP()
         fbp.initialize(**wh.row_to_kwargs(row, out_req))
-        got = dict(zip(out_req, (wh.scalarize(v) for v in fbp.runFBP())))
+        got = dict(zip(out_req, (wh.scalarize(v) for v in fbp.runFBP()), strict=False))
 
         # Fire type: exact category match (numeric -> S/I/C letter). C6 final CFB
         # intentionally follows completed blended HROS rather than the reference's SROS.
@@ -165,7 +165,7 @@ def test_scalar_snapshot(scalar_golden):
         row = by_id[case["id"]]
         fbp = FBP()
         fbp.initialize(**wh.row_to_kwargs(row, outputs))
-        got = dict(zip(outputs, (wh.scalarize(v) for v in fbp.runFBP())))
+        got = dict(zip(outputs, (wh.scalarize(v) for v in fbp.runFBP()), strict=False))
         for name in outputs:
             if not _equal_at_float32(got[name], case["outputs"][name]):
                 mismatches.append(
@@ -182,7 +182,7 @@ def test_array_snapshot(array_golden):
     outputs = array_golden["outputs"]
     fbp = FBP()
     fbp.initialize(out_request=outputs, **wh.load_raster_inputs())
-    result = dict(zip(outputs, (wh.arrayize(v) for v in fbp.runFBP())))
+    result = dict(zip(outputs, (wh.arrayize(v) for v in fbp.runFBP()), strict=False))
 
     mismatches = []
     for name in outputs:

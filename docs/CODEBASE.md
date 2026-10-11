@@ -11,7 +11,10 @@ PyPI-bound. Maturin builds one mixed Python/Rust wheel; its version comes from
 
 Two independent systems live side by side in one package:
 
-- **`cffdrs.cffbps`** (FBP) — a facade class (`FBP`) that orchestrates pure,
+- **`cffdrs.cffbps`** (FBP) — a lazy public interface to the Python reference.
+  `python/core.py` holds the `FBP` class; `common/` holds shared constants and
+  input validation; `cupy/core.py` holds the experimental GPU backend.
+  The Python class orchestrates pure,
   single-purpose equation functions in a fixed sequence. Facade holds no fire-behavior
   math itself; equation submodules never call across files — all wiring between
   quantities (e.g. crown fraction burned feeding into fuel consumption) happens in
@@ -28,13 +31,13 @@ The codebase is a genuine two-tier system, not just old-vs-new file age:
 
 | Tier | Files | Typing | Error handling |
 |---|---|---|---|
-| Modern, strict-mypy-gated | `cffbps/equations/*`, `cffbps/constants.py`, `_typing.py` | Fully typed, `from __future__ import annotations`, reST docstrings | `TypeError`/`ValueError` only for structural problems; domain issues handled via masking/clipping/`np.errstate` |
-| Modern, typed but ungated | `cffbps/facade.py`, `cffbps/inputs.py`, `cffbps/parallel.py` | Typed, excluded from strict mypy (dynamic dict access, masked-array narrowing fights numpy stubs) | Same masking-first philosophy as equations |
+| Modern, strict-mypy-gated | `cffbps/python/equations/*`, `cffbps/common/constants.py`, `_typing.py` | Fully typed, `from __future__ import annotations`, reST docstrings | `TypeError`/`ValueError` only for structural problems; domain issues handled via masking/clipping/`np.errstate` |
+| Modern, typed but ungated | `cffbps/python/core.py`, `cffbps/common/inputs.py`, `cffbps/python/parallel.py` | Typed, excluded from strict mypy (dynamic dict access, masked-array narrowing fights numpy stubs) | Same masking-first philosophy as equations |
 | Legacy/untyped | `cffwis.py`, `diurnal_ffmc_lawson.py` | Bypasses `_typing.py` entirely | Manual `isinstance` checks repeated per parameter, per function |
 
 ## Key files and responsibilities
 
-### `cffbps/facade.py` (~930 lines) — the `FBP` class
+### `cffbps/python/core.py` (~930 lines) — the `FBP` class
 - `initialize(...)` — accepts fuel/terrain/weather inputs (scalar or ndarray), calls
   `inputs.check_array()` then `inputs.verify_inputs()`, pre-binds ~40 output attributes
   to one shared zero-filled `self.ref_array` template, raises `ValueError` if any of
@@ -51,7 +54,7 @@ The codebase is a genuine two-tier system, not just old-vs-new file age:
   the requested subset; branches once on scalar-vs-array mode to unwrap results.
 - `getSeasonGrassCuring(...)` — standalone lookup helper, not tied to an instance.
 
-### `cffbps/inputs.py` — validation/coercion
+### `cffbps/common/inputs.py` — validation/coercion
 Pure functions, no mutation of shared state. `check_array()` detects scalar-vs-array
 mode and validates all array inputs share one shape. `_coerce()` wraps a single
 value as a masked array (NaN → default for pc/pdf/gfl/gcf, NaN → masked for
@@ -59,7 +62,7 @@ everything else — deliberate, golden-snapshot-locked behavior). `verify_inputs
 the main entry, returns a `VerifiedInputs` NamedTuple whose field names match `FBP`
 attributes by contract.
 
-### `cffbps/parallel.py` — multiprocessing driver
+### `cffbps/python/parallel.py` — multiprocessing driver
 `fbpMultiprocessArray(...)`: estimates block size from available memory
 (`psutil`) and processor count, splits array inputs into non-overlapping blocks,
 runs a fresh `FBP()` per block via `multiprocessing.Pool.starmap` (return-value
@@ -68,14 +71,14 @@ arrays by position. `num_processors < 2` is bumped to 2 with a `warnings.warn(..
 (not a `print()`); an invalid `out_request` raises inside the worker's `runFBP()`
 call and propagates cleanly back out through `pool.starmap`, not swallowed.
 
-### `cffbps/constants.py` — static lookup tables
+### `cffbps/common/constants.py` — static lookup tables
 Fuel-type code tables (numeric ↔ alpha), `valid_outputs`, per-fuel-type CBH/CFL/height
 table, per-fuel-type ROS coefficients (`rosParams`), open/non-crowning fuel-type sets.
-Wrapped immutable (`MappingProxyType`/`tuple`/`Final`). `facade.__init__` copies these
+Wrapped immutable (`MappingProxyType`/`tuple`/`Final`). `core.FBP.__init__` copies these
 into per-instance mutable attributes so one instance can be calibrated without
 affecting others or the shared module table.
 
-### `cffbps/equations/*` — pure calculation functions
+### `cffbps/python/equations/*` — pure calculation functions
 One file per concern, all operating on `numpy.ma.MaskedArray` only (no separate
 scalar path — scalars are coerced upstream):
 - `slope_wind.py` — wind/slope geometry, zero-wind ISI, wind/slope-adjusted ISI, RSI, BUI effect
@@ -111,7 +114,7 @@ backing-spread variability shrinks as wind speed increases, the same way backing
 itself does; head-fire noise is not wind-scaled.
 
 *Project choices, not from the paper:* (1) the surface-vs-crown regime is chosen by
-`cfb < 0.1`, using each direction's own pre-percentile CFB (`facade.py`'s
+`cfb < 0.1`, using each direction's own pre-percentile CFB (`python/core.py`'s
 `self.percentile_cfb`/`self.percentile_bros_cfb`), because the paper assumes the fire
 type is known; (2) if the crown radicand goes negative the adjusted ROS is 0 (no positive ROS
 exists there, and this keeps the output continuous and non-decreasing in ROS); (3) fuel scope: only C-1..C-7 are adjusted —
@@ -188,15 +191,15 @@ flowchart TD
         C -.->|"diurnalFFMC_lawson() wraps"| L
     end
 
-    subgraph FBPInit["FBP.initialize()"]
-        D["inputs.check_array()\n(scalar vs array mode)"]
-        E["inputs.verify_inputs()\n(coerce, clamp, mask invalid)"]
+    subgraph FBPInit["python/core.py: FBP.initialize()"]
+        D["common/inputs.py: check_array()\n(scalar vs array mode)"]
+        E["common/inputs.py: verify_inputs()\n(coerce, clamp, mask invalid)"]
         F["VerifiedInputs NamedTuple\n-> setattr onto self.*"]
         G["Pre-bind ~40 output attrs\nto shared self.ref_array template"]
         D --> E --> F --> G
     end
 
-    subgraph FBPRun["FBP.runFBP() - fixed 23-step sequence"]
+    subgraph FBPRun["python/core.py: FBP.runFBP() - fixed 23-step sequence"]
         direction TB
         S1["invertWindAspect"] --> S2["calcSF"] --> S3["calcISZ"] --> S4["calcFMC"]
         S4 --> S5["calcISI_RSI_BE"] --> S6["calcROS"] --> S7["calcSFC"]
@@ -208,7 +211,7 @@ flowchart TD
         S20 --> S21["calcTFC"] --> S22["calcHFI"] --> S23["calcFireIntensityClass"]
     end
 
-    subgraph Eq["cffbps.equations.* (pure functions, MaskedArray in/out)"]
+    subgraph Eq["cffbps.python.equations.* (pure functions, MaskedArray in/out)"]
         EQ1["slope_wind"]
         EQ2["ros"]
         EQ3["surface"]
@@ -218,9 +221,11 @@ flowchart TD
         EQ7["consumption"]
     end
 
-    subgraph Const["cffbps.constants"]
+    subgraph Const["common/constants.py"]
         K["rosParams, CBH/CFL LUT,\nfuel-type code tables"]
     end
+
+    GPU["cupy/core.py: experimental GPU backend\n(explicit cffdrs.cffbps.cupy import)"]
 
     A --> B
     C -->|"FFMC, BUI"| D
@@ -254,7 +259,7 @@ flowchart TD
     S23 --> H["getParams(out_request)\nfill masked -> NaN (array mode)\nor .item() (scalar mode)"]
     H --> I["Output: hros, hfi, fire_type,\ncfb, tfc, fi_class, ... (up to 54 vars)"]
 
-    subgraph Parallel["cffbps.parallel.fbpMultiprocessArray (large rasters)"]
+    subgraph Parallel["cffbps.python.parallel.fbpMultiprocessArray (large rasters)"]
         P1["Estimate block size\n(psutil available memory)"]
         P2["Split array inputs into blocks"]
         P3["Pool.starmap: fresh FBP() per block\n-> initialize() + runFBP()"]
@@ -344,7 +349,7 @@ flowchart TD
   (`raz`/`wse`/`wsx`/`wsy`/`bros`), which is platform noise, not drift; float32 still
   carries ~7 significant digits, so a real regression still fails the test.
 - **`equations/__init__.py` re-exports nothing** — every equation function must be
-  imported from its specific submodule (`from cffdrs.cffbps.equations.crown import
+  imported from its specific submodule (`from cffdrs.cffbps.python.equations.crown import
   calc_cfb`), not from the `equations` package itself.
 - **Two hourly test-fixture surfaces for the same system**: `cffwis` tests live both
   under `tests/cffwis/` and as a separate `tests/test_cffwis.py` at the repo root of

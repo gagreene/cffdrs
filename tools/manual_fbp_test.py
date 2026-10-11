@@ -9,7 +9,7 @@ import os
 
 import numpy as np
 
-from cffdrs.cffbps import (
+from cffdrs.cffbps.python import (
     FBP,
     fbpFTCode_AlphaToNum_LUT,
     fbpMultiprocessArray,

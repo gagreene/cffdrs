@@ -14,7 +14,7 @@ pip install cffdrs
 ```
 
 Published wheels include the compiled Rust grid backend. Installing from a
-source distribution requires a Rust toolchain as well as Python 3.10+.
+source distribution requires a Rust toolchain as well as Python 3.11+.
 
 Optional extras:
 
@@ -22,13 +22,16 @@ Optional extras:
 pip install "cffdrs[io]"    # rasterio + pandas, for raster/tabular workflows
 ```
 
-Requires Python 3.10+. Core dependencies: `numpy`, `scipy`, `psutil`.
+Requires Python 3.11+. Core dependencies: `numpy`, `scipy`, `psutil`.
 
 ## Package layout
 
 | Module | Contents |
 |---|---|
-| `cffdrs.cffbps` | FBP System: the `FBP` class (facade) over pure equation modules |
+| `cffdrs.cffbps` | Lazy public FBP API; currently selects the Python reference |
+| `cffdrs.cffbps.python` | Explicit Python FBP backend; `python/core.py` orchestrates `python/equations/` |
+| `cffdrs.cffbps.common` | Shared constants, fuel-code conversion, and input validation |
+| `cffdrs.cffbps.cupy` | Experimental CuPy GPU backend |
 | `cffdrs.cffwis` | FWI System: FFMC/DMC/DC/ISI/BUI/FWI/DSR functions (hourly + daily) |
 | `cffdrs.diurnal_ffmc_lawson` | Diurnal (hourly) FFMC interpolation per Lawson et al. |
 | `cffdrs._rust` | Compiled, low-level FBP grid pass used as the performance backend |
@@ -36,7 +39,7 @@ Requires Python 3.10+. Core dependencies: `numpy`, `scipy`, `psutil`.
 The repository is a mixed Python/Rust project. Python package sources live under
 `src/cffdrs`; the top-level `rust/` directory is a Cargo workspace containing:
 
-- `cffdrs-core`: dependency-free Rust FBP equations and the grid pass.
+- `cffbps-rust`: dependency-free Rust FBP equations and the grid pass.
 - `cffdrs-py`: thin PyO3 bindings that install as `cffdrs._rust` in the same
   `cffdrs` wheel as the Python package.
 
@@ -51,7 +54,25 @@ Cargo workspace that can also be tested and packaged with Cargo tooling.
 
 The `FBP` class is a facade: initialize it with fuel, terrain, and weather inputs,
 run the model, and request any of 50+ output variables. The underlying equations
-live in `cffdrs.cffbps.equations` as pure, typed functions if you need them directly.
+live in `cffdrs.cffbps.python.equations` as pure, typed functions if you need them directly.
+
+### Breaking changes in 0.2.0
+
+The public `from cffdrs.cffbps import FBP` import remains supported and currently
+returns the Python backend. Import `FBP` from `cffdrs.cffbps.python` to select the
+reference explicitly. Package imports load this backend only when a public name
+is requested.
+
+Deep imports move without compatibility shims:
+
+| Previous import | New import |
+|---|---|
+| `cffdrs.cffbps.facade` | `cffdrs.cffbps.python.core` |
+| `cffdrs.cffbps.equations` | `cffdrs.cffbps.python.equations` |
+| `cffdrs.cffbps.parallel` | `cffdrs.cffbps.python.parallel` |
+| `cffdrs.cffbps.constants` | `cffdrs.cffbps.common.constants` |
+| `cffdrs.cffbps.inputs` | `cffdrs.cffbps.common.inputs` |
+| `cffdrs.cffbps.cupy_backend` | `cffdrs.cffbps.cupy` (implementation: `cupy/core.py`) |
 
 ### Scalar example
 
@@ -108,7 +129,7 @@ intermediates (`isi`, `wsv`, `raz`, `sfc`, `fmc`, `csfi`, `rso`, `be`, …).
 ### Experimental GPU backend
 
 An experimental CuPy (GPU) variant of the FBP model lives at
-`cffdrs.cffbps.cupy_backend`. Install the optional `gpu` extra (needs a
+`cffdrs.cffbps.cupy`. Install the optional `gpu` extra (needs a
 CUDA-capable environment):
 
 ```bash
@@ -118,7 +139,7 @@ pip install "cffdrs[gpu]"
 ```
 
 ```python
-from cffdrs.cffbps.cupy_backend import FBP   # requires cupy + CUDA
+from cffdrs.cffbps.cupy import FBP   # requires cupy + CUDA
 ```
 
 > **Experimental — not held to reference parity.** This backend is frozen at the
@@ -156,7 +177,7 @@ full-precision golden snapshots on both the scalar and array code paths.
 
 ## Development
 
-Development requires Python 3.10+, `uv`, and a stable Rust toolchain. The main
+Development requires Python 3.11+, `uv`, and a stable Rust toolchain. The main
 project uses Maturin, so syncing the environment builds `cffdrs._rust` alongside
 the editable Python package:
 
@@ -172,7 +193,7 @@ cargo test --manifest-path rust/Cargo.toml
 
 The Python distribution version comes from `rust/crates/cffdrs-py/Cargo.toml`;
 update that crate version when preparing a release tag. The pure Rust core has
-its own version in `rust/crates/cffdrs-core/Cargo.toml` because it may be consumed
+its own version in `rust/crates/cffbps-rust/Cargo.toml` because it may be consumed
 independently by Rust applications.
 
 Golden regression fixtures are regenerated with `uv run python tools/gen_fbp_goldens.py`

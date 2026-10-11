@@ -6,13 +6,15 @@ built wheel was installed, from a directory outside the repository checkout:
     python tools/smoke_test_wheel.py
 
 It checks that the package imported from site-packages (not the source tree),
-that the compiled ``cffdrs._rust`` extension loads, and that the compiled grid
+that its metadata declares the ``cp311-abi3`` tag, that the compiled
+``cffdrs._rust`` extension loads, and that the compiled grid
 pass agrees with the pure-Python FBP on a small synthetic grid, including a
 percentile-growth run, a Fortran-ordered input, and rejection of an invalid date.
 """
 from __future__ import annotations
 
 import sys
+from importlib.metadata import distribution
 
 import numpy as np
 
@@ -71,6 +73,10 @@ def assert_close(a, b, label):
 
 
 def main() -> None:
+    wheel_metadata = distribution("cffdrs").read_text("WHEEL")
+    assert wheel_metadata is not None and any(
+        line.startswith("Tag: cp311-abi3-") for line in wheel_metadata.splitlines()
+    ), f"installed wheel does not contain a cp311-abi3 tag: {wheel_metadata}"
     location = cffdrs.__file__.replace("\\", "/")
     if "site-packages" not in location:
         raise SystemExit(f"cffdrs was imported from {location}, not an installed wheel")

@@ -20,6 +20,14 @@ class FMCResult(NamedTuple):
     fme: MaskedArray
 
 
+def _as_masked(value) -> MaskedArray:
+    """Coerce an explicit d0/dj override (scalar, array or masked array) to a masked array; NaN is masked."""
+    data = np.ma.getdata(value)
+    if data.dtype.kind == 'f':
+        return mask.array(data, mask=np.ma.getmaskarray(value) | np.isnan(data))
+    return mask.array(data, mask=np.ma.getmaskarray(value))
+
+
 def calc_fmc(*,
              lat: MaskedArray,
              long: MaskedArray,
@@ -41,27 +49,25 @@ def calc_fmc(*,
                       43 + (33.7 * np.exp(-0.0351 * (150 - np.abs(long)))),
                       46 + (23.4 * (np.exp(-0.036 * (150 - np.abs(long))))))
 
-    # D0 calculation
-    if d0 is None:
-        if d0_override is None:
-            # Calculate date of minimum foliar moisture content (D0)
-            # This value is rounded to mimic the approach used in the cffdrs R package.
-            d0 = mask.MaskedArray.round(mask.where((elevation is not None) & (elevation > 0),
-                                                   142.1 * (lat / latn) + (0.0172 * elevation),
-                                                   151 * (lat / latn)),
-                                        0)
-        else:
-            d0 = mask.array(d0_override, mask=np.isnan(d0_override))
+    # D0 calculation (an explicit override takes priority over the derived value)
+    if d0_override is not None:
+        d0 = _as_masked(d0_override)
+    elif d0 is None:
+        # Calculate date of minimum foliar moisture content (D0)
+        # This value is rounded to mimic the approach used in the cffdrs R package.
+        d0 = mask.MaskedArray.round(mask.where((elevation is not None) & (elevation > 0),
+                                               142.1 * (lat / latn) + (0.0172 * elevation),
+                                               151 * (lat / latn)),
+                                    0)
 
-    # Julian Date
-    if dj is None:
-        if dj_override is None:
-            # Calculate Julian date (Dj)
-            dj = mask.where(np.isfinite(latn),
-                            dt.strptime(str(wx_date), '%Y%m%d').timetuple().tm_yday,
-                            0)
-        else:
-            dj = mask.array(dj_override, mask=np.isnan(dj_override))
+    # Julian Date (an explicit override takes priority over the derived value)
+    if dj_override is not None:
+        dj = _as_masked(dj_override)
+    elif dj is None:
+        # Calculate Julian date (Dj)
+        dj = mask.where(np.isfinite(latn),
+                        dt.strptime(str(wx_date), '%Y%m%d').timetuple().tm_yday,
+                        0)
 
     # Number of days between Dj and D0 (ND)
     nd = np.absolute(dj - d0)

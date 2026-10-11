@@ -9,7 +9,9 @@ __author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
 import numpy as np
 from numpy import ma as mask
 
-from . import constants, inputs
+from ..common import constants, inputs
+from ..common.fingerprint import fingerprint
+from ..common.fmc_inputs import coerce_override, resolve_dj_override
 from .equations import consumption as consumption_eq
 from .equations import crown as crown_eq
 from .equations import fmc as fmc_eq
@@ -61,6 +63,19 @@ def getSeasonGrassCuring(season: str,
     return gc_dict.get(season.lower(), None)
 
 
+class _Normalised:
+    """Attribute whose assignments are normalised exactly like ``initialize`` normalises its inputs."""
+
+    def __set_name__(self, owner, name):
+        self.name, self.slot = name, '_' + name
+
+    def __get__(self, obj, objtype=None):
+        return self if obj is None else getattr(obj, self.slot)
+
+    def __set__(self, obj, value):
+        setattr(obj, self.slot, None if value is None else inputs.normalize_input(self.name, value))
+
+
 ##################################################################################################
 # #### CLASS FOR CANADIAN FOREST FIRE BEHAVIOR PREDICTION SYSTEM (CFFBPS) MODELLING ####
 ##################################################################################################
@@ -69,7 +84,78 @@ class FBP:
     Class to model fire behavior with the Canadian Forest Fire Behavior Prediction System.
     """
 
+    # Inputs normalised on every assignment (``aspect`` is a property below)
+    slope = _Normalised()
+    ws = _Normalised()
+    ffmc = _Normalised()
+    bui = _Normalised()
+    pc = _Normalised()
+    pdf = _Normalised()
+    gfl = _Normalised()
+    gcf = _Normalised()
+
+    @property
+    def wd(self):
+        return self._wd_inv if self._wd_inv is not None else self._wd_in
+
+    @wd.setter
+    def wd(self, value):
+        self._wd_in = value
+        self._wd_inv = self._aspect_inv = None
+
+    @property
+    def aspect(self):
+        return self._aspect_inv if self._aspect_inv is not None else self._aspect_in
+
+    @aspect.setter
+    def aspect(self, value):
+        self._aspect_in = None if value is None else inputs.normalize_input('aspect', value)
+        self._wd_inv = self._aspect_inv = None
+
+    @property
+    def d0(self):
+        return self._d0_res if self._d0_res is not None else self._d0_supplied
+
+    @d0.setter
+    def d0(self, value):
+        self.set_override('d0', value)
+
+    @property
+    def dj(self):
+        return self._dj_res if self._dj_res is not None else self._dj_supplied
+
+    @dj.setter
+    def dj(self, value):
+        self.set_override('dj', value)
+
+    def set_override(self, name: str, values) -> None:
+        """
+        Set or clear an explicit ``d0`` or ``dj`` for the foliar moisture calculation.
+
+        An explicit value takes priority over the derived value and persists until it is replaced
+        or cleared (``None``). Scalars, arrays and masked arrays are accepted; NaN and masked cells
+        are missing (that cell's ``fmc`` and ``fme`` are NaN). A ``dj`` is floored and clipped to the
+        days of the year of ``wx_date`` when it is used; ``d0`` is not range-limited.
+
+        :param name: 'd0' or 'dj'
+        :param values: the explicit value, or None to return to the derived value
+        :return: None
+        """
+        if name not in ('d0', 'dj'):
+            raise ValueError("set_override name must be 'd0' or 'dj'")
+        supplied = coerce_override(name, values)
+        if name == 'd0':
+            self._d0_supplied, self._d0_res = supplied, None
+        else:
+            self._dj_supplied, self._dj_res = supplied, None
+
     def __init__(self):
+        # Explicit d0/dj overrides, their computed results and the foliar moisture result cache
+        self._d0_supplied = self._dj_supplied = None
+        self._d0_res = self._dj_res = None
+        self._fmc_cache = None
+        self._dj_warned = set()
+
         # Initialize CFFBPS input parameters
         self.fuel_type = None
         self.wx_date = None
@@ -183,7 +269,7 @@ class FBP:
         self.fi_class = None
 
         # ### CFFBPS reference tables — per-instance mutable copies of the read-only
-        # module constants (see cffbps.constants). Instance-local copies preserve the
+        # module constants (see cffdrs.cffbps.common.constants). Instance-local copies preserve the
         # historical ability to calibrate one FBP instance (e.g. tweak rosParams for
         # a sensitivity run) without leaking the change into other instances or the
         # shared module tables.
@@ -205,41 +291,6 @@ class FBP:
 
         # CFFBPS Surface Fire Rate of Spread Parameters (a, b, c, q, BUI0, be_max)
         self.rosParams = dict(constants.rosParams)
-
-    def _checkArray(self) -> None:
-        """
-        Detect array inputs and build the reference arrays (delegates to
-        :func:`cffbps.inputs.check_array`).
-        :return: None
-        """
-        input_list = [
-            self.fuel_type, self.lat, self.long,
-            self.elevation, self.slope, self.aspect,
-            self.ws, self.wd, self.ffmc, self.bui,
-            self.pc, self.pdf,
-            self.gfl, self.gcf
-        ]
-        self.return_array, self.ref_array, self.ref_int_array = inputs.check_array(input_list)
-        return
-
-    def _verifyInputs(self) -> None:
-        """
-        Validate all inputs and coerce them to masked numpy arrays (delegates to
-        :func:`cffbps.inputs.verify_inputs`), writing the results back onto self.
-        :return: None
-        """
-        validated = inputs.verify_inputs(
-            fuel_type=self.fuel_type, wx_date=self.wx_date,
-            lat=self.lat, long=self.long, elevation=self.elevation,
-            slope=self.slope, aspect=self.aspect, ws=self.ws, wd=self.wd,
-            ffmc=self.ffmc, bui=self.bui, pc=self.pc, pdf=self.pdf,
-            gfl=self.gfl, gcf=self.gcf, d0=self.d0, dj=self.dj,
-            out_request=self.out_request,
-            convert_fuel_type_codes=self.convert_fuel_type_codes,
-        )
-        # VerifiedInputs field names match the facade attribute names by contract.
-        for key, value in validated._asdict().items():
-            setattr(self, key, value)
 
     def initialize(self,
                    fuel_type: int | str | np.ndarray | None = None,
@@ -389,32 +440,46 @@ class FBP:
             only, C-5 in the surface regime only); all other fuels return the unadjusted ROS. Values outside
             (0.001, 99.999) are capped to those bounds.
         """
-        # Initialize CFFBPS input parameters
-        self.fuel_type = fuel_type
-        self.wx_date = wx_date  # For FMC calculations
-        self.lat = lat
-        self.long = long
-        self.elevation = elevation
-        self.slope = slope
-        self.aspect = aspect
-        self.ws = ws
-        self.wd = wd
-        self.ffmc = ffmc
-        self.bui = bui
-        self.pc = pc
-        self.pdf = pdf
-        self.gfl = gfl
-        self.gcf = gcf
-        self.d0 = d0  # For FMC calculations
-        self.dj = dj  # For FMC calculations
+        # Verify and coerce the inputs (shared with the other backends)
+        prepared = inputs.prepare_inputs(
+            fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation,
+            slope=slope, aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui,
+            pc=pc, pdf=pdf, gfl=gfl, gcf=gcf, d0=d0, dj=dj,
+            out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes,
+        )
+        self.return_array = prepared.return_array
+        self.ref_array = prepared.ref_array
+        self.ref_int_array = prepared.ref_int_array
+
+        # VerifiedInputs field names match the attribute names by contract. The nine normalised inputs
+        # are already normalised, so they go straight into their slots.
+        for key, value in prepared.verified._asdict().items():
+            if key == 'aspect':
+                self._aspect_in = value
+            elif key in inputs.NORMALISED_INPUTS:
+                setattr(self, '_' + key, value)
+            else:
+                setattr(self, key, value)
+        self._wd_inv = self._aspect_inv = None
+        self.wx_date = wx_date
         self.out_request = out_request
         self.convert_fuel_type_codes = convert_fuel_type_codes
         self.percentile_growth = percentile_growth
+        self._fmc_cache = None
+        self._dj_warned = set()
 
-        # Verify input parameters
-        self._checkArray()
-        self._verifyInputs()
+        self._bind_templates()
 
+        # Set initialized to True
+        self.initialized = True
+
+        return
+
+    def _bind_templates(self) -> None:
+        """
+        Bind every computed result attribute to its zero-filled template (``ffc``, ``wfc`` and ``sfc`` to NaN).
+        :return: None
+        """
         # ### Bind result attributes to the zero-filled template.
         # runFBP rebinds every one of these to a fresh array returned by its
         # equation, and the equations never mutate their inputs (enforced
@@ -502,27 +567,27 @@ class FBP:
         # Fire intensity class parameter
         self.fi_class = self.ref_int_array
 
-        # List of required parameters
-        required_params = [
-            'fuel_type', 'wx_date', 'lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui'
-        ]
+    def reset(self) -> None:
+        """
+        Discard every computed or injected result and return to the freshly initialised state.
 
-        # Check for missing required parameters
-        missing_params = [param for param in required_params if getattr(self, param) is None]
-        if missing_params:
-            raise ValueError(f"Missing required parameters: {missing_params}")
-
-        # Set initialized to True
-        self.initialized = True
-
-        return
+        Inputs (including later assignments), explicit ``d0``/``dj`` overrides, ``out_request``,
+        ``percentile_growth``, the instance tables and the foliar moisture result cache are kept.
+        :return: None
+        :raises ValueError: if the class has not been initialized
+        """
+        if not self.initialized:
+            raise ValueError('FBP class must be initialized before running calculations. Call "initialize" first.')
+        self._wd_inv = self._aspect_inv = None
+        self._d0_res = self._dj_res = None
+        self._bind_templates()
 
     def invertWindAspect(self):
         """
         Function to invert/flip wind direction and aspect by 180 degrees
         :return: None
         """
-        self.wd, self.aspect = sw_eq.invert_wind_aspect(self.wd, self.aspect)
+        self._wd_inv, self._aspect_inv = sw_eq.invert_wind_aspect(self._wd_in, self._aspect_in)
         return
 
     def calcSF(self) -> None:
@@ -552,19 +617,35 @@ class FBP:
         Function to calculate foliar moisture content (FMC) and foliar moisture effect (FME).
         :return: None
         """
+        if d0 is not None:
+            self.set_override('d0', d0)
+        if dj is not None:
+            self.set_override('dj', dj)
         if lat is not None:
-            self.lat = lat
+            self.lat = inputs.coerce_input('lat', lat)
         if long is not None:
-            self.long = long
+            self.long = np.absolute(inputs.coerce_input('long', long))
         if elevation is not None:
-            self.elevation = elevation
+            self.elevation = inputs.coerce_input('elevation', elevation)
         if wx_date is not None:
-            self.wx_date = wx_date
+            self.wx_date = inputs.validate_wx_date(wx_date)
 
-        self.latn, self.d0, self.dj, self.nd, self.fmc, self.fme = fmc_eq.calc_fmc(
-            lat=self.lat, long=self.long, elevation=self.elevation, wx_date=self.wx_date,
-            d0=self.d0, dj=self.dj, d0_override=d0, dj_override=dj,
-        )
+        # Results always reflect the current inputs: an identical repeat call reuses the previous
+        # result, found by an exact fingerprint of every input (content, mask, dtype and shape).
+        key = (fingerprint(self.lat, self.long, self.elevation, self._d0_supplied, self._dj_supplied),
+               self.wx_date)
+        cache = self._fmc_cache
+        if cache is None or cache[0] != key:
+            dj_effective = None
+            if self._dj_supplied is not None:
+                dj_effective = resolve_dj_override(self._dj_supplied, self.wx_date, self._dj_warned)
+            result = fmc_eq.calc_fmc(
+                lat=self.lat, long=self.long, elevation=self.elevation, wx_date=self.wx_date,
+                d0=None, dj=None, d0_override=self._d0_supplied, dj_override=dj_effective,
+            )
+            # The cache owns private copies; attributes always receive further copies.
+            cache = self._fmc_cache = (key, tuple(r.copy() for r in result))
+        self.latn, self._d0_res, self._dj_res, self.nd, self.fmc, self.fme = (r.copy() for r in cache[1])
         return
 
     def calcISI_RSI_BE(self) -> None:
@@ -799,11 +880,22 @@ class FBP:
         """
         # Iterate through the set dictionary and assign values
         for key, value in set_dict.items():
-            if hasattr(self, key):  # Check if the class has the attribute
-                if isinstance(value, np.ndarray):
-                    setattr(self, key, mask.array(value, mask=np.isnan(value)))
-                else:
-                    setattr(self, key, mask.array([value], mask=np.isnan([value])))
+            if not hasattr(self, key):  # Check if the class has the attribute
+                continue
+            if key in ('d0', 'dj'):
+                self.set_override(key, value)
+            elif key == 'wx_date':
+                self.wx_date = inputs.validate_wx_date(value)
+            elif key == 'percentile_growth':
+                self.percentile_growth = value
+            elif key in inputs.NORMALISED_INPUTS:
+                setattr(self, key, value)  # normalised exactly like initialize
+            elif key == 'fuel_type':
+                self.fuel_type, self.ftypes = inputs.prepare_fuel_type(value, self.convert_fuel_type_codes)
+            elif isinstance(value, np.ndarray):
+                setattr(self, key, mask.array(value, mask=np.isnan(value)))
+            else:
+                setattr(self, key, mask.array([value], mask=np.isnan([value])))
         return
 
     def getParams(self, out_request: list[str]) -> list:
@@ -930,13 +1022,17 @@ class FBP:
         :param block: The array of partial data (block) to run FBP with.
         :returns:
             Tuple of values requested through out_request parameter. Default values are fire_type, hros, and hfi.
-        :raises ValueError: if out_request contains any name not in cffbps.constants.valid_outputs.
+        :raises ValueError: if out_request contains any name not in
+            cffdrs.cffbps.common.constants.valid_outputs.
         """
         if not self.initialized:
             raise ValueError('FBP class must be initialized before running calculations. Call "initialize" first.')
 
         if block is not None:
             self.block = block
+
+        # Start from the initialised inputs: computed and injected results from earlier steps are discarded
+        self.reset()
 
         # Check output requests values
         if self.out_request is None:

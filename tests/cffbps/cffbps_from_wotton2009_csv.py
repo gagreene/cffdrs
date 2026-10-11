@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from cffdrs.cffbps import FBP
+from cffdrs.cffbps.python import FBP
 
 # Fuel types
 fuel_type_lookup = {
@@ -58,7 +58,10 @@ for idx, row in df.iterrows():
         # ft_num = fuel_type_lookup.get(ft_str)
 
         # Collect input values (it doesn't understand NA, leave empty)
-        inputs = [None if (~np.isfinite(row[col]) | isinstance(row[col], type(pd.NA))) else row[col] for col in input_columns]
+        inputs = [
+            None if (~np.isfinite(row[col]) | isinstance(row[col], type(pd.NA))) else row[col]
+            for col in input_columns
+        ]
         inputs.append(output_request)
 
         # Initialize and run model
@@ -67,7 +70,7 @@ for idx, row in df.iterrows():
         output = fbp.runFBP()
 
         # Store result with ID
-        results.append(dict(zip(output_request, output), id=row['id']))
+        results.append(dict(zip(output_request, output, strict=False), id=row['id']))
 
     except Exception as e:
         print(f'Error in row {idx} (ID {row.get("id")}): {e}')
