@@ -7,7 +7,7 @@ name = "cffdrs"
 dynamic = ["version"]
 description = "Canadian Forest Fire Danger Rating System (CFFDRS) tools: Fire Behaviour Prediction (FBP) and Fire Weather Index (FWI) systems."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Gregory A. Greene", email = "map.n.trowel@gmail.com" }]
 keywords = ["wildfire", "fire behaviour", "CFFDRS", "FBP", "FWI", "forestry"]
@@ -17,10 +17,10 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Atmospheric Science",
     "Typing :: Typed",
@@ -34,7 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 # Raster / tabular I/O used by the multiprocessing driver's callers and tooling.
 io = ["rasterio>=1.3", "pandas>=2.0"]
-# Experimental CuPy (GPU) backend (cffdrs.cffbps.cupy_backend). CuPy ships
+# Experimental CuPy (GPU) backend (cffdrs.cffbps.cupy). CuPy ships
 # CUDA-version-specific wheels (cupy-cuda12x / cupy-cuda11x); the plain `cupy`
 # sdist builds from source. Users on CUDA should prefer the matching wheel.
 gpu = ["cupy", "rasterio>=1.3"]
@@ -55,7 +55,7 @@ manifest-path = "rust/crates/cffdrs-py/Cargo.toml"
 python-source = "src"
 module-name = "cffdrs._rust"
 bindings = "pyo3"
-# The Cargo workspace has a sibling path dependency (cffdrs-core), so use the
+# The Cargo workspace has a sibling path dependency (cffbps-rust), so use the
 # repository file set rather than cargo-package's single-crate sdist file set.
 sdist-generator = "git"
 
@@ -67,23 +67,23 @@ line-length = 120
 src = ["src", "tests", "tools"]
 # Experimental GPU backend, frozen at the pre-refactor monolith shape and not
 # held to the reference's lint/typing standards — excluded deliberately.
-extend-exclude = ["src/cffdrs/cffbps/cupy_backend.py"]
+extend-exclude = ["src/cffdrs/cffbps/cupy/core.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]
 
 [tool.mypy]
-# 3.12 so mypy can parse numpy's stubs; runtime still targets >=3.10.
+# 3.12 so mypy can parse numpy's stubs; runtime targets >=3.11
 python_version = "3.12"
-# Scoped to the pure, typed equation core. The facade's dynamic getParams dict and
-# the heterogeneous list-building in parallel.py are intentionally out of the strict
+# Scoped to the pure, typed equation core. python/core.py's dynamic getParams dict and
+# the heterogeneous list-building in python/parallel.py are intentionally out of the strict
 # gate for now (don't chase dynamically-shaped masked-array internals);
 # cffwis/diurnal remain legacy/untyped.
 files = [
     "src/cffdrs/_typing.py",
-    "src/cffdrs/cffbps/constants.py",
-    "src/cffdrs/cffbps/equations",
+    "src/cffdrs/cffbps/common/constants.py",
+    "src/cffdrs/cffbps/python/equations",
 ]
-# Parked (incremental typing debt): inputs.py, facade.py, parallel.py — heavy
+# Parked (incremental typing debt): common/inputs.py, python/core.py, python/parallel.py — heavy
 # masked-array narrowing / dynamic dict access that fights numpy's stubs.
 ignore_missing_imports = true

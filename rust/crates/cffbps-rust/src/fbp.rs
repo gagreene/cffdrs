@@ -10,19 +10,11 @@
 //! snapshot (`tests/cffbps/data/golden/wotton2009_scalar_snapshot.json`) —
 //! the same file the Python suite validates against.
 
-use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc};
-use crate::crown::{
-    calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
-};
 pub use crate::fmc::is_valid_wx_date;
-use crate::fmc::{calc_fmc, injected_fmc};
-use crate::fuel::{CrownFuel, FuelType, RosParams};
-use crate::growth::calc_accel_param;
-use crate::normalize::{invert_wind_aspect, normalize, Normalized};
-use crate::percentile::{percentile_ros, percentile_tinv, wind_decay};
-use crate::ros::{calc_c6_blend, calc_ros, Ros};
-use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
-use crate::surface::{calc_sfc, SurfaceFuel};
+#[cfg(test)]
+use crate::stage::Stage;
+#[cfg(test)]
+use crate::state::CellState;
 
 /// Scalar inputs for one cell, matching `FBP.initialize` in the Python
 /// package. NaN in any numeric field means a missing/masked value and
@@ -92,7 +84,7 @@ impl FbpInput {
     /// itself.
     ///
     /// ```
-    /// use cffdrs_core::fbp::{run, FbpInput};
+    /// use cffbps_rust::fbp::{run, FbpInput};
     ///
     /// let mut input = FbpInput::new(2, 20230615);
     /// input.lat = 55.0;
@@ -358,8 +350,10 @@ impl FbpResult {
 /// fallbacks. For such a code (checked for 0, 19, 20 and 99) `sfc`, `rso`,
 /// `tfc` and `hfi` are NaN, while `hros`, `bros` and `cfb` are 0, `fi_class` is
 /// -99 and `fmc` is finite; `fire_type` is 0 (1 for code 0), not NaN. Only
-/// [`grid::run_grid`](crate::grid::run_grid) forces every output to NaN for a
-/// non-modeled cell. An invalid `wx_date` is treated as missing (NaN foliar
+/// the grid pass replaces these: [`grid::run_grid`](crate::grid::run_grid)
+/// forces every output to NaN for a non-modeled cell, and
+/// [`grid::NonModeled::PythonCompat`](crate::grid::NonModeled::PythonCompat)
+/// gives the Python package's values. An invalid `wx_date` is treated as missing (NaN foliar
 /// moisture, so NaN `rso` for codes 1..=13 and, for crowning fuels at any
 /// percentile other than 50, NaN percentile-adjusted `hros`/`bros`); use
 /// [`is_valid_wx_date`] to check it first.
@@ -373,7 +367,7 @@ impl FbpResult {
 /// # Examples
 ///
 /// ```
-/// use cffdrs_core::fbp::{run, FbpInput};
+/// use cffbps_rust::fbp::{run, FbpInput};
 ///
 /// let input = FbpInput {
 ///     fuel_type: 2, // C-2 boreal spruce
@@ -402,11 +396,46 @@ impl FbpResult {
 /// assert!([1.0, 2.0, 3.0].contains(&result.fire_type));
 /// assert_eq!(result.get("hros"), Some(result.hros));
 /// ```
-// One straight-line pass that mirrors the Python `FBP` pipeline stage by stage;
-// splitting it would obscure that correspondence.
-#[allow(clippy::too_many_lines)]
+///
+/// `run` is the fused straight-line pass; it gives bit-for-bit the same result
+/// as applying every [`crate::stage::Stage`] in [`crate::stage::Stage::ALL`] order to a
+/// [`crate::state::CellState::from_input`] (a test pins this). See [`crate::state`] to run
+/// the stages one at a time.
 #[must_use]
 pub fn run(input: &FbpInput) -> FbpResult {
+    run_fused(input)
+}
+
+/// Every [`Stage`] in [`Stage::ALL`] order applied to [`CellState::from_input`].
+/// The stage-by-stage form of [`run`]; the tests keep the two bit-identical.
+#[cfg(test)]
+pub(crate) fn run_stages(input: &FbpInput) -> FbpResult {
+    let mut s = CellState::from_input(input);
+    for stage in Stage::ALL {
+        s.apply(stage);
+    }
+    s.into_result()
+}
+
+/// The scalar pass as one straight-line body. The stage composition was measured
+/// 16-29% slower per cell than this body (release, Task 7), so `run` keeps the
+/// fused form; `fused_run_equals_stage_composition` keeps the two identical.
+// One straight-line pass that mirrors the Python `FBP` pipeline stage by stage.
+#[allow(clippy::too_many_lines)]
+pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
+    use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc};
+    use crate::crown::{
+        calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
+    };
+    use crate::fmc::{calc_fmc, injected_fmc};
+    use crate::fuel::{CrownFuel, FuelType, RosParams};
+    use crate::growth::calc_accel_param;
+    use crate::normalize::{invert_wind_aspect, normalize, Normalized};
+    use crate::percentile::{percentile_ros, percentile_tinv, wind_decay};
+    use crate::ros::{c6_cros, c6_hros, calc_ros, Ros};
+    use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
+    use crate::surface::{calc_sfc, SurfaceFuel};
+
     let ft = FuelType::from_code(input.fuel_type);
 
     // --- inputs._verify_inputs normalization
@@ -485,9 +514,9 @@ pub fn run(input: &FbpInput) -> FbpResult {
     let mut cros = 0.0;
     if ft == FuelType::C6 {
         let blend_cfb = cfb_from_ros(sros, rso);
-        let blend = calc_c6_blend(sros, blend_cfb, cfl, isi, fmc.fme);
-        cros = blend.cros;
-        hros = blend.hros;
+        let blend_cfc = calc_cfc(ft, blend_cfb, cfl, pc, pdf);
+        cros = c6_cros(blend_cfc, isi, fmc.fme);
+        hros = c6_hros(sros, blend_cfb, cros);
     }
 
     // --- directional CFB used only to pick the percentile-growth regime
@@ -501,9 +530,10 @@ pub fn run(input: &FbpInput) -> FbpResult {
         hros = percentile_ros(ft, hros, percentile_cfb, tinv, 1.0);
         bros = percentile_ros(ft, bros, percentile_bros_cfb, tinv, wind_decay(sw.wsv));
     }
+    let growth_made_nan = hros.is_nan() && !hros_before_percentile.is_nan();
 
     // --- final CFB from the percentile-adjusted head ROS (NaN rule in final_cfb)
-    let cfb = final_cfb(ft, hros, hros_before_percentile, rso);
+    let cfb = final_cfb(ft, hros, growth_made_nan, rso);
 
     // --- calc_accel_param
     let accel = calc_accel_param(ft, cfb);
@@ -589,6 +619,25 @@ pub fn run(input: &FbpInput) -> FbpResult {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+
+    // The bit-level oracle's input generator (it names the crate
+    // `cffbps_rust`, which `lib.rs` aliases for tests).
+    #[path = "../../../tests/common/cases.rs"]
+    mod cases;
+
+    #[test]
+    fn fused_run_equals_stage_composition() {
+        for (n, (fuel, percentile, input)) in cases::cases().iter().enumerate() {
+            let fused = run_fused(input).named_values();
+            let staged = run_stages(input).named_values();
+            for ((name, a), (_, b)) in fused.iter().zip(staged.iter()) {
+                assert!(
+                    cases::same_bits(*a, *b),
+                    "case {n} (fuel {fuel}, percentile {percentile}) {name}: fused {a} staged {b}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn field_name_table_is_complete_and_unique() {

@@ -1,7 +1,7 @@
 //! Threaded grid pass: every thread count gives bit-identical results to the
 //! serial pass, and `run_grid` itself never starts threads.
 
-use cffdrs_core::grid::{run_grid, run_grid_with_threads, BehaviourGrids, GridInput};
+use cffbps_rust::grid::{run_grid, run_grid_with_threads, BehaviourGrids, GridInput};
 
 const BASE_FUEL: [i32; 9] = [2, 13, 10, 11, 14, 15, 12, 19, 7];
 
@@ -45,21 +45,23 @@ fn grids_for(c: &Cells, threads: Option<usize>) -> BehaviourGrids {
         .collect();
     let input = GridInput {
         fuel_type: &c.fuel,
-        lat: &c.cols[0],
-        long: &c.cols[1],
-        elevation: &c.cols[2],
-        slope_pct: &c.cols[3],
-        aspect_deg: &c.cols[4],
-        pct_conifer: &c.cols[5],
-        grass_curing: &c.cols[6],
-        ws: &c.cols[7],
-        wd: &wd,
+        lat: (&c.cols[0]).into(),
+        long: (&c.cols[1]).into(),
+        elevation: (&c.cols[2]).into(),
+        slope_pct: (&c.cols[3]).into(),
+        aspect_deg: (&c.cols[4]).into(),
+        pct_conifer: (&c.cols[5]).into(),
+        pct_dead_fir: 35.0.into(),
+        grass_fuel_load: 0.35.into(),
+        grass_curing: (&c.cols[6]).into(),
+        ws: (&c.cols[7]).into(),
+        wd: (&wd).into(),
+        ffmc: 91.0.into(),
+        bui: 76.0.into(),
         wx_date: 20_230_615,
-        ffmc: 91.0,
-        bui: 76.0,
-        pct_dead_fir: 35.0,
-        grass_fuel_load: 0.35,
         percentile_growth: 90.0,
+        d0: None,
+        dj: None,
     };
     match threads {
         None => run_grid(&input).unwrap(),

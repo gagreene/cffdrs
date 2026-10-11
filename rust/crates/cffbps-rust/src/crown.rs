@@ -53,13 +53,14 @@ pub(crate) fn directional_cfb(ft: FuelType, ros: f64, rso: f64) -> f64 {
     }
 }
 
-/// Final CFB from the percentile-adjusted head ROS. A NaN that appears
-/// only at the percentile step from a NaN percentile is an unmasked
-/// non-finite value in Python, which the CFB sanitiser zeroes. A NaN that was
-/// already there, or that comes from a missing `rso` (a masked regime CFB
-/// masks the percentile result), is a masked cell and stays NaN.
-pub(crate) fn final_cfb(ft: FuelType, hros: f64, hros_before_percentile: f64, rso: f64) -> f64 {
-    if hros.is_nan() && !hros_before_percentile.is_nan() && !rso.is_nan() {
+/// Final CFB from the percentile-adjusted head ROS. `growth_made_nan` says
+/// that the percentile step itself turned a non-NaN head ROS into NaN (a NaN
+/// percentile): that is an unmasked non-finite value in Python, which the CFB
+/// sanitiser zeroes. A NaN that was already there (or was injected), or that
+/// comes from a missing `rso` (a masked regime CFB masks the percentile
+/// result), is a masked cell and stays NaN.
+pub(crate) fn final_cfb(ft: FuelType, hros: f64, growth_made_nan: bool, rso: f64) -> f64 {
+    if growth_made_nan && hros.is_nan() && !rso.is_nan() {
         0.0
     } else {
         directional_cfb(ft, hros, rso)
@@ -123,10 +124,37 @@ mod tests {
         // A NaN hros after the percentile step is masked in Python when the
         // regime CFB was masked (missing rso): the final CFB stays NaN for
         // crowning fuels and 0 for fuels that cannot crown.
-        assert!(final_cfb(FuelType::C2, f64::NAN, 10.0, f64::NAN).is_nan());
-        assert_eq!(final_cfb(FuelType::D1, f64::NAN, 10.0, f64::NAN), 0.0);
+        assert!(final_cfb(FuelType::C2, f64::NAN, true, f64::NAN).is_nan());
+        assert_eq!(final_cfb(FuelType::D1, f64::NAN, true, f64::NAN), 0.0);
+    }
+
+    #[test]
+    fn final_cfb_zeroes_a_nan_made_by_the_percentile_step() {
         // A NaN percentile with a finite rso is an unmasked NaN: zeroed.
-        assert_eq!(final_cfb(FuelType::C2, f64::NAN, 10.0, 2.0), 0.0);
+        assert_eq!(final_cfb(FuelType::C2, f64::NAN, true, 2.0), 0.0);
+    }
+
+    #[test]
+    fn final_cfb_keeps_a_nan_head_ros_the_percentile_step_did_not_make() {
+        // An injected NaN hros (or one already NaN before the step) is a
+        // masked cell: NaN for crowning fuels.
+        assert!(final_cfb(FuelType::C2, f64::NAN, false, 2.0).is_nan());
+        assert_eq!(final_cfb(FuelType::D1, f64::NAN, false, 2.0), 0.0);
+    }
+
+    #[test]
+    fn final_cfb_without_the_flag_is_the_directional_cfb() {
+        for (ft, hros, rso) in [
+            (FuelType::C2, 12.0, 2.0),
+            (FuelType::C2, 1.0, 9.0),
+            (FuelType::C6, 30.0, 4.0),
+            (FuelType::D1, 12.0, 2.0),
+        ] {
+            assert_eq!(
+                final_cfb(ft, hros, false, rso).to_bits(),
+                directional_cfb(ft, hros, rso).to_bits()
+            );
+        }
     }
 
     #[test]

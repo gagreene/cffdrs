@@ -1,18 +1,19 @@
 //! Fixture loading shared by the golden test binaries.
 
-use cffdrs_core::fbp::FbpInput;
+use cffbps_rust::fbp::FbpInput;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub fn repo_path(rel: &str) -> PathBuf {
-    // crates/cffdrs-core -> repo root
+    // crates/cffbps-rust -> repo root
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
         .join(rel)
 }
 
-// One field per CSV column, so the length tracks the fixture schema.
-#[allow(clippy::too_many_lines)]
+// One field per CSV column, so the length tracks the fixture schema. Not every
+// test binary that includes this module reads the CSV.
+#[allow(clippy::too_many_lines, dead_code)]
 pub fn parse_inputs() -> HashMap<i64, FbpInput> {
     let text = std::fs::read_to_string(repo_path(
         "tests/cffbps/data/Inputs_for_Test_Cases_Wotton2009.csv",

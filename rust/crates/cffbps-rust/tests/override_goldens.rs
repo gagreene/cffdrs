@@ -19,7 +19,7 @@
 //!   injected hros.
 //! - hfi = 0 yields `fi_class` -99 (case 5).
 
-use cffdrs_core::fbp::{run, FbpInput};
+use cffbps_rust::fbp::{run, FbpInput};
 
 struct Case {
     fuel_type: i32,

@@ -3,8 +3,8 @@
 //! percentile_ros_function_snapshot.json`). Regenerate with
 //! `tools/gen_fbp_goldens.py` when the Python spec changes.
 
-use cffdrs_core::fuel::FuelType;
-use cffdrs_core::percentile::{percentile_ros, percentile_tinv, wind_decay};
+use cffbps_rust::fuel::FuelType;
+use cffbps_rust::percentile::{percentile_ros, percentile_tinv, wind_decay};
 use std::path::PathBuf;
 
 fn load(rel: &str) -> serde_json::Value {

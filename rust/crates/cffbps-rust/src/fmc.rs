@@ -1,6 +1,7 @@
 //! Foliar moisture content (`fmc.py`) and the calendar helpers it needs.
 
-fn is_leap_year(y: i64) -> bool {
+/// Gregorian leap year: divisible by 4, except centuries not divisible by 400.
+pub(crate) fn is_leap_year(y: i64) -> bool {
     y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)
 }
 

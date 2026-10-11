@@ -5,7 +5,7 @@
 //! `tools/gen_fbp_goldens.py` when the Python spec changes; this suite
 //! then holds the Rust core to it.
 
-use cffdrs_core::fbp::{run, FbpResult};
+use cffbps_rust::fbp::{run, FbpResult};
 mod common;
 
 use common::parse_inputs;

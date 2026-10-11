@@ -2,7 +2,7 @@
 //! inputs left missing (NaN) so that forgetting one propagates instead of
 //! silently defaulting.
 
-use cffdrs_core::fbp::{run, FbpInput};
+use cffbps_rust::fbp::{run, FbpInput};
 
 #[test]
 fn new_has_the_python_initialize_defaults() {
