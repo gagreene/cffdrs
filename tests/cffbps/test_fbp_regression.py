@@ -36,7 +36,7 @@ if HERE not in sys.path:
 
 import _wotton_helpers as wh  # noqa: E402
 
-from cffdrs.cffbps.python import FBP  # noqa: E402
+from cffdrs.cffbps.python import FBP as PythonFBP  # noqa: E402
 
 # ── Published Wotton (2009) reference (authoritative external oracle) ──────────
 # Column indices in Reference_Results.xlsx for the "Wotton 2009" source of each metric.
@@ -96,7 +96,7 @@ def _angular_diff(a: float, b: float) -> float:
     return min(d, 360.0 - d)
 
 
-def test_scalar_matches_published_wotton2009():
+def test_scalar_matches_published_wotton2009(backend_fbp):
     """Current outputs must track the published Wotton (2009) values.
 
     Tolerances are loose on purpose: cross-implementation rounding differs. This
@@ -124,7 +124,7 @@ def test_scalar_matches_published_wotton2009():
 
     for i, (_, row) in enumerate(df.iterrows()):
         cid = int(row["id"])
-        fbp = FBP()
+        fbp = backend_fbp()
         fbp.initialize(**wh.row_to_kwargs(row, out_req))
         got = dict(zip(out_req, (wh.scalarize(v) for v in fbp.runFBP()), strict=False))
 
@@ -154,7 +154,7 @@ def test_scalar_matches_published_wotton2009():
 
 
 # ── Layer 2: exact-equality snapshot lock, scalar path ────────────────────────
-def test_scalar_snapshot(scalar_golden):
+def test_scalar_snapshot(scalar_golden, backend_fbp):
     """Every scalar output for all 20 cases must match the golden at float32 precision."""
     outputs = scalar_golden["outputs"]
     df = wh.load_input_frame()
@@ -163,7 +163,7 @@ def test_scalar_snapshot(scalar_golden):
     mismatches = []
     for case in scalar_golden["cases"]:
         row = by_id[case["id"]]
-        fbp = FBP()
+        fbp = backend_fbp()
         fbp.initialize(**wh.row_to_kwargs(row, outputs))
         got = dict(zip(outputs, (wh.scalarize(v) for v in fbp.runFBP()), strict=False))
         for name in outputs:
@@ -176,16 +176,39 @@ def test_scalar_snapshot(scalar_golden):
 
 
 # ── Layer 3: float32-precision snapshot lock, array/masked-array path ─────────
-def test_array_snapshot(array_golden):
+def test_array_snapshot(array_golden, backend_fbp):
     """Every array output must match the golden at float32 precision (masked-array path)."""
     pytest.importorskip("rasterio")
     outputs = array_golden["outputs"]
-    fbp = FBP()
-    fbp.initialize(out_request=outputs, **wh.load_raster_inputs())
+    fbp = backend_fbp()
+    inputs = wh.load_raster_inputs()
+    fbp.initialize(out_request=outputs, **inputs)
     result = dict(zip(outputs, (wh.arrayize(v) for v in fbp.runFBP()), strict=False))
 
     mismatches = []
     for name in outputs:
-        if not _array_equal_at_float32(result[name], array_golden["arrays"][name]):
+        expected = array_golden["arrays"][name]
+        if (not isinstance(fbp, PythonFBP) and np.shape(expected) == (1, 1)
+                and np.shape(result[name]) != np.shape(expected)):
+            # D12(c): Rust expands scalar-derived outputs to the full grid. Keep
+            # Python's original shape gate and compare every native cell exactly.
+            assert np.shape(result[name]) == inputs["fuel_type"].shape, name
+            expected = np.broadcast_to(expected, inputs["fuel_type"].shape).tolist()
+        if not _array_equal_at_float32(result[name], expected):
             mismatches.append(f"  {name}:\n    got    {result[name]}\n    golden {array_golden['arrays'][name]}")
     assert not mismatches, "array snapshot drift:\n" + "\n".join(mismatches)
+
+
+def test_rust_array_dj_keeps_full_grid_shape():
+    """A scalar day override must reach every native grid cell without collapsing shape."""
+    from cffdrs.cffbps.rust import FBP
+
+    fbp = FBP()
+    fbp.initialize(
+        fuel_type=np.full((2, 3), 2), wx_date=20160516, dj=137,
+        lat=55., long=-110., elevation=500., slope=10., aspect=270.,
+        ws=20., wd=0., ffmc=91., bui=76., out_request=["dj"],
+    )
+    result = fbp.runFBP()[0]
+    assert result.shape == (2, 3)
+    assert np.array_equal(result, np.full((2, 3), 137))

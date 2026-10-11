@@ -1148,3 +1148,50 @@ fn fmc_scalar_parameters(d: &Data) {
     assert_grids_same(&g, &planned(d, 95.0, &all, 1), &all, "percentile 95");
     assert_staged_equals_fused(&g, "percentile 95");
 }
+
+#[test]
+fn non_modeled_stages_consume_injected_values() {
+    let d = data(3, &[19, 20, 0]);
+    let mut g = d.grid(50.0, &[Field::Tfc, Field::Hfi, Field::FiClass]);
+    g.set_const(Field::Sfc, 2.0).unwrap();
+    g.set_const(Field::Cfc, 3.0).unwrap();
+    g.set_const(Field::Hros, 4.0).unwrap();
+    g.run_stage(Stage::CalcTfc, 1).unwrap();
+    assert_eq!(g.get(Field::Tfc).unwrap(), vec![5.0; 3]);
+    g.run_stage(Stage::CalcHfi, 1).unwrap();
+    assert_eq!(g.get(Field::Hfi).unwrap(), vec![6000.0; 3]);
+    g.run_stage(Stage::CalcFireIntensityClass, 1).unwrap();
+    assert_eq!(g.get(Field::FiClass).unwrap(), vec![5.0; 3]);
+}
+
+#[test]
+fn alternate_acceleration_fuel_uses_current_cfb_and_retention() {
+    let d = data(2, &[0, 2]);
+    let modeled = data(2, &[2, 2]);
+    let mut g = d.grid(50.0, &[Field::Accel]);
+    let mut reference = modeled.grid(50.0, &[Field::Accel]);
+    g.set_const(Field::Cfb, 0.2).unwrap();
+    reference.set_const(Field::Cfb, 0.2).unwrap();
+    reference.run_stage(Stage::CalcAccelParam, 1).unwrap();
+    g.run_acceleration_for_fuel(&[2, 2], 1).unwrap();
+    assert_eq!(
+        g.get(Field::Accel).unwrap(),
+        reference.get(Field::Accel).unwrap()
+    );
+    assert_eq!(g.get(Field::FuelType).unwrap(), vec![0.0, 2.0]);
+    let mut unretained = d.grid(50.0, &[Field::Hros, Field::Hfi, Field::FireType]);
+    unretained.run_acceleration_for_fuel(&[2, 2], 1).unwrap();
+    assert_eq!(
+        unretained.get(Field::Accel),
+        Err(StageError::FreedRead(Field::Accel))
+    );
+    assert!(matches!(
+        g.run_acceleration_for_fuel(&[2], 1),
+        Err(StageError::LengthMismatch { .. })
+    ));
+    g.run_fused(1).unwrap();
+    assert_eq!(
+        g.run_acceleration_for_fuel(&[2, 2], 1),
+        Err(StageError::AfterFused)
+    );
+}

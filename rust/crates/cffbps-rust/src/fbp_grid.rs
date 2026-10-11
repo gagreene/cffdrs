@@ -389,6 +389,15 @@ impl FbpGrid {
     /// the stage reads (in [`Stage::reads`] order) that was dropped. Nothing
     /// changes on an error.
     pub fn run_stage(&mut self, stage: Stage, threads: usize) -> Result<(), StageError> {
+        self.run_stage_with_fuel(stage, threads, None)
+    }
+
+    fn run_stage_with_fuel(
+        &mut self,
+        stage: Stage,
+        threads: usize,
+        fuel: Option<&[i32]>,
+    ) -> Result<(), StageError> {
         if self.phase == Phase::Fused {
             return Err(StageError::AfterFused);
         }
@@ -412,7 +421,11 @@ impl FbpGrid {
                 }
             }
         } else {
-            let values = self.compute(stage, &keep, threads)?;
+            let values = if let Some(codes) = fuel {
+                self.compute_with_fuel(stage, &keep, threads, codes)?
+            } else {
+                self.compute(stage, &keep, threads)?
+            };
             for f in stage.writes() {
                 self.slots[f.index()] = Slot::Freed;
             }
@@ -793,6 +806,42 @@ impl FbpGrid {
         keep: &[Field],
         threads: usize,
     ) -> Result<Vec<Vec<f64>>, StageError> {
+        self.compute_with_fuel(stage, keep, threads, &self.fuel)
+    }
+
+    /// Evaluate acceleration with wrapper-retained fuel codes and the current
+    /// CFB/template/injection, without changing stored fuel. Normal stage liveness and retention apply.
+    /// This preserves the original modeled code underneath a Python fuel mask.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StageError::LengthMismatch`] for a different fuel count, or
+    /// the lifecycle/read errors of [`Self::run_stage`]. No state changes on error.
+    pub fn run_acceleration_for_fuel(
+        &mut self,
+        codes: &[i32],
+        threads: usize,
+    ) -> Result<(), StageError> {
+        if self.phase == Phase::Fused {
+            return Err(StageError::AfterFused);
+        }
+        if codes.len() != self.n {
+            return Err(StageError::LengthMismatch {
+                field: Field::FuelType,
+                expected: self.n,
+                found: codes.len(),
+            });
+        }
+        self.run_stage_with_fuel(Stage::CalcAccelParam, threads, Some(codes))
+    }
+
+    fn compute_with_fuel(
+        &self,
+        stage: Stage,
+        keep: &[Field],
+        threads: usize,
+        fuel: &[i32],
+    ) -> Result<Vec<Vec<f64>>, StageError> {
         let mut sources: Vec<(Field, PerCell<'_>)> = Vec::with_capacity(stage.reads().len());
         for &f in stage.reads() {
             // the fuel code is loaded per cell below
@@ -818,7 +867,7 @@ impl FbpGrid {
             self.input(Field::Bui),
         );
         let dj = self.dj.as_ref().map(|d| d.resolved.as_per_cell());
-        let (fuel, wx_date) = (&self.fuel, self.wx_date);
+        let wx_date = self.wx_date;
         fill_chunks(self.n, threads, &mut out, |start, len, part| {
             // A stage reads only its declared fields, so one state serves the
             // whole chunk once those are loaded for each cell.
@@ -830,9 +879,36 @@ impl FbpGrid {
                 for (f, p) in &sources {
                     s.set(*f, p.at(i));
                 }
-                s.apply(stage);
                 let ft = FuelType::from_code(code);
-                if ft.is_modeled() {
+                // Invalid/masked fuels are absent from the Python canopy
+                // lookup loop. Preserve the consumed state at this boundary;
+                // the legacy scalar stage composition remains unchanged.
+                if stage != Stage::GetCbhCfl || !matches!(ft, FuelType::Unknown(_)) {
+                    s.apply(stage);
+                }
+                // A masked activation condition masks CROS in the Python
+                // stage, independently of finite ISI/FME or current weather.
+                if stage == Stage::CalcC6Cros && code == 6 && s.get(Field::C6BlendCfc).is_nan() {
+                    s.set(Field::Cros, f64::NAN);
+                }
+                // Arithmetic stages consume actual inputs, including injections.
+                if ft.is_modeled()
+                    || matches!(
+                        stage,
+                        Stage::CalcTfc
+                            | Stage::CalcRso
+                            | Stage::GetCbhCfl
+                            | Stage::CalcRosPercentileGrowth
+                            | Stage::CalcHfi
+                            | Stage::CalcFireIntensityClass
+                            | Stage::CalcAccelParam
+                    )
+                    || (matches!(ft, FuelType::NonFuel | FuelType::Water)
+                        && matches!(
+                            stage,
+                            Stage::CalcRos | Stage::CalcC6Cros | Stage::CalcC6Hros | Stage::CalcCfc
+                        ))
+                {
                     for (o, f) in part.iter_mut().zip(keep) {
                         o[j] = s.get(*f);
                     }

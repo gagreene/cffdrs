@@ -829,11 +829,11 @@ def test_nan_optional_fields_use_documented_defaults():
     assert not np.ma.is_masked(fbp.gcf)
 
 
-def test_default_fbp_is_the_python_backend():
+def test_default_fbp_is_the_dispatching_class():
     from cffdrs.cffbps import FBP
-    from cffdrs.cffbps.python import FBP as PythonFBP
+    from cffdrs.cffbps.auto import AutoFBP
 
-    assert FBP is PythonFBP
+    assert FBP is AutoFBP
 
 
 def test_importing_cffbps_does_not_import_rust_or_cupy():

@@ -16,19 +16,19 @@
 //! | [`field`] | [`field::Field`]: the 75 per-cell quantities (54 outputs, 12 input-only, 9 internal) | `FBP` attributes |
 //! | [`stage`] | [`stage::Stage`]: the 23 pipeline stages, their order and the fields each reads and writes | `FBP.calcX` methods |
 //! | [`state`] | [`state::CellState`], [`state::StageParams`]: one cell's fields and the stage bodies | an initialised `FBP` |
-//! | [`grid`] | [`grid::GridInput`] of [`grid::PerCell`] inputs, [`grid::run_grid_fields`] (any requested [`field::Field`]s, [`grid::NonModeled`] choice), [`grid::GridError`], [`grid::BehaviourGrids`], [`grid::run_grid`] | `cffdrs._rust.run_fbp_grid` (compiled grid pass); `fbpMultiprocessArray` in `parallel.py` |
+//! | [`grid`] | [`grid::GridInput`] of [`grid::PerCell`] inputs, [`grid::run_grid_fields`] (any requested [`field::Field`]s, [`grid::NonModeled`] choice), [`grid::GridError`], [`grid::BehaviourGrids`], [`grid::run_grid`] | `cffdrs._rust.run_fbp_grid` (compiled grid pass); `fbpMultiprocessArray` in `python/parallel.py` |
 //! | [`fbp_grid`] | [`fbp_grid::FbpGrid`]: the stages (or the fused pass) over a whole grid, storing only the arrays still needed; [`fbp_grid::StageError`], [`fbp_grid::ParamName`] | a Python `FBP` object stepped with `calcX`, `setParams`, `getParams`, `runFBP` and `reset` |
 //! | `liveness` (private) | which computed fields the planned stages still read | |
-//! | [`fuel`] | [`fuel::FuelType`] | `constants.py` |
-//! | [`percentile`] | percentile growth model | `equations/growth.py` |
+//! | [`fuel`] | [`fuel::FuelType`] | `common/constants.py` |
+//! | [`percentile`] | percentile growth model | `python/equations/growth.py` |
 //! | `quantile` (private) | internal Student-t / normal quantile used by the percentile model | scipy `t.ppf` |
 //!
 //! The remaining modules are private implementation stages: input
-//! normalisation (`inputs.py`), foliar moisture (`equations/fmc.py`), slope and
-//! wind effects (`equations/slope_wind.py`), surface fuel consumption
-//! (`equations/surface.py`), rate of spread (`equations/ros.py`), crown fire
-//! (`equations/crown.py`), fire growth (`equations/growth.py`) and total
-//! consumption / intensity (`equations/consumption.py`).
+//! normalisation (`common/inputs.py`), foliar moisture (`python/equations/fmc.py`), slope and
+//! wind effects (`python/equations/slope_wind.py`), surface fuel consumption
+//! (`python/equations/surface.py`), rate of spread (`python/equations/ros.py`), crown fire
+//! (`python/equations/crown.py`), fire growth (`python/equations/growth.py`) and total
+//! consumption / intensity (`python/equations/consumption.py`).
 //!
 //! # Conventions
 //!
@@ -70,15 +70,15 @@
 //! [`grid::GridError::InfiniteDj`] and [`grid::GridError::NotAnOverride`] are
 //! new. [`fbp_grid::FbpGrid`] is new: the pipeline stages over whole grids.
 //!
-//! # Changes in 0.2.0
+//! # Historical changes in core 0.2.0
 //!
 //! `fbp::run_grid` and `fbp::BehaviourGrids` are replaced by
 //! [`grid::run_grid`], [`grid::GridInput`], [`grid::GridError`] and
 //! [`grid::BehaviourGrids`]; `run_grid` now returns a `Result` instead of
 //! panicking on bad input.
 //!
-//! `cffdrs-py` keeps its own version (it versions the Python distribution) and
-//! does not move to 0.2.0 with this crate.
+//! Current versions are core 0.3.0 and `cffdrs-py` 0.2.0 (the Python
+//! distribution). The historical core 0.2.0 release had an independent binding version.
 //!
 //! # Developing
 //!

@@ -1,0 +1,362 @@
+{
+  "masked_fuel_type": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_lat": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_long": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_elevation": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_slope": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_aspect": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_ws": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_wd": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_ffmc": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "masked_bui": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 2,
+      "dtype": "int8"
+    }
+  },
+  "fuel_0_array": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 0,
+      "dtype": "int8"
+    }
+  },
+  "fuel_0_scalar": {
+    "fire_type": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "fi_class": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int"
+    },
+    "fuel_type": {
+      "value": 0.0,
+      "dtype": "float"
+    }
+  },
+  "fuel_19_array": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 19,
+      "dtype": "int8"
+    }
+  },
+  "fuel_19_scalar": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int"
+    },
+    "fi_class": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int"
+    },
+    "fuel_type": {
+      "value": 19,
+      "dtype": "int"
+    }
+  },
+  "fuel_20_array": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 20,
+      "dtype": "int8"
+    }
+  },
+  "fuel_20_scalar": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int"
+    },
+    "fi_class": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int"
+    },
+    "fuel_type": {
+      "value": 20,
+      "dtype": "int"
+    }
+  },
+  "fuel_99_array": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 0,
+      "dtype": "int8"
+    }
+  },
+  "fuel_99_scalar": {
+    "fire_type": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "fi_class": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int"
+    },
+    "fuel_type": {
+      "value": 0.0,
+      "dtype": "float"
+    }
+  },
+  "fuel_-1_array": {
+    "fire_type": {
+      "value": 0,
+      "dtype": "int64"
+    },
+    "fi_class": {
+      "value": -99,
+      "dtype": "int64"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int64"
+    },
+    "fuel_type": {
+      "value": 0,
+      "dtype": "int8"
+    }
+  },
+  "fuel_-1_scalar": {
+    "fire_type": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "fi_class": {
+      "value": 0.0,
+      "dtype": "float"
+    },
+    "dj": {
+      "value": 166,
+      "dtype": "int"
+    },
+    "fuel_type": {
+      "value": 0.0,
+      "dtype": "float"
+    }
+  }
+}

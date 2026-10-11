@@ -12,6 +12,7 @@ from numpy import ma as mask
 from ..common import constants, inputs
 from ..common.fingerprint import fingerprint
 from ..common.fmc_inputs import coerce_override, resolve_dj_override
+from ..common.season import getSeasonGrassCuring as getSeasonGrassCuring
 from .equations import consumption as consumption_eq
 from .equations import crown as crown_eq
 from .equations import fmc as fmc_eq
@@ -19,48 +20,6 @@ from .equations import growth as growth_eq
 from .equations import ros as ros_eq
 from .equations import slope_wind as sw_eq
 from .equations import surface as surface_eq
-
-
-def getSeasonGrassCuring(season: str,
-                         province: str,
-                         subregion: str | None = None) -> int | None:
-    """
-    Function returns a default grass curing code based on season, province, and subregion
-    :param season: annual season ("spring", "summer", "fall", "winter")
-    :param province: province being assessed ("AB", "BC")
-    :param subregion: British Columbia subregions ("southeast", "other")
-    :return: grass curing percent (%); "None" is returned if season or province are invalid
-    """
-    if province == 'AB':
-        # Default seasonal grass curing values for Alberta
-        # These curing rates are recommended by Neal McLoughlin to align with Alberta Wildfire knowledge and practices
-        gc_dict = {
-            'spring': 75,
-            'summer': 40,
-            'fall': 60,
-            'winter': 100
-        }
-    elif province == 'BC':
-        if subregion == 'southeast':
-            # Default seasonal grass curing values for southeastern British Columbia
-            gc_dict = {
-                'spring': 100,
-                'summer': 90,
-                'fall': 90,
-                'winter': 100
-            }
-        else:
-            # Default seasonal grass curing values for British Columbia
-            gc_dict = {
-                'spring': 100,
-                'summer': 60,
-                'fall': 85,
-                'winter': 100
-            }
-    else:
-        gc_dict = {}
-
-    return gc_dict.get(season.lower(), None)
 
 
 class _Normalised:
@@ -1007,6 +966,13 @@ class FBP:
                 for var in out_request
             ]
         else:
+            # Explicit missing dates must stay missing in scalar FMC exports (D15).
+            for name in ('d0', 'dj', 'fmc', 'fme'):
+                value = fbp_params[name]
+                missing_date = any(v is not None and np.ma.getmaskarray(v).any()
+                                   for v in (self._d0_supplied, self._dj_supplied))
+                if missing_date and value is not None and np.ma.getmaskarray(value).any():
+                    fbp_params[name] = mask.array([np.nan], mask=False)
             return [
                 fbp_params.get(var).item() if fbp_params.get(var, None) is not None
                                               and fbp_params.get(var).ndim == 0

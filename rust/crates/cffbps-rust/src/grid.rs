@@ -502,7 +502,18 @@ impl Pass<'_, '_> {
             self.fill_with(start, len, part, |cell, fields, out, j| {
                 let r = run(cell);
                 for (o, &f) in out.iter_mut().zip(fields) {
-                    o[j] = output_value(&r, f);
+                    // Python's masked C6 activation condition stays masked even
+                    // when ISI and FME are finite. Preserve the legacy scalar
+                    // result for engine/oracle callers and the ten-field path.
+                    o[j] = if self.non_modeled == NonModeled::PythonCompat
+                        && f == Field::Cros
+                        && cell.fuel_type == 6
+                        && (r.sros.is_nan() || r.rso.is_nan())
+                    {
+                        f64::NAN
+                    } else {
+                        output_value(&r, f)
+                    };
                 }
             });
         }
@@ -925,7 +936,7 @@ pub fn run_grid(input: &GridInput<'_>) -> Result<BehaviourGrids, GridError> {
 ///
 /// `threads == 1` computes on the calling thread, exactly like [`run_grid`].
 /// `threads == 0` means "all available cores"; any other value is the number
-/// of threads to use (capped by the number of work chunks). Grids with fewer
+/// of workers to start (explicit counts are not capped by work chunks). Grids with fewer
 /// than 4,096 cells always run on the calling thread, because thread start-up
 /// costs more than it saves.
 ///

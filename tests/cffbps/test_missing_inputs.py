@@ -28,12 +28,12 @@ WFC_USES = {'bui': {7, 16, 17, 18}, 'ffmc': set()}
 NON_CROWNING = {8, 9, 14, 15, 16, 17, 18}
 
 
-def _run(fuel, missing=None):
+def _run(backend_fbp, fuel, missing=None):
     """One-cell run with every input passed as an array; ``missing`` is set to NaN."""
     kwargs = {k: np.array([[v]]) for k, v in SCENARIO.items()}
     if missing is not None:
         kwargs[missing] = np.array([[np.nan]])
-    fbp = FBP()
+    fbp = backend_fbp()
     fbp.initialize(fuel_type=np.array([[fuel]], dtype=np.float64), wx_date=20230615,
                    out_request=FIELDS, **kwargs)
     out = fbp.runFBP()
@@ -54,9 +54,9 @@ def _expected_nan(fuel, missing):
 
 @pytest.mark.parametrize('missing', ['bui', 'ffmc'])
 @pytest.mark.parametrize('fuel', FUELS)
-def test_missing_input_propagates_to_dependent_surface_outputs(fuel, missing):
-    base = _run(fuel)
-    got = _run(fuel, missing)
+def test_missing_input_propagates_to_dependent_surface_outputs(backend_fbp, fuel, missing):
+    base = _run(backend_fbp, fuel)
+    got = _run(backend_fbp, fuel, missing)
     nan = _expected_nan(fuel, missing)
     for name in sorted(nan):
         assert np.isnan(got[name]), f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected NaN'
@@ -69,14 +69,14 @@ def test_missing_input_propagates_to_dependent_surface_outputs(fuel, missing):
             f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected {base[name]!r}')
 
 
-def test_independent_fuels_keep_their_finite_values():
-    assert _run(2, 'ffmc')['sfc'] == pytest.approx(2.9136045, abs=1e-7)
-    assert _run(1, 'bui')['sfc'] == pytest.approx(1.421, abs=1e-3)
-    assert _run(14, 'bui')['sfc'] == pytest.approx(0.35, abs=1e-12)
+def test_independent_fuels_keep_their_finite_values(backend_fbp):
+    assert _run(backend_fbp, 2, 'ffmc')['sfc'] == pytest.approx(2.9136045, abs=1e-7)
+    assert _run(backend_fbp, 1, 'bui')['sfc'] == pytest.approx(1.421, abs=1e-3)
+    assert _run(backend_fbp, 14, 'bui')['sfc'] == pytest.approx(0.35, abs=1e-12)
 
 
-def test_finite_baseline_is_unchanged():
-    assert _run(2)['sfc'] == pytest.approx(2.9136045, abs=1e-7)
+def test_finite_baseline_is_unchanged(backend_fbp):
+    assert _run(backend_fbp, 2)['sfc'] == pytest.approx(2.9136045, abs=1e-7)
 
 
 # ── Python/Rust parity on the same scenario, one cell per modeled fuel ─────────

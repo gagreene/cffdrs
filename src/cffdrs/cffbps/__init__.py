@@ -1,9 +1,10 @@
-"""Canadian Forest Fire Behavior Prediction System, with a lazy Python API."""
+"""Canadian Forest Fire Behavior Prediction System, with lazy automatic backend selection."""
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from .auto import AutoFBP as FBP
+    from .auto import available_backends
     from .python import (
-        FBP,
         convert_grid_codes,
         fbpFTCode_AlphaToNum_LUT,
         fbpFTCode_NumToAlpha_LUT,
@@ -16,6 +17,7 @@ __author__ = ["Gregory A. Greene, map.n.trowel@gmail.com"]
 
 __all__ = [
     "FBP",
+    "available_backends",
     "convert_grid_codes",
     "fbpFTCode_AlphaToNum_LUT",
     "fbpFTCode_NumToAlpha_LUT",
@@ -26,7 +28,11 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    """Load the explicit Python backend when a public name is requested."""
+    """Load the dispatcher or Python helper only when requested."""
+    if name in ('FBP', 'available_backends'):
+        from .auto import AutoFBP, available_backends
+
+        return AutoFBP if name == 'FBP' else available_backends
     if name in __all__:
         from . import python
 

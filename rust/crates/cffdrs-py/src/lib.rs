@@ -2,6 +2,8 @@
 //! lives in cffbps-rust; the cffdrs Python package remains the reference
 //! implementation and the spec.
 
+mod fbp_grid;
+
 use cffbps_rust::grid::{run_grid_with_threads, GridInput, PerCell};
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
@@ -181,5 +183,6 @@ fn run_fbp_grid<'py>(
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__core_version__", cffbps_rust::VERSION)?;
     m.add_function(wrap_pyfunction!(run_fbp_grid, m)?)?;
+    m.add_class::<fbp_grid::FbpGrid>()?;
     Ok(())
 }
