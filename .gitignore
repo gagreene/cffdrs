@@ -72,6 +72,8 @@ Desktop.ini
 /src/cffdrs/_rust*.pyd
 /src/cffdrs/_rust*.so
 /src/cffdrs/_rust*.dylib
+# Windows debug symbols written next to the extension
+*.pdb
 
 # Legacy hatch-vcs output; ignored so old development checkouts stay clean
 /src/cffdrs/_version.py
