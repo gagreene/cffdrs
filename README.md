@@ -9,14 +9,14 @@ multiprocessing driver for large rasters.
 
 ## Installation
 
-```bash
-pip install cffdrs
-```
+cffdrs is **not published to PyPI yet** (publishing is disabled in the release
+workflow until the owner enables it), so `pip install cffdrs` does not work. Install
+one of:
 
-A tested prebuilt wheel includes Rust and needs no Rust compiler on the consumer's
-machine. Building a source distribution requires Python 3.11+, a Rust toolchain
-and the platform linker/build tools. Version 0.2.0 is local development work;
-this change does not publish a release. Use a tested wheel artifact for this version.
+- a **prebuilt wheel** from the release workflow artifacts: it already contains the
+  compiled Rust extension, so no Rust compiler is needed (`pip install cffdrs-*.whl`);
+- a **source checkout**, which builds the extension and needs the Rust toolchain
+  described below: `pip install .` or `uv sync` from the repository root.
 
 Optional extras:
 
@@ -24,7 +24,23 @@ Optional extras:
 pip install "cffdrs[io]"    # rasterio + pandas, for raster/tabular workflows
 ```
 
-Requires Python 3.11+. Core dependencies: `numpy`, `scipy`, `psutil`.
+Core dependencies: `numpy>=1.24`, `scipy>=1.10`, `psutil>=5.9` (pip chooses newer
+releases where an interpreter needs them).
+
+### Supported versions
+
+| Component | Supported | Checked by |
+|---|---|---|
+| CPython | 3.11, 3.12, 3.13, 3.14 (`requires-python >= 3.11`; Python 3.10 is no longer supported) | CI runs the full suite on 3.12 for every PR; the release workflow smoke-tests the wheel on 3.11-3.14 on each platform |
+| Wheels | one `cp311-abi3` wheel per platform: Linux x86-64 (manylinux 2_17), macOS x86-64 and arm64, Windows x86-64 | release workflow (manual dispatch or tag) |
+| Rust, building from source | **1.78 or newer** (the MSRV) | CI builds with the MSRV toolchain on every PR; consumers of the wheel need no Rust |
+| Rust crate `cffbps-rust` | 1.78 or newer, no runtime dependencies | CI |
+| PyO3 / rust-numpy | 0.27 | `Cargo.lock` |
+| NumPy / SciPy | tested with NumPy 2.4-2.5 and SciPy 1.17-1.18 (see `uv.lock`); older NumPy 1.24+ is allowed by the metadata but not tested here | CI uses `uv.lock` |
+| Free-threaded Python (3.14t) | not supported | n/a |
+
+The abi3 wheel keeps working on later CPython versions, but that does not certify
+future NumPy/SciPy releases or untested dependency combinations.
 
 ## Package layout
 
@@ -59,7 +75,7 @@ support or untested dependency combinations. Free-threaded Python is unsupported
 ## Fire Behavior Prediction (`cffdrs.cffbps`)
 
 The `FBP` class is a facade: initialize it with fuel, terrain, and weather inputs,
-run the model, and request any of 50+ output variables. The underlying equations
+run the model, and request any of the 54 output variables. The underlying equations
 live in `cffdrs.cffbps.python.equations` as pure, typed functions if you need them directly.
 
 ### Breaking changes in 0.2.0
@@ -111,6 +127,10 @@ initialization for those workflows. For Rust canopy injection, run
 Rust uses threads for parallel work. See [the lifecycle and stage reference](docs/CODEBASE.md)
 for memory retention and supported update routes.
 
+Every difference between the two backends that is known today is tracked in
+[docs/BACKEND_DIFFERENCES.md](docs/BACKEND_DIFFERENCES.md); `tools/compare_backends.py`
+re-checks them.
+
 ### Scalar example
 
 ```python
@@ -158,6 +178,30 @@ hros, hfi, fire_type = fbp.runFBP()
 
 For large rasters, use Rust `threads=`. Python-only
 `cffdrs.cffbps.python.fbpMultiprocessArray(...)` splits inputs into worker blocks.
+
+### Running stage by stage (and growth percentiles)
+
+Both backends expose the 23 pipeline steps (`invertWindAspect`, `calcSF`, ...,
+`calcFireIntensityClass`) in `runFBP()` order, plus `setParams` to inject a value
+between steps and `getParams` to read results. `reset()` discards computed and injected
+values and returns to the initialised inputs; `runFBP()` always starts from there.
+On Rust, intermediate arrays that no later step needs are freed, so request what you
+want to read afterwards in `out_request`:
+
+```python
+fbp = FBP()
+fbp.initialize(fuel_type=2, wx_date=20240516, lat=62.2, long=-133.8, elevation=1180,
+               slope=8, aspect=60, ws=24, wd=266, ffmc=92, bui=31,
+               out_request=['fmc', 'hros'])
+fbp.invertWindAspect(); fbp.calcSF(); fbp.calcISZ(); fbp.calcFMC()
+fmc = fbp.getParams(['fmc'])[0]          # inspect, or inject with fbp.setParams({'fmc': ...})
+fbp.calcISI_RSI_BE(); fbp.calcROS()
+hros = fbp.getParams(['hros'])[0]
+```
+
+`initialize(..., percentile_growth=p)` takes a percentile (0-100) of the rate-of-spread
+distribution of the Han & Braun (2014) model, not a percent change: 50 (the default)
+is the unadjusted ROS, and for example 95 scales surface-fire ROS by about 4.6x.
 
 ### Available outputs
 
@@ -230,12 +274,16 @@ Hourly FFMC (Van Wagner 1977 / Alexander et al. 1984) is available via
 FBP outputs are validated against the published test cases in Wotton, Alexander &
 Taylor (2009), *Updates and revisions to the 1992 Canadian Forest Fire Behavior
 Prediction System* (all 20 reference cases; fire type 20/20, core metrics within
-cross-implementation rounding). The test suite locks all 54 outputs to
-full-precision golden snapshots on both the scalar and array code paths.
+cross-implementation rounding). The test suite locks all 54 outputs to golden
+snapshots on both the scalar and array code paths, compared at float32 precision so
+that last-bit libm/BLAS differences between platforms do not fail the tests.
+The golden, missing-input and unit suites also run against the Rust backend, and a
+bit-level oracle pins the scalar Rust core.
 
 ## Development
 
-Development requires Python 3.11+, `uv`, and a stable Rust toolchain. The main
+Development requires Python 3.11+ (3.11-3.14), `uv`, and Rust 1.78 or newer
+(`rustup` stable works; CI also builds with 1.78). The main
 project uses Maturin, so syncing the environment builds `cffdrs._rust` alongside
 the editable Python package:
 
@@ -247,7 +295,11 @@ uv run --no-sync python -m pytest tests -q -p no:cacheprovider  # both backends
 uv run --no-sync ruff check src/ tests/cffbps  # lint
 uv run --no-sync mypy               # type-check the equation core
 cargo test --manifest-path rust/Cargo.toml -p cffbps-rust
+uv run --no-sync python tools/compare_backends.py   # Python-vs-Rust differences
 ```
+
+After a Rust-only change, rebuild the extension with
+`uv sync --reinstall-package cffdrs --extra test --extra dev`.
 
 The Python distribution version comes from `rust/crates/cffdrs-py/Cargo.toml`;
 update that crate version when preparing a release tag. The pure Rust core has

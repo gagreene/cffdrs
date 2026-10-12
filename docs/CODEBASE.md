@@ -3,9 +3,11 @@
 Python implementation of the Canadian Forest Fire Danger Rating System: the Fire
 Behaviour Prediction (FBP) System and the Fire Weather Index (FWI) System. Library
 only — no server, no CLI, no event handlers. Scalar and NumPy-array inputs share
-one API; missing/NoData values propagate via masked arrays. `uv`-managed and
-PyPI-bound. Maturin builds one mixed Python/Rust wheel; its version comes from
-`rust/crates/cffdrs-py/Cargo.toml`.
+one API; missing/NoData values propagate via masked arrays. `uv`-managed; not yet
+published to PyPI (the publish jobs are disabled). Maturin builds one mixed
+Python/Rust `cp311-abi3` wheel; its version comes from `rust/crates/cffdrs-py/Cargo.toml`.
+Two interchangeable FBP backends exist (Python reference, Rust); every known
+difference between them is tracked in [BACKEND_DIFFERENCES.md](BACKEND_DIFFERENCES.md).
 
 ## Architecture overview
 
@@ -16,10 +18,10 @@ Two independent systems live side by side in one package:
   input validation; `rust/core.py` wraps the owned native `FbpGrid`;
   `cupy/core.py` holds the experimental GPU backend.
   The Python class orchestrates pure,
-  single-purpose equation functions in a fixed sequence. Facade holds no fire-behavior
+  single-purpose equation functions in a fixed sequence. The `FBP` class holds no fire-behavior
   math itself; equation submodules never call across files — all wiring between
   quantities (e.g. crown fraction burned feeding into fuel consumption) happens in
-  the facade's hardcoded call order.
+  the `FBP` class's hardcoded call order.
 - **`cffdrs.cffwis`** (FWI) — flat, independent module functions (no shared class).
   Legacy/untyped style, predates the `cffbps` typing conventions. Not called by
   `cffbps` internally — FBP takes FFMC/BUI as caller-supplied inputs.
@@ -156,6 +158,15 @@ importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
   external `ProcessRasters` module not in this repo).
 - `manual_fbp_test.py` — explicitly not part of the package or pytest suite; manual
   smoke test only.
+- `compare_backends.py` — differential comparison of the Python and Rust backends over
+  every fuel code, each input missing in turn, two percentiles and scalar / array /
+  mixed input; its output is the basis of [BACKEND_DIFFERENCES.md](BACKEND_DIFFERENCES.md).
+- `probe_integer_outputs.py` — records what the Python reference returns for the
+  integer outputs at masked cells (the source of `integer_outputs_snapshot.json`).
+- `bench_rust_grid.py`, `bench_rust_stages.py` — release-profile benchmarks of the fused
+  grid pass and of the stepwise stages (time and memory); run on a quiet machine, three times.
+- `smoke_test_wheel.py` — installs-and-checks a built wheel in a clean environment
+  (used by the release workflow and locally for 3.11 / 3.14).
 
 ### `tests/`
 - `tests/cffbps/` — `test_fbp_unit.py`, `test_fbp_regression.py` against Wotton et
@@ -173,8 +184,31 @@ importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
     in trig-derived fields (`raz`, `wse`/`wse1`, `wsx`, `wsy`, `bros`) without masking
     real regressions (confirmed no real drift: casting the observed float64
     mismatches to float32 made them equal on both sides).
+- Rust backend tests: `test_rust_parity.py` (native grid vs the golden snapshots),
+  `test_rust_fbpgrid.py` (the `cffdrs._rust.FbpGrid` class), `test_rust_backend.py`
+  (the `cffbps.rust.FBP` wrapper: outputs, update routes, lifecycle, integer exports,
+  against `integer_outputs_snapshot.json` and `non_modeled_snapshot.json`),
+  `test_auto_backend.py` (automatic dispatch) and `test_final_review_regressions.py`
+  (stateful injections and scalar missing-input exports). `conftest.py` provides the
+  backend fixtures that run the shared suites on Python and Rust.
+- `rust/crates/cffbps-rust/tests/` — the bit-level oracle `characterization.rs` (local
+  `#[ignore]` tool, baseline in `rust/target/`, never re-record it on a refactor), the
+  golden tests, `grid_api.rs`, `threads.rs`, `stage_state.rs` and `fbp_grid.rs`.
 - `tests/cffwis/` + `tests/test_cffwis.py` — includes a real BC weather-station
   dataset (Haig Camp) for validation, plus diurnal-FFMC-specific tests.
+
+## Rust workspace (`rust/`)
+
+A Cargo workspace beside `src/`, with no root `Cargo.toml` (always pass
+`--manifest-path rust/Cargo.toml`):
+
+- `crates/cffbps-rust` (0.3.0, MSRV 1.78, no runtime dependencies): the module map is in
+  the crate docs (`src/lib.rs`): `fbp` (scalar `run()`), `field`/`stage`/`state` (75
+  fields, 23 stages, one cell), `grid` (per-cell or constant inputs, any requested
+  outputs, threads), `fbp_grid` (stages over whole grids with freeing) and one module
+  per equation family mirroring `python/equations/`.
+- `crates/cffdrs-py` (0.2.0): PyO3 bindings that build as `cffdrs._rust`
+  (`run_fbp_grid` and the `FbpGrid` class); the Python wrapper is `cffbps/rust/core.py`.
 
 ## Data flow
 
@@ -485,8 +519,11 @@ and its existing pytest command now covers both CPU backends; no jobs or schedul
 were added for this change.
 
 A prebuilt wheel avoids Rust compiler installation for Python consumers. Source
-builds require Rust and platform build tools. The ABI3 wheel tag is cp311-abi3;
-Python 3.11–3.14 are the tested target range. Future CPython ABI compatibility
+builds require Rust 1.78 or newer (the MSRV, enforced in CI) and platform build tools.
+The ABI3 wheel tag is cp311-abi3 (PyO3 0.27); supported Python is 3.11-3.14
+(`requires-python >= 3.11`), CI runs the suite on 3.12 and the release workflow
+smoke-tests wheels on 3.11-3.14 for Linux x86-64, macOS x86-64 and arm64, and Windows
+x86-64. Future CPython ABI compatibility
 is not certification of future NumPy/SciPy dependencies. Free-threaded builds
 are unsupported. This local version has not been published by this work.
 
