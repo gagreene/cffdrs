@@ -58,6 +58,9 @@ bindings = "pyo3"
 # The Cargo workspace has a sibling path dependency (cffbps-rust), so use the
 # repository file set rather than cargo-package's single-crate sdist file set.
 sdist-generator = "git"
+# Keep the ~240 MB of raster test fixtures out of the source distribution; the test
+# suite that uses them runs from a repository checkout.
+exclude = ["tests/cffbps/data/inputs/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
