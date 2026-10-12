@@ -615,15 +615,19 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     }
 }
 
+// The bit-level oracle's input generator (it names the crate `cffbps_rust`,
+// which `lib.rs` aliases for tests). Declared here, not inside `mod tests`, so
+// the path does not climb out of a directory that does not exist (Linux).
+#[cfg(test)]
+#[path = "../tests/common/cases.rs"]
+mod cases;
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    // The bit-level oracle's input generator (it names the crate
-    // `cffbps_rust`, which `lib.rs` aliases for tests).
-    #[path = "../../../tests/common/cases.rs"]
-    mod cases;
+    use super::cases;
 
     #[test]
     fn fused_run_equals_stage_composition() {
