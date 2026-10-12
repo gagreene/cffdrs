@@ -13,7 +13,7 @@ if TYPE_CHECKING:
         valid_outputs,
     )
 
-__author__ = ["Gregory A. Greene, map.n.trowel@gmail.com"]
+__author__ = ["Gregory A. Greene"]
 
 __all__ = [
     "FBP",

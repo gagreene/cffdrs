@@ -9,7 +9,7 @@ description = "Canadian Forest Fire Danger Rating System (CFFDRS) tools: Fire Be
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-authors = [{ name = "Gregory A. Greene", email = "map.n.trowel@gmail.com" }]
+authors = [{ name = "Gregory A. Greene" }]
 keywords = ["wildfire", "fire behaviour", "CFFDRS", "FBP", "FWI", "forestry"]
 classifiers = [
     "Development Status :: 4 - Beta",
