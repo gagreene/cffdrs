@@ -85,6 +85,8 @@ class AutoFBP:
         Auto silently uses Python when Rust is unavailable or a calibration table
         was accessed. Forcing Rust in either case raises an informative error.
         Reinitialization resets model inputs while retaining the chosen backend.
+        ``threads`` is used by Rust only: 1 (default) uses the calling thread, 0 uses every
+        available core, and Python ignores it.
         """
         if backend not in ('auto', 'python', 'rust'):
             raise ValueError("backend must be 'auto', 'python', or 'rust'")
