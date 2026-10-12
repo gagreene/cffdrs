@@ -221,14 +221,23 @@ def test_invalid_backend(backend):
 
 
 def test_available_backends_reports_importable_modules(monkeypatch):
-    monkeypatch.setitem(sys.modules, 'cupy', None)
+    monkeypatch.setitem(sys.modules, 'cffdrs.cffbps.cupy', None)
     assert available_backends() == ['python', 'rust']
     from cffdrs.cffbps import available_backends as public_available
     assert public_available is available_backends
+    # the Rust facade module is already imported; simulate a missing extension
     monkeypatch.setitem(sys.modules, 'cffdrs._rust', None)
+    monkeypatch.setitem(sys.modules, 'cffdrs.cffbps.rust', None)
     assert available_backends() == ['python']
-    monkeypatch.setitem(sys.modules, 'cupy', importlib)
+    monkeypatch.setitem(sys.modules, 'cffdrs.cffbps.cupy', importlib)
     assert available_backends() == ['python', 'cupy']
+
+
+def test_cupy_is_listed_only_when_its_backend_module_imports(monkeypatch):
+    # cupy itself installed, but the backend module fails (for example rasterio is missing)
+    monkeypatch.setitem(sys.modules, 'cupy', importlib)
+    monkeypatch.setitem(sys.modules, 'cffdrs.cffbps.cupy', None)
+    assert 'cupy' not in available_backends()
 
 
 def test_public_fbp_import_is_lazy():

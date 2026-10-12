@@ -161,3 +161,19 @@ def test_missing_date_override_exports_nan_before_and_after_calcfmc(name, route,
 def test_scalar_mixedwood_growth_keeps_the_foliar_moisture_mask(missing, fuel, percentile):
     kwargs = {'fuel_type': fuel, 'percentile_growth': percentile, missing: np.nan}
     equal(make(**kwargs).runFBP(), make('python', **kwargs).runFBP(), scalar=True)
+
+
+@pytest.mark.parametrize('route', ['initialize', 'setParams', 'attribute'])
+@pytest.mark.parametrize('kwargs', [{}, {'fuel_type': 10, 'lat': np.nan}])
+def test_percentile_growth_none_means_no_adjustment(route, kwargs):
+    models = []
+    for backend in ('rust', 'python'):
+        model = make(backend, **kwargs, **({'percentile_growth': None} if route == 'initialize' else {}))
+        if route == 'setParams':
+            model.setParams({'percentile_growth': None})
+        elif route == 'attribute':
+            model.percentile_growth = None
+        models.append(model)
+    equal(models[0].runFBP(), models[1].runFBP(), scalar=True)
+    reference = make('python', **kwargs, percentile_growth=50).runFBP()
+    equal(models[1].runFBP(), reference, scalar=True)

@@ -23,7 +23,9 @@ _RUST_INSTALL = (
 def available_backends() -> list[str]:
     """Return importable backends; this explicit query may import Rust and CuPy."""
     backends = ['python']
-    for name, module in [('rust', 'cffdrs._rust'), ('cupy', 'cupy')]:
+    # probe the backend modules themselves: cupy alone can be present while the CuPy
+    # facade still fails to import (for example without rasterio)
+    for name, module in [('rust', 'cffdrs.cffbps.rust'), ('cupy', 'cffdrs.cffbps.cupy')]:
         try:
             importlib.import_module(module)
         except ImportError:

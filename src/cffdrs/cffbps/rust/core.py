@@ -46,6 +46,11 @@ _STAGE_WRITES = {name: fields.split() for name, fields in _STAGE_WRITES.items()}
 _DEFAULT = ['hros', 'hfi', 'fire_type']
 
 
+def _percentile(value):
+    """The native percentile: ``None`` means no adjustment, as in the Python reference (the median, 50)."""
+    return 50 if value is None else value
+
+
 class FBP:
     """FBP with Rust calculations and explicit owned-input update routes."""
 
@@ -96,7 +101,7 @@ class FBP:
         overrides = {name: getattr(verified, name) for name in ('d0', 'dj')}
         grid = _rust.FbpGrid(
             fuel_type=self._fuel_boundary(verified.fuel_type, shape), **values, wx_date=wx_date,
-            percentile_growth=percentile_growth,
+            percentile_growth=_percentile(percentile_growth),
             d0=self._boundary(overrides['d0'], shape), dj=self._boundary(overrides['dj'], shape),
             out_request=request, threads=threads)
         object.__setattr__(self, '_grid', grid)
@@ -162,7 +167,7 @@ class FBP:
         self._require()
         if name == 'wx_date':
             value = inputs.validate_wx_date(value)
-        self._grid.set_param(name, value)
+        self._grid.set_param(name, _percentile(value) if name == 'percentile_growth' else value)
         object.__setattr__(self, name, value)
         if name == 'wx_date':
             self._fmc_done = False
@@ -224,7 +229,7 @@ class FBP:
         self._grid.run()
         if self._scalar_masks is not None:
             for stage in _STAGE_WRITES:
-                self._scalar_masks.stage(stage, self._fuel, self.percentile_growth)
+                self._scalar_masks.stage(stage, self._fuel, _percentile(self.percentile_growth))
         self._fmc_done = self._sfc_done = self._accel_done = True
         self._accel_fused = True
         self._accel_fuel = self._fuel
@@ -246,7 +251,7 @@ class FBP:
         else:
             self._grid.run_stage(name)
         if self._scalar_masks is not None:
-            self._scalar_masks.stage(name, self._fuel, self.percentile_growth)
+            self._scalar_masks.stage(name, self._fuel, _percentile(self.percentile_growth))
         for field in _STAGE_WRITES[name]:
             self._injected.pop(field, None)
         if name == 'calcAccelParam':
