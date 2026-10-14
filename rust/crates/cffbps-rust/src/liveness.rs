@@ -110,15 +110,20 @@ mod tests {
     #[test]
     fn a_two_stage_plan_counts_each_planned_reader() {
         let mut l = Liveness::new(&[Stage::CalcTfc, Stage::CalcHfi]);
-        // sfc: CalcTfc; cfc: CalcTfc; hros: CalcHfi; tfc: CalcHfi
-        for f in [Field::Sfc, Field::Cfc, Field::Hros, Field::Tfc] {
+        // ffc, wfc, sfc, cfc: CalcTfc; tfc: CalcHfi; hros: CalcTfc and CalcHfi
+        for f in [Field::Ffc, Field::Wfc, Field::Sfc, Field::Cfc, Field::Tfc] {
             assert_eq!(l.pending_readers(f), 1, "{f:?}");
             assert!(l.needed(f), "{f:?}");
         }
+        assert_eq!(l.pending_readers(Field::Hros), 2);
+        assert!(l.needed(Field::Hros));
         assert!(!l.needed(Field::Hfi), "no planned stage reads hfi");
         let mut freed = l.record_run(Stage::CalcTfc);
         freed.sort_by_key(|f| f.index());
-        assert_eq!(freed, [Field::Sfc, Field::Cfc]);
+        let mut expected = [Field::Ffc, Field::Wfc, Field::Sfc, Field::Cfc];
+        expected.sort_by_key(|f| f.index());
+        assert_eq!(freed, expected);
+        assert!(l.needed(Field::Hros), "calcHFI still reads hros");
         assert!(l.needed(Field::Tfc));
         assert_eq!(l.record_run(Stage::CalcHfi), [Field::Hros, Field::Tfc]);
         for f in Field::ALL {
@@ -133,8 +138,8 @@ mod tests {
             let readers = Stage::ALL.iter().filter(|s| s.reads().contains(&f)).count();
             assert_eq!(usize::from(l.pending_readers(f)), readers, "{f:?}");
         }
-        // hros: calcC6HROS, calcPercentileCFB, calcRosPercentileGrowth, calcCFB, calcHFI
-        assert_eq!(l.pending_readers(Field::Hros), 5);
+        // hros: calcC6HROS, calcPercentileCFB, calcRosPercentileGrowth, calcCFB, calcTFC, calcHFI
+        assert_eq!(l.pending_readers(Field::Hros), 6);
         let mut freed_total = 0;
         for s in Stage::ALL {
             freed_total += l.record_run(s).len();

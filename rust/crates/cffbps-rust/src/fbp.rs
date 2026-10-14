@@ -423,7 +423,7 @@ pub(crate) fn run_stages(input: &FbpInput) -> FbpResult {
 // One straight-line pass that mirrors the Python `FBP` pipeline stage by stage.
 #[allow(clippy::too_many_lines)]
 pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
-    use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc};
+    use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc, without_spread};
     use crate::crown::{
         calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
     };
@@ -549,6 +549,12 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     // The scalar getParams export maps masked -> 0.0 via `.item()`; that
     // convention belongs to the export layer and is applied by the Wotton
     // golden harness, not here.
+
+    // --- no fuel is consumed without spread (after the crown calculations used sfc)
+    let ffc = without_spread(hros, ffc);
+    let wfc = without_spread(hros, wfc);
+    let sfc = without_spread(hros, sfc);
+    let cfc = without_spread(hros, cfc);
 
     // --- calc_tfc / calc_hfi
     let tfc = calc_tfc(sfc, cfc);

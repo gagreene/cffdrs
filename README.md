@@ -219,7 +219,9 @@ and injected results can preserve their dtype. Prepared array fuel is normally
 `fi_class` arrays are `int64` (masked values 0 and -99 respectively). `dj` is
 `int64` when complete, `float64` with NaN when an override is missing. Fuel
 exports retain the prepared code beneath a mask. Missing values follow each
-field's dependencies, not a blanket mask of every output.
+field's dependencies, not a blanket mask of every output, with one exception: fuel
+consumption (`ffc`, `wfc`, `sfc`, `cfc`, `tfc`) follows the spread, so it is 0 where the head
+rate of spread is 0 (for example D-2 with BUI below 70) and NaN where it is NaN.
 
 All-scalar inputs export Python scalars. Legacy masked/non-modeled cases can
 export floating zero even for nominal integer fields; missing explicit dates

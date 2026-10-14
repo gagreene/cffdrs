@@ -1,5 +1,19 @@
 //! Total fuel consumption, head fire intensity and the intensity class.
 
+/// Fuel consumption that follows whether the fire spreads: 0 where the head
+/// rate of spread is exactly 0, NaN where it is NaN, otherwise `value`
+/// unchanged. Applied in `calcTFC` (after the crown calculations used `sfc`) to
+/// `ffc`, `wfc`, `sfc` and `cfc`; mirrors `consumption.zero_without_spread`.
+pub(crate) fn without_spread(hros: f64, value: f64) -> f64 {
+    if hros == 0.0 {
+        0.0
+    } else if hros.is_nan() {
+        f64::NAN
+    } else {
+        value
+    }
+}
+
 /// `calc_tfc`: total fuel consumption.
 pub(crate) fn calc_tfc(sfc: f64, cfc: f64) -> f64 {
     sfc + cfc
@@ -32,6 +46,15 @@ pub(crate) fn calc_fire_intensity_class(hfi: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn no_spread_consumes_no_fuel_and_a_missing_rate_gives_missing_consumption() {
+        assert_eq!(without_spread(0.0, 1.5), 0.0);
+        assert_eq!(without_spread(0.0, f64::NAN), 0.0);
+        assert!(without_spread(f64::NAN, 1.5).is_nan());
+        assert_eq!(without_spread(2.0, 1.5), 1.5);
+        assert!(without_spread(2.0, f64::NAN).is_nan());
+    }
 
     #[test]
     fn fire_intensity_class_boundaries() {

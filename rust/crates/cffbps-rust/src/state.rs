@@ -9,7 +9,7 @@
 //! [`FbpResult`] at any point. Running [`Stage::ALL`] in order on
 //! [`CellState::from_input`] is [`fbp::run`](crate::fbp::run).
 
-use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc};
+use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc, without_spread};
 use crate::crown::{
     calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
 };
@@ -425,6 +425,11 @@ impl CellState {
                 self.set(F::Cfc, cfc);
             }
             Stage::CalcTfc => {
+                let hros = self.get(F::Hros);
+                for f in [F::Ffc, F::Wfc, F::Sfc, F::Cfc] {
+                    let adjusted = without_spread(hros, self.get(f));
+                    self.set(f, adjusted);
+                }
                 let tfc = calc_tfc(self.get(F::Sfc), self.get(F::Cfc));
                 self.set(F::Tfc, tfc);
             }

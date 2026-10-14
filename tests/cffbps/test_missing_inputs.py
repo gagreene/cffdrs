@@ -1,10 +1,11 @@
-"""Missing inputs stay missing through surface fuel consumption.
+"""Missing inputs stay missing through fuel consumption.
 
-A NaN ``bui`` or ``ffmc`` cell arrives masked. Every surface output that depends
-on it (``sfc``, the fine/woody split ``ffc``/``wfc`` where a fuel defines one,
-and the ``rso``/``tfc`` derived from ``sfc``) must come out NaN, never a finite
-number left behind by masked arithmetic. Outputs that do not depend on the
-missing input keep their finite values.
+A NaN ``bui`` or ``ffmc`` cell arrives masked. The rate of spread then depends on a
+missing value, so it is NaN, and consumption follows the spread: ``sfc``, ``ffc``,
+``wfc``, ``cfc`` and ``tfc`` are NaN (never a finite number left behind by masked
+arithmetic), even for fuels whose ``sfc`` does not itself use that input. ``rso`` is
+not a consumption output: it is NaN only where the input feeds ``sfc`` and otherwise
+keeps its finite value.
 """
 from __future__ import annotations
 
@@ -42,13 +43,10 @@ def _run(backend_fbp, fuel, missing=None):
 
 
 def _expected_nan(fuel, missing):
-    nan = set()
+    # consumption follows the spread, which is NaN whenever bui or ffmc is missing
+    nan = {'sfc', 'ffc', 'wfc', 'tfc'}
     if fuel in SFC_USES[missing]:
-        nan |= {'sfc', 'rso', 'tfc'}
-    if fuel in FFC_USES[missing]:
-        nan.add('ffc')
-    if fuel in WFC_USES[missing]:
-        nan.add('wfc')
+        nan.add('rso')
     return nan
 
 
@@ -60,19 +58,18 @@ def test_missing_input_propagates_to_dependent_surface_outputs(backend_fbp, fuel
     nan = _expected_nan(fuel, missing)
     for name in sorted(nan):
         assert np.isnan(got[name]), f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected NaN'
-    # Outputs that do not depend on the missing input keep their finite values. tfc also
-    # carries crown consumption (NaN through the spread chain), so it is compared only
-    # for fuels that cannot crown.
-    kept = {'sfc', 'ffc', 'wfc', 'rso'} | ({'tfc'} if fuel in NON_CROWNING else set())
-    for name in sorted(kept - nan):
+    # rso does not follow the spread: it keeps its finite value unless the input feeds sfc.
+    for name in sorted({'rso'} - nan):
         assert np.array_equal(got[name], base[name], equal_nan=True), (
             f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected {base[name]!r}')
 
 
-def test_independent_fuels_keep_their_finite_values(backend_fbp):
-    assert _run(backend_fbp, 2, 'ffmc')['sfc'] == pytest.approx(2.9136045, abs=1e-7)
-    assert _run(backend_fbp, 1, 'bui')['sfc'] == pytest.approx(1.421, abs=1e-3)
-    assert _run(backend_fbp, 14, 'bui')['sfc'] == pytest.approx(0.35, abs=1e-12)
+def test_consumption_is_missing_when_the_spread_is_missing(backend_fbp):
+    # sfc does not use ffmc for C-2, bui for C-1 or bui for O-1a, but their spread does
+    assert np.isnan(_run(backend_fbp, 2, 'ffmc')['sfc'])
+    assert np.isnan(_run(backend_fbp, 1, 'bui')['sfc'])
+    assert np.isnan(_run(backend_fbp, 14, 'bui')['sfc'])
+    assert np.isfinite(_run(backend_fbp, 2, 'ffmc')['rso'])
 
 
 def test_finite_baseline_is_unchanged(backend_fbp):

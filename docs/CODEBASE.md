@@ -300,7 +300,7 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
 | `calcAccelParam` | fuel_type, cfb, accel | accel |
 | `calcFireType` | fuel_type, cfb | fire_type |
 | `calcCFC` | fuel_type, cfb, cfl, pc, pdf | cfc |
-| `calcTFC` | sfc, cfc | tfc |
+| `calcTFC` | hros, ffc, wfc, sfc, cfc | ffc, wfc, sfc, cfc, tfc |
 | `calcHFI` | hros, tfc | hfi |
 | `calcFireIntensityClass` | hfi | fi_class |
 
@@ -406,6 +406,16 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
   retained as directionally consistent facade state. Rerunning the C6 blend with
   final CFB would overwrite percentile-adjusted HROS and reintroduce the original
   ordering bug.
+
+- **No fuel is consumed when the fire does not spread.** `calcTFC` (the last consumption
+  step, after the crown calculations have used `sfc`) sets `ffc`, `wfc`, `sfc`, `cfc` and
+  `tfc` to 0 where the head ROS is exactly 0 (for example D-2 with BUI < 70, or an injected
+  `hros` of 0), and to NaN where the ROS is NaN, even for fuels whose `sfc` does not itself
+  use the missing input (a missing FFMC or wind makes `sfc` NaN). Because it runs in
+  `calcTFC`, reading `sfc` before that step still gives the formula value, and `rso`,
+  `cfb` and the fire type are not affected. Non-fuel, water and invalid fuel cells have a
+  NaN ROS, so their consumption stays NaN. Python: `consumption.zero_without_spread`; Rust:
+  `consumption::without_spread` (fused `run()` and the stage engine).
 
 ## Outputs and intentional differences
 

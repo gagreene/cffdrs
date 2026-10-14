@@ -97,14 +97,14 @@ type NanCase = (fn(&mut FbpInput), f64);
 
 #[test]
 fn nan_weather_inputs_propagate_to_nan_spread() {
-    // (mutator, sfc expectation): sfc is BUI/FFMC-driven per fuel, so it
-    // pins that NaN reaches exactly the fields Python's masks let through.
+    // (mutator, sfc expectation): consumption follows the spread, so a missing
+    // input that makes the rate of spread NaN also makes sfc NaN, even where sfc
+    // does not itself depend on that input (Python agrees).
     let cases: [NanCase; 4] = [
-        (|i| i.ws = f64::NAN, 2.913_604_549_006_544_5),
-        (|i| i.ffmc = f64::NAN, 2.913_604_549_006_544_5),
-        // C-2 sfc is BUI-driven: a missing bui gives NaN sfc (Python agrees).
+        (|i| i.ws = f64::NAN, f64::NAN),
+        (|i| i.ffmc = f64::NAN, f64::NAN),
         (|i| i.bui = f64::NAN, f64::NAN),
-        (|i| i.slope_pct = f64::NAN, 2.913_604_549_006_544_5),
+        (|i| i.slope_pct = f64::NAN, f64::NAN),
     ];
     for (idx, (mutate, sfc)) in cases.iter().enumerate() {
         let mut input = base();
@@ -127,4 +127,43 @@ fn nan_weather_inputs_propagate_to_nan_spread() {
             );
         }
     }
+}
+
+#[test]
+fn d2_below_bui_70_consumes_no_fuel() {
+    // D-2 has no spread below BUI 70, so no fuel is consumed: ffc, wfc, sfc, cfc and tfc
+    // are 0 (not the formula values), and hfi is 0.
+    for bui in [0.0, 30.0, 60.0, 69.9] {
+        let mut input = base();
+        input.fuel_type = 9;
+        input.bui = bui;
+        let r = run(&input);
+        assert_eq!(r.hros, 0.0, "bui {bui}");
+        assert_eq!(
+            [r.ffc, r.wfc, r.sfc, r.cfc, r.tfc],
+            [0.0; 5],
+            "bui {bui}: consumption"
+        );
+        assert_eq!(r.hfi, 0.0, "bui {bui}");
+    }
+    let mut input = base();
+    input.fuel_type = 9;
+    input.bui = 70.0;
+    let r = run(&input);
+    assert!(r.hros > 0.0 && r.sfc > 0.0 && r.tfc > 0.0, "bui 70 spreads");
+}
+
+#[test]
+fn injected_zero_ros_consumes_no_fuel_and_a_missing_ros_gives_missing_consumption() {
+    let mut input = base();
+    input.hros_override = Some(0.0);
+    let r = run(&input);
+    assert_eq!([r.sfc, r.cfc, r.tfc], [0.0; 3]);
+    let mut input = base();
+    input.ws = f64::NAN;
+    let r = run(&input);
+    assert!(r.hros.is_nan());
+    assert!([r.ffc, r.wfc, r.sfc, r.cfc, r.tfc]
+        .iter()
+        .all(|v| v.is_nan()));
 }

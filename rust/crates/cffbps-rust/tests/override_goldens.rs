@@ -17,7 +17,8 @@
 //!   recomputed from the blended hros (case 2: hros 1.378 is far below rso, so
 //!   cfb is 0 and the cell is a surface fire); other crowning fuels use the
 //!   injected hros.
-//! - hfi = 0 yields `fi_class` -99 (case 5).
+//! - hfi = 0 yields `fi_class` -99 (case 5); an injected hros of 0 also means no fuel
+//!   is consumed (sfc and tfc are 0 in case 5).
 
 use cffbps_rust::fbp::{run, FbpInput};
 
@@ -127,10 +128,10 @@ const CASES: [Case; 5] = [
             1.0,
             0.0,
             0.0,
-            1.923_960_632_007_811_3,
+            0.0,
             0.0,
             -99.0,
-            1.923_960_632_007_811_3,
+            0.0,
             99.0,
         ],
     },

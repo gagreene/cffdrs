@@ -118,6 +118,9 @@ class ScalarMasks:
         elif name == 'calcFireType':
             put('fire_type', invalid or (code < 19 and any_mask('cfb')))
         elif name == 'calcTFC':
+            # consumption follows the spread: a masked rate of spread masks it
+            for target in ('ffc', 'wfc', 'sfc', 'cfc'):
+                put(target, any_mask(target, 'hros'))
             put('tfc', any_mask('sfc', 'cfc'))
         elif name == 'calcHFI':
             put('hfi', any_mask('hros', 'tfc'))

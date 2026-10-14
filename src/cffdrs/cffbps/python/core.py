@@ -805,10 +805,16 @@ class FBP:
 
     def calcTFC(self) -> None:
         """
-        Function to calculate total fuel consumed (kg/m^2)
+        Function to calculate total fuel consumed (kg/m^2).
+
+        No fuel is consumed (ffc, wfc, sfc, cfc and tfc are 0) where the head rate of spread is 0,
+        and consumption is missing where the rate of spread is missing. The adjustment is made
+        here, after the crown calculations have used sfc, so it does not change the fire type.
 
         :return: None
         """
+        self.ffc, self.wfc, self.sfc, self.cfc = consumption_eq.zero_without_spread(
+            hros=self.hros, values=(self.ffc, self.wfc, self.sfc, self.cfc))
         self.tfc = consumption_eq.calc_tfc(sfc=self.sfc, cfc=self.cfc)
         return
 

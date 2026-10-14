@@ -195,7 +195,7 @@ impl Stage {
             Stage::CalcAccelParam => &[F::FuelType, F::Cfb, F::Accel],
             Stage::CalcFireType => &[F::FuelType, F::Cfb],
             Stage::CalcCfc => &[F::FuelType, F::Cfb, F::Cfl, F::Pc, F::Pdf],
-            Stage::CalcTfc => &[F::Sfc, F::Cfc],
+            Stage::CalcTfc => &[F::Hros, F::Ffc, F::Wfc, F::Sfc, F::Cfc],
             Stage::CalcHfi => &[F::Hros, F::Tfc],
             Stage::CalcFireIntensityClass => &[F::Hfi],
         }
@@ -251,7 +251,7 @@ impl Stage {
             Stage::CalcAccelParam => &[F::Accel],
             Stage::CalcFireType => &[F::FireType],
             Stage::CalcCfc => &[F::Cfc],
-            Stage::CalcTfc => &[F::Tfc],
+            Stage::CalcTfc => &[F::Ffc, F::Wfc, F::Sfc, F::Cfc, F::Tfc],
             Stage::CalcHfi => &[F::Hfi],
             Stage::CalcFireIntensityClass => &[F::FiClass],
         }
@@ -368,7 +368,11 @@ mod tests {
             &["fuel_type", "cfb", "cfl", "pc", "pdf"],
             &["cfc"],
         ),
-        ("calcTFC", &["sfc", "cfc"], &["tfc"]),
+        (
+            "calcTFC",
+            &["hros", "ffc", "wfc", "sfc", "cfc"],
+            &["ffc", "wfc", "sfc", "cfc", "tfc"],
+        ),
         ("calcHFI", &["hros", "tfc"], &["hfi"]),
         ("calcFireIntensityClass", &["hfi"], &["fi_class"]),
     ];

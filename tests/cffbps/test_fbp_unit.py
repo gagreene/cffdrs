@@ -1293,3 +1293,67 @@ def test_prepare_inputs_reports_every_missing_required_parameter():
         prepare_inputs(fuel_type=2, wx_date=None, lat=None, long=None, elevation=None, slope=None,
                        aspect=None, ws=None, wd=None, ffmc=None, bui=None, pc=50, pdf=35, gfl=0.35,
                        gcf=80, d0=None, dj=None, out_request=None, convert_fuel_type_codes=False)
+
+
+# ── no fuel is consumed when the fire does not spread ─────────────────────────
+CONSUMPTION = ['ffc', 'wfc', 'sfc', 'cfc', 'tfc']
+
+
+def _consumption(**changes):
+    fbp = FBP()
+    fbp.initialize(**dict(BASE_KWARGS, out_request=CONSUMPTION + ['hros', 'hfi']) | changes)
+    return dict(zip(CONSUMPTION + ['hros', 'hfi'], fbp.runFBP(), strict=True))
+
+
+@pytest.mark.parametrize('bui', [0., 30., 60., 69.9])
+def test_d2_below_bui_70_consumes_no_fuel(bui):
+    out = _consumption(fuel_type=9, bui=bui)
+    assert out['hros'] == 0
+    assert [out[name] for name in CONSUMPTION] == [0, 0, 0, 0, 0]
+    assert out['hfi'] == 0
+
+
+@pytest.mark.parametrize('bui', [70., 80.])
+def test_d2_from_bui_70_consumes_fuel(bui):
+    out = _consumption(fuel_type=9, bui=bui)
+    assert out['hros'] > 0
+    assert out['sfc'] > 0 and out['tfc'] > 0
+
+
+def test_injected_zero_ros_consumes_no_fuel():
+    fbp = FBP()
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2, out_request=CONSUMPTION))
+    fbp.runFBP()
+    fbp.reset()
+    for step in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcFMC', 'calcISI_RSI_BE', 'calcROS'):
+        getattr(fbp, step)()
+    fbp.setParams({'hros': 0.0})
+    for step in ('calcSFC', 'getCBH_CFL', 'calcCSFI', 'calcRSO', 'calcC6BlendCFB', 'calcC6BlendCFC', 'calcC6CROS',
+                 'calcC6HROS', 'calcPercentileCFB', 'calcRosPercentileGrowth', 'calcCFB', 'calcAccelParam',
+                 'calcFireType', 'calcCFC', 'calcTFC'):
+        getattr(fbp, step)()
+    assert fbp.getParams(CONSUMPTION) == [0, 0, 0, 0, 0]
+
+
+@pytest.mark.parametrize('missing', ['ws', 'wd', 'slope', 'aspect'])
+def test_missing_ros_inputs_make_every_consumption_output_missing(missing):
+    n = 2
+    kwargs = {k: np.full((1, n), float(v)) for k, v in BASE_KWARGS.items() if k != 'wx_date'}
+    kwargs['wx_date'] = BASE_KWARGS['wx_date']
+    kwargs['fuel_type'] = np.full((1, n), 2, dtype=np.int8)
+    kwargs[missing][0, 0] = np.nan
+    fbp = FBP()
+    fbp.initialize(**kwargs, out_request=CONSUMPTION + ['hros'])
+    out = dict(zip(CONSUMPTION + ['hros'], fbp.runFBP(), strict=True))
+    assert np.isnan(out['hros'][0, 0])
+    assert all(np.isnan(out[name][0, 0]) for name in CONSUMPTION)
+    assert all(np.isfinite(out[name][0, 1]) and out[name][0, 1] > 0 for name in ('sfc', 'tfc', 'hros'))
+
+
+@pytest.mark.parametrize('fuel', [19, 20, 0, 99])
+def test_non_fuel_cells_stay_missing_not_zero(fuel):
+    kwargs = {k: np.full((1, 1), v) for k, v in BASE_KWARGS.items() if k != 'wx_date'}
+    kwargs.update(wx_date=BASE_KWARGS['wx_date'], fuel_type=np.array([[fuel]]))
+    fbp = FBP()
+    fbp.initialize(**kwargs, out_request=CONSUMPTION + ['hros'])
+    assert all(np.isnan(v).all() for v in fbp.runFBP())

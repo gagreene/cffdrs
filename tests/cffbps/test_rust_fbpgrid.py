@@ -142,7 +142,7 @@ def test_lifecycle_freed_fields_and_keep():
     grid.run_planned()
     with pytest.raises(ValueError, match='sfc.*out_request'):
         grid.get('sfc')
-    with pytest.raises(ValueError, match='sfc.*out_request'):
+    with pytest.raises(ValueError, match='ffc.*out_request'):   # calcTFC reads ffc first of the freed fields
         grid.run_stage('calcTFC')
     kept = make(out_request=['hros'], keep=['sfc'])
     kept.run_planned()
