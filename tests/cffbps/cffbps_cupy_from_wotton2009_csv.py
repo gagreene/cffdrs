@@ -37,7 +37,7 @@ results_dir = os.path.join(outputs_dir, 'wotton2009')
 os.makedirs(results_dir, exist_ok=True)
 
 # Load CSV
-data_path = os.path.join(inputs_dir, input_data) # path to input data
+data_path = os.path.join(data_dir, input_data) # path to input data (the CSV sits in data/, not data/inputs/)
 df = pd.read_csv(data_path, na_values=['NA', ''])
 
 # Convert d0 and dj to nullable integers (preserve NaN values)

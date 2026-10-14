@@ -240,7 +240,13 @@ CUDA-capable environment):
 pip install "cffdrs[gpu]"
 # On CUDA, prefer the version-matched wheel instead, e.g.:
 #   pip install cupy-cuda12x
+#   pip install cupy-cuda13x
+# If CuPy fails with "Failed to find CUDA headers", add the CUDA component extra:
+#   pip install "cupy-cuda13x[ctk]"
 ```
+
+The CuPy backend was last run on one NVIDIA RTX 5090 (CUDA 13.3, Python 3.14, `cupy-cuda13x[ctk]`
+14.2); no other GPU, CUDA version or platform has been tried.
 
 ```python
 from cffdrs.cffbps.cupy import FBP   # requires cupy + CUDA
