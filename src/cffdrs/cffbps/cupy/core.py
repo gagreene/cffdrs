@@ -1431,8 +1431,17 @@ class FBP:
         """
         Function to calculate total fuel consumed (kg/m^2) using CuPy.
 
+        No fuel is consumed (ffc, wfc, sfc, cfc and tfc are 0) where the head rate of spread is
+        0, and consumption is NaN where the rate of spread is NaN, as in the reference backends.
+
         :return: None
         """
+        no_spread = self.hfros == 0
+        missing_spread = cp.isnan(self.hfros)
+        self.ffc = cp.where(no_spread, 0.0, cp.where(missing_spread, cp.nan, self.ffc))
+        self.wfc = cp.where(no_spread, 0.0, cp.where(missing_spread, cp.nan, self.wfc))
+        self.sfc = cp.where(no_spread, 0.0, cp.where(missing_spread, cp.nan, self.sfc))
+        self.cfc = cp.where(no_spread, 0.0, cp.where(missing_spread, cp.nan, self.cfc))
         self.tfc = self.sfc + self.cfc
 
         return

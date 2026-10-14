@@ -415,7 +415,9 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
   `calcTFC`, reading `sfc` before that step still gives the formula value, and `rso`,
   `cfb` and the fire type are not affected. Non-fuel, water and invalid fuel cells have a
   NaN ROS, so their consumption stays NaN. Python: `consumption.zero_without_spread`; Rust:
-  `consumption::without_spread` (fused `run()` and the stage engine).
+  `consumption::without_spread` (fused `run()` and the stage engine); the experimental CuPy backend
+  applies the same rule in its `calcTFC`, checked only through a NumPy stand-in for `cupy`
+  (`tests/cffbps/test_cupy_consumption.py`), not on a GPU.
 
 ## Outputs and intentional differences
 
