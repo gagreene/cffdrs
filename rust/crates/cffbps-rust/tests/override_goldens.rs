@@ -10,13 +10,12 @@
 //!
 //! Notable spec behaviours these goldens pin (captured verbatim from the
 //! Python package running that exact sequence):
-//! - calcFMC never runs, so fme keeps its zero template value — C-6 crown
-//!   ROS is therefore 0 and the C-6 blend collapses to sros * (1 - cfb),
-//!   OVERWRITING the injected hros (case 3).
+//! - calcFMC never runs, but the injected fmc gives the matching fme, so the
+//!   C-6 crown ROS is the one calcFMC would give for that fmc; the C-6 blend
+//!   OVERWRITES the injected hros (case 3).
 //! - C-6 blends from an SROS-derived temporary cfb, then the FINAL cfb is
-//!   recomputed from the blended hros (case 2: hros 1.378 is far below rso, so
-//!   cfb is 0 and the cell is a surface fire); other crowning fuels use the
-//!   injected hros.
+//!   recomputed from the blended hros (case 3: hros 30.9 exceeds rso, so the
+//!   cell is a crown fire); other crowning fuels use the injected hros.
 //! - hfi = 0 yields `fi_class` -99 (case 5); an injected hros of 0 also means no fuel
 //!   is consumed (sfc and tfc are 0 in case 5).
 
@@ -90,13 +89,13 @@ const CASES: [Case; 5] = [
         expected: [
             3_320.360_999_080_089,
             5.030_716_309_746_868,
-            0.0,
-            1.0,
-            0.0,
-            1.378_236_428_950_598_8,
-            2.200_058_463_938_813_4,
-            909.660_216_246_471,
+            0.997_423_468_935_725_5,
             3.0,
+            1.795_362_244_084_306,
+            30.949_461_237_990_97,
+            3.995_420_708_031_103,
+            37_096.835_499_727_52,
+            6.0,
             2.200_058_463_938_813_4,
             105.0,
         ],
@@ -194,10 +193,13 @@ fn override_chain_matches_python_sequence() {
             let ok = (a - e).abs() <= e.abs().max(1e-12) * 1e-9;
             assert!(ok, "case {i} field {name}: expected {e}, got {a}");
         }
-        // fme keeps the zero template in override mode
-        assert_eq!(
-            result.fme, 0.0,
-            "case {i}: fme must stay 0 in override mode"
+        // the injected fmc gives the matching foliar moisture effect
+        let fme = 1000.0 * (1.5 - 0.00275 * case.fmc_override).powi(4)
+            / (460.0 + 25.9 * case.fmc_override);
+        assert!(
+            (result.fme - fme).abs() <= fme * 1e-12,
+            "case {i}: fme {} vs {fme}",
+            result.fme
         );
     }
 }

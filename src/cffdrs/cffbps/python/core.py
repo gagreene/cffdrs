@@ -80,6 +80,18 @@ class FBP:
         self.set_override('d0', value)
 
     @property
+    def fmc(self):
+        return self._fmc
+
+    @fmc.setter
+    def fmc(self, value):
+        # A foliar moisture content provided by the user (setParams or assignment) also gives the matching
+        # foliar moisture effect, which the C-6 crown rate of spread needs. Internal results write ``_fmc``.
+        self._fmc = value
+        if value is not None:
+            self.fme = fmc_eq.calc_fme(value)
+
+    @property
     def dj(self):
         return self._dj_res if self._dj_res is not None else self._dj_supplied
 
@@ -188,7 +200,7 @@ class FBP:
         # Initialize foliar moisture content parameters
         self.latn = None
         self.nd = None
-        self.fmc = None
+        self._fmc = None
         self.fme = None
 
         # Initialize crown and total fuel consumed parameters
@@ -488,7 +500,7 @@ class FBP:
         # Foliar moisture content parameters
         self.latn = template
         self.nd = template
-        self.fmc = template
+        self._fmc = template
         self.fme = template
 
         # Crown and total fuel consumed parameters
@@ -604,7 +616,7 @@ class FBP:
             )
             # The cache owns private copies; attributes always receive further copies.
             cache = self._fmc_cache = (key, tuple(r.copy() for r in result))
-        self.latn, self._d0_res, self._dj_res, self.nd, self.fmc, self.fme = (r.copy() for r in cache[1])
+        self.latn, self._d0_res, self._dj_res, self.nd, self._fmc, self.fme = (r.copy() for r in cache[1])
         return
 
     def calcISI_RSI_BE(self) -> None:
@@ -843,8 +855,9 @@ class FBP:
         :param set_dict: Dictionary of FBP parameter names and the values to assign to the FBP class object
         :return: None
         """
-        # Iterate through the set dictionary and assign values
-        for key, value in set_dict.items():
+        # Iterate through the set dictionary and assign values (an explicit fme goes last so that it wins
+        # over the one derived from a fmc given in the same call)
+        for key, value in sorted(set_dict.items(), key=lambda item: item[0] == 'fme'):
             if not hasattr(self, key):  # Check if the class has the attribute
                 continue
             if key in ('d0', 'dj'):

@@ -43,3 +43,15 @@ def test_calc_tfc_consumes_no_fuel_without_spread(cupy_core, dtype):
     np.testing.assert_array_equal(fbp.cfc, [0, np.nan, 0.5])
     np.testing.assert_array_equal(fbp.tfc, [0, np.nan, 2.5])
     assert fbp.tfc.dtype == dtype
+
+
+def test_set_params_fmc_gives_the_matching_fme(cupy_core):
+    fbp = object.__new__(cupy_core.FBP)
+    fbp.fmc = np.array([0.0])
+    fbp.fme = np.array([0.0])
+    fbp.setParams({'fmc': 100.0})
+    expected = 1000 * (1.5 - 0.00275 * 100.0) ** 4 / (460 + 25.9 * 100.0)
+    np.testing.assert_allclose(fbp.fme, [expected], rtol=1e-12)
+    for update in ({'fmc': 100.0, 'fme': 0.7}, {'fme': 0.7, 'fmc': 100.0}):   # an explicit fme wins, in either order
+        fbp.setParams(update)
+        np.testing.assert_array_equal(fbp.fme, [0.7])

@@ -65,6 +65,12 @@ pub(crate) struct Fmc {
     pub fme: f64,
 }
 
+/// `fmc.calc_fme`: the foliar moisture effect from the foliar moisture content
+/// (NaN in, NaN out).
+pub(crate) fn fme_from_fmc(fmc: f64) -> f64 {
+    1000.0 * (1.5 - 0.00275 * fmc).powi(4) / (460.0 + 25.9 * fmc)
+}
+
 /// `fmc.calc_fmc`
 pub(crate) fn calc_fmc(
     lat: f64,
@@ -116,7 +122,7 @@ pub(crate) fn calc_fmc(
     } else {
         120.0
     };
-    let fme = 1000.0 * (1.5 - 0.00275 * fmc).powi(4) / (460.0 + 25.9 * fmc);
+    let fme = fme_from_fmc(fmc);
     Fmc {
         latn,
         d0,
@@ -128,8 +134,9 @@ pub(crate) fn calc_fmc(
 }
 
 /// The `setParams({'fmc': ...})` injection in place of [`calc_fmc`]:
-/// calcFMC never runs, so latn/d0/dj/nd/fme keep their zero templates —
-/// the zero fme is load-bearing for C-6, see `FbpInput::fmc_override`.
+/// calcFMC never runs, so latn/d0/dj/nd keep their zero templates, but the
+/// foliar moisture effect is derived from the provided fmc (the C-6 crown
+/// rate of spread needs it), see `FbpInput::fmc_override`.
 pub(crate) fn injected_fmc(fmc: f64) -> Fmc {
     Fmc {
         latn: 0.0,
@@ -137,7 +144,7 @@ pub(crate) fn injected_fmc(fmc: f64) -> Fmc {
         dj: 0.0,
         nd: 0.0,
         fmc,
-        fme: 0.0,
+        fme: fme_from_fmc(fmc),
     }
 }
 

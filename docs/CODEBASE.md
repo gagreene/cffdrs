@@ -419,6 +419,15 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
   applies the same rule in its `calcTFC`, checked only through a NumPy stand-in for `cupy`
   (`tests/cffbps/test_cupy_consumption.py`), not on a GPU.
 
+- **A provided `fmc` gives the matching `fme`.** Foliar moisture content given by the user
+  (`setParams({'fmc': ...})`, assigning `fbp.fmc`, `FbpGrid.set(Fmc, ...)` or the crate's
+  `FbpInput::fmc_override`) also sets the foliar moisture effect from the same formula, so the C-6
+  crown rate of spread (the only user of `fme`) is the one `calcFMC` would give for that `fmc`. Before,
+  injecting `fmc` instead of running `calcFMC` left `fme` at its zero template and collapsed C-6 crown
+  results (crown cells came out as surface fire). `latn`, `d0`, `dj` and `nd` still keep their templates;
+  an explicit `fme` in the same `setParams` call wins; a later `calcFMC` computes both again. Python:
+  `fmc.calc_fme` and the `fmc` property; Rust: `fmc::fme_from_fmc`; CuPy: `setParams` (stand-in test only).
+
 ## Outputs and intentional differences
 
 Both high-level backends return an ordered list. Array entries are plain NumPy

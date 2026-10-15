@@ -199,9 +199,9 @@ impl CellState {
                 self.set(F::Isz, isz);
             }
             Stage::CalcFmc => {
-                // setParams({'fmc': ...}) in place of calcFMC: latn/d0/dj/nd/fme
-                // keep their zero templates (the zero fme is load-bearing for
-                // C-6, see FbpInput::fmc_override)
+                // setParams({'fmc': ...}) in place of calcFMC: latn/d0/dj/nd keep
+                // their zero templates and fme is derived from the injected fmc
+                // (see FbpInput::fmc_override)
                 let Fmc {
                     latn,
                     d0,

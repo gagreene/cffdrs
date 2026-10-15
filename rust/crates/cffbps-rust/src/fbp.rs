@@ -62,11 +62,11 @@ pub struct FbpInput {
     /// from `wx_date` when None.
     pub dj_override: Option<f64>,
     /// Injected foliar moisture (`setParams({'fmc': ...})` in place of
-    /// calcFMC). When Some, calcFMC is skipped entirely: latn/d0/dj/nd keep
-    /// their zero template values and — critically — so does fme, which
-    /// zeroes the C-6 crown ROS. This mirrors the recompute sequence
-    /// fire-growth engines run to regenerate output quantities from stamped
-    /// per-cell weather.
+    /// calcFMC). When Some, calcFMC is skipped: latn/d0/dj/nd keep their zero
+    /// template values, and fme is derived from the injected fmc (as the Python
+    /// package does), so the C-6 crown ROS is the one calcFMC would give for the
+    /// same fmc. This mirrors the recompute sequence fire-growth engines run to
+    /// regenerate output quantities from stamped per-cell weather.
     pub fmc_override: Option<f64>,
     /// Injected head ROS (`setParams({'hros': ...})` after calcROS): replaces
     /// hros before calcCSFI onward; bros and sros keep their computed values,
@@ -456,8 +456,8 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     let Isz { m, f_f, isz } = calc_isz(n.ffmc);
 
     // --- calc_fmc (or the setParams({'fmc': ...}) injection in its place:
-    // calcFMC never runs, so latn/d0/dj/nd/fme keep their zero templates —
-    // the zero fme is load-bearing for C-6, see FbpInput::fmc_override)
+    // calcFMC never runs, so latn/d0/dj/nd keep their zero templates; fme is
+    // derived from the injected fmc, see FbpInput::fmc_override)
     let fmc = match input.fmc_override {
         Some(v) => injected_fmc(v),
         None => calc_fmc(

@@ -197,13 +197,19 @@ class FBP:
             self._grid.set(_ALIASES.get(name, name), self._boundary(arr, self._grid.shape))
             if self._scalar_masks is not None:
                 self._scalar_masks.set(_ALIASES.get(name, name), arr)
+            if name == 'fmc':
+                # the grid derived the matching foliar moisture effect from the provided fmc
+                if self._scalar_masks is not None:
+                    self._scalar_masks.set('fme', arr)
+                self._injected.pop('fme', None)
             if name in _INPUTS:
                 self._inputs[name] = arr.copy()
             else:
                 self._injected[_ALIASES.get(name, name)] = arr.copy()
 
     def setParams(self, set_dict):
-        for name, value in set_dict.items():
+        # an explicit fme goes last so that it wins over the one derived from a fmc given in the same call
+        for name, value in sorted(set_dict.items(), key=lambda item: item[0] == 'fme'):
             if name in _SETTABLE or name in ('wx_date', 'percentile_growth'):
                 self.set(name, value)
 

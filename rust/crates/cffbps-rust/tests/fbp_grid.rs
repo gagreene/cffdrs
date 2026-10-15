@@ -308,10 +308,10 @@ fn injection_matches_the_pyrocell_sequence() {
                 );
             }
             if d.fuel[i] == 6 {
-                assert_eq!(
-                    got.iter().find(|(f, _)| *f == Field::Fme).unwrap().1[i],
-                    0.0
-                );
+                // the injected fmc gives the matching foliar moisture effect
+                let fme = got.iter().find(|(f, _)| *f == Field::Fme).unwrap().1[i];
+                let expected = 1000.0 * (1.5 - 0.00275 * fmc[i]).powi(4) / (460.0 + 25.9 * fmc[i]);
+                assert!(same(fme, expected), "fme {fme} vs {expected}");
                 let h = got.iter().find(|(f, _)| *f == Field::Hros).unwrap().1[i];
                 if percentile == 50.0 && !same(h, hros[i]) {
                     c6_blended += 1;
@@ -319,7 +319,10 @@ fn injection_matches_the_pyrocell_sequence() {
             }
         }
         if percentile == 50.0 {
-            assert!(c6_blended > 0, "the C-6 blend overwrites the injected hros");
+            assert!(
+                c6_blended > 0,
+                "the C-6 blend overwrites the injected hros (sros blended with crown ROS)"
+            );
         }
     }
 }

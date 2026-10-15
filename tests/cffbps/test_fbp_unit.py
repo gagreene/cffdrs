@@ -1357,3 +1357,67 @@ def test_non_fuel_cells_stay_missing_not_zero(fuel):
     fbp = FBP()
     fbp.initialize(**kwargs, out_request=CONSUMPTION + ['hros'])
     assert all(np.isnan(v).all() for v in fbp.runFBP())
+
+
+# ── a user-provided fmc gives the matching foliar moisture effect ─────────────
+PYROCELL_STEPS = ['calcISI_RSI_BE', 'calcROS', 'calcSFC', 'getCBH_CFL', 'calcCSFI', 'calcRSO', 'calcC6BlendCFB',
+                  'calcC6BlendCFC', 'calcC6CROS', 'calcC6HROS', 'calcPercentileCFB', 'calcRosPercentileGrowth',
+                  'calcCFB', 'calcAccelParam', 'calcFireType', 'calcCFC', 'calcTFC', 'calcHFI',
+                  'calcFireIntensityClass']
+C6_OUTPUTS = ['hros', 'cfb', 'hfi', 'fire_type', 'fi_class', 'tfc', 'accel', 'cros']
+
+
+def _inject_fmc_and_run(fmc, route, **extra):
+    fbp = _model(fuel_type=6, **extra)
+    for step in ('invertWindAspect', 'calcSF', 'calcISZ'):
+        getattr(fbp, step)()
+    if route == 'setParams':
+        fbp.setParams({'fmc': fmc})
+    else:
+        fbp.fmc = fmc
+    for step in PYROCELL_STEPS:
+        getattr(fbp, step)()
+    return fbp
+
+
+@pytest.mark.parametrize('route', ['setParams', 'attribute'])
+def test_injected_fmc_gives_the_same_c6_result_as_calc_fmc(route):
+    reference = _model(fuel_type=6, ws=40, ffmc=95, bui=90)
+    computed = reference.runFBP()
+    fmc = reference.getParams(['fmc'])[0]
+    fme = reference.getParams(['fme'])[0]
+    assert fme > 0
+    injected = _inject_fmc_and_run(fmc, route, ws=40, ffmc=95, bui=90)
+    assert injected.getParams(['fme'])[0] == pytest.approx(fme, rel=1e-12)
+    expected = dict(zip(ALL_OUTPUTS, computed, strict=True))
+    for name, value in zip(C6_OUTPUTS, injected.getParams(C6_OUTPUTS), strict=True):
+        np.testing.assert_allclose(value, expected[name], rtol=1e-12, err_msg=name)
+    assert expected['cros'] > 0
+
+
+def test_injected_fmc_derives_fme_from_the_formula():
+    fbp = _model(fuel_type=6)
+    fbp.setParams({'fmc': 100.0})
+    expected = 1000 * (1.5 - 0.00275 * 100.0) ** 4 / (460 + 25.9 * 100.0)
+    assert fbp.getParams(['fme']) == [pytest.approx(expected, rel=1e-12)]
+    fbp.setParams({'fmc': np.nan})
+    assert np.ma.is_masked(fbp.fme)          # a missing fmc gives a missing fme
+
+
+def test_an_explicit_fme_wins_over_the_derived_one_in_either_key_order():
+    for update in ({'fmc': 100.0, 'fme': 0.7}, {'fme': 0.7, 'fmc': 100.0}):
+        fbp = _model(fuel_type=6)
+        fbp.setParams(update)
+        assert fbp.getParams(['fme']) == [0.7]
+
+
+def test_reset_and_calc_fmc_after_an_injected_fmc():
+    fbp = _model(fuel_type=6)
+    fbp.setParams({'fmc': 100.0})
+    fbp.reset()
+    assert fbp.getParams(['fmc', 'fme']) == [0, 0]          # the zero templates again
+    fbp.setParams({'fmc': 100.0})
+    fbp.calcFMC()                                           # calcFMC still computes both from the inputs
+    fresh = _model(fuel_type=6)
+    fresh.calcFMC()
+    assert fbp.getParams(['fmc', 'fme']) == fresh.getParams(['fmc', 'fme'])

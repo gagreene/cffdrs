@@ -28,6 +28,11 @@ def _as_masked(value) -> MaskedArray:
     return mask.array(data, mask=np.ma.getmaskarray(value))
 
 
+def calc_fme(fmc):
+    """Foliar moisture effect (FME) from the foliar moisture content (%); a missing fmc gives a missing fme."""
+    return 1000 * np.power(1.5 - (0.00275 * fmc), 4) / (460 + (25.9 * fmc))
+
+
 def calc_fmc(*,
              lat: MaskedArray,
              long: MaskedArray,
@@ -80,6 +85,6 @@ def calc_fmc(*,
                                 120))
 
     # Calculate foliar moisture effect (FME)
-    fme = 1000 * np.power(1.5 - (0.00275 * fmc), 4) / (460 + (25.9 * fmc))
+    fme = calc_fme(fmc)
 
     return FMCResult(latn=latn, d0=d0, dj=dj, nd=nd, fmc=fmc, fme=fme)

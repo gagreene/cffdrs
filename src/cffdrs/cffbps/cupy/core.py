@@ -1483,8 +1483,9 @@ class FBP:
         :param set_dict: Dictionary of FBP parameter names and the values to assign to the FBP class object
         :return: None
         """
-        # Iterate through the set dictionary and assign values
-        for key, value in set_dict.items():
+        # Iterate through the set dictionary and assign values (an explicit fme goes last so that it wins over
+        # the one derived from a fmc given in the same call)
+        for key, value in sorted(set_dict.items(), key=lambda item: item[0] == 'fme'):
             if hasattr(self, key):  # Check if the class has the attribute
                 if isinstance(value, cp.ndarray):  # Check if value is already a CuPy array
                     # Mask NaN values using CuPy
@@ -1495,6 +1496,9 @@ class FBP:
                                    if isinstance(value, (list, tuple, np.ndarray))
                                    else cp.asarray([value]))
                     setattr(self, key, cp.where(cp.isnan(value_array), cp.nan, value_array))
+                if key == 'fmc':
+                    # A provided foliar moisture content also gives the matching foliar moisture effect
+                    self.fme = 1000 * cp.power(1.5 - (0.00275 * self.fmc), 4) / (460 + (25.9 * self.fmc))
         return
 
     def getParams(self, out_request: list[str]) -> Union[list, str, None]:
