@@ -96,6 +96,10 @@ Deep imports move without compatibility shims:
 | `cffdrs.cffbps.inputs` | `cffdrs.cffbps.common.inputs` |
 | `cffdrs.cffbps.cupy_backend` | `cffdrs.cffbps.cupy` (implementation: `cupy/core.py`) |
 
+Inside `python.equations`, the module `fmc` is now `foliar_moisture`: `calc_fmc` no longer computes everything
+(it gives the foliar moisture content from `nd`); `calc_foliar_moisture()` chains `calc_latn`, `calc_d0`,
+`calc_dj`, `calc_nd`, `calc_fmc` and `calc_fme`, and returns a `FoliarMoistureResult` (was `FMCResult`).
+
 ### Choosing a backend
 
 ```python

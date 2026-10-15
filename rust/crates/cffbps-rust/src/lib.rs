@@ -24,7 +24,7 @@
 //! | `quantile` (private) | internal Student-t / normal quantile used by the percentile model | scipy `t.ppf` |
 //!
 //! The remaining modules are private implementation stages: input
-//! normalisation (`common/inputs.py`), foliar moisture (`python/equations/fmc.py`), slope and
+//! normalisation (`common/inputs.py`), foliar moisture (`python/equations/foliar_moisture.py`), slope and
 //! wind effects (`python/equations/slope_wind.py`), surface fuel consumption
 //! (`python/equations/surface.py`), rate of spread (`python/equations/ros.py`), crown fire
 //! (`python/equations/crown.py`), fire growth (`python/equations/growth.py`) and total
@@ -119,7 +119,7 @@ mod crown;
 pub mod fbp;
 pub mod fbp_grid;
 pub mod field;
-mod fmc;
+mod foliar_moisture;
 pub mod fuel;
 pub mod grid;
 mod growth;

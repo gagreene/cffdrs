@@ -89,10 +89,11 @@ scalar path — scalars are coerced upstream):
 - `surface.py` — surface fuel consumption (one formula per fuel type/group)
 - `crown.py` — CBH/CFL, CSFI, RSO, directional/temporary C6 blend CFB, fire type, CFC
 - `consumption.py` — total fuel consumption, HFI, fire intensity class
-- `fmc.py` — foliar moisture content and effect
+- `foliar_moisture.py` — one function per quantity (`calc_latn`, `calc_d0`, `calc_dj`, `calc_nd`, `calc_fmc`,
+  `calc_fme`) and `calc_foliar_moisture()`, which chains them (Rust: `foliar_moisture.rs`, same names)
 - `growth.py` — growth-percentile ROS adjustment, point-ignition acceleration
 
-Multi-value returns use `NamedTuple`s (`FMCResult`, `SlopeWindISI`, `ISIRSIBEResult`)
+Multi-value returns use `NamedTuple`s (`FoliarMoistureResult`, `SlopeWindISI`, `ISIRSIBEResult`)
 whose field names double as the facade attribute contract.
 
 **`growth.calc_ros_percentile_growth`'s statistical basis.** `percentile_growth` is a percentile of the ROS
@@ -175,7 +176,7 @@ importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
   variants.
   - `test_fbp_unit.py` includes guardrail regression tests for: the own-and-return
     convention on `calc_cbh_cfl`/`calc_ros`/`calc_accel_param`/`calc_isi_rsi_be`; the
-    `VerifiedInputs`/`ISIRSIBEResult` setattr-target contract, `FMCResult`'s
+    `VerifiedInputs`/`ISIRSIBEResult` setattr-target contract, `FoliarMoistureResult`'s
     positional-unpack field order, and `SlopeWindISI`'s fields being a subset of
     `ISIRSIBEResult`'s; unknown `out_request` names raising; `num_processors<2`
     warning (not printing); and NaN-to-default coercion for `pc`/`pdf`/`gfl`/`gcf`.
@@ -320,8 +321,8 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
   way.** `VerifiedInputs`/`ISIRSIBEResult` field names must exactly match the `FBP`
   attribute names they get `setattr`'d onto (via `._asdict()`) — nothing type-checks
   this, a renamed field silently creates a dead attribute instead of raising.
-  `FMCResult` is consumed differently: it's unpacked *positionally*
-  (`self.latn, self._d0_res, ... = fmc_eq.calc_fmc(...)`), so a field reorder (not a
+  `FoliarMoistureResult` is consumed differently: it's unpacked *positionally*
+  (`self.latn, self._d0_res, ... = fm_eq.calc_foliar_moisture(...)`), so a field reorder (not a
   rename) is the failure mode there. `SlopeWindISI` is internal to
   `calc_isi_rsi_be` only — its fields are folded one-by-one into `ISIRSIBEResult`,
   never touching the facade directly. Each pattern has its own guardrail test in
@@ -426,7 +427,7 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
   injecting `fmc` instead of running `calcFMC` left `fme` at its zero template and collapsed C-6 crown
   results (crown cells came out as surface fire). `latn`, `d0`, `dj` and `nd` still keep their templates;
   an explicit `fme` in the same `setParams` call wins; a later `calcFMC` computes both again. Python:
-  `fmc.calc_fme` and the `fmc` property; Rust: `fmc::fme_from_fmc`; CuPy: `setParams` (stand-in test only).
+  `foliar_moisture.calc_fme` and the `fmc` property; Rust: `foliar_moisture::calc_fme`; CuPy: `setParams` (stand-in test only).
 
 ## Outputs and intentional differences
 

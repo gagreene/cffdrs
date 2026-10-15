@@ -10,7 +10,7 @@
 //! snapshot (`tests/cffbps/data/golden/wotton2009_scalar_snapshot.json`) —
 //! the same file the Python suite validates against.
 
-pub use crate::fmc::is_valid_wx_date;
+pub use crate::foliar_moisture::is_valid_wx_date;
 #[cfg(test)]
 use crate::stage::Stage;
 #[cfg(test)]
@@ -427,7 +427,7 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     use crate::crown::{
         calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
     };
-    use crate::fmc::{calc_fmc, injected_fmc};
+    use crate::foliar_moisture::{calc_foliar_moisture, injected_fmc};
     use crate::fuel::{CrownFuel, FuelType, RosParams};
     use crate::growth::calc_accel_param;
     use crate::normalize::{invert_wind_aspect, normalize, Normalized};
@@ -455,12 +455,12 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     // --- calc_isz
     let Isz { m, f_f, isz } = calc_isz(n.ffmc);
 
-    // --- calc_fmc (or the setParams({'fmc': ...}) injection in its place:
+    // --- calc_foliar_moisture (or the setParams({'fmc': ...}) injection in its place:
     // calcFMC never runs, so latn/d0/dj/nd keep their zero templates; fme is
     // derived from the injected fmc, see FbpInput::fmc_override)
     let fmc = match input.fmc_override {
         Some(v) => injected_fmc(v),
-        None => calc_fmc(
+        None => calc_foliar_moisture(
             lat,
             abs_long,
             elevation,

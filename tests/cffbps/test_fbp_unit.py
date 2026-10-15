@@ -769,13 +769,13 @@ def test_setattr_namedtuples_match_facade_attributes():
 
 
 def test_fmc_result_field_order_matches_positional_unpack():
-    """FMCResult is unpacked positionally, not via setattr (python/core.py:547):
-        self.latn, self.d0, self.dj, self.nd, self.fmc, self.fme = fmc_eq.calc_fmc(...)
-    A field reorder in FMCResult's class body would silently scramble which value
+    """FoliarMoistureResult is unpacked positionally, not via setattr (python/core.py calcFMC):
+        self.latn, self._d0_res, ... = fm_eq.calc_foliar_moisture(...)
+    A field reorder in FoliarMoistureResult's class body would silently scramble which value
     lands on which attribute — hasattr can't catch that, only order can."""
-    from cffdrs.cffbps.python.equations.fmc import FMCResult
+    from cffdrs.cffbps.python.equations.foliar_moisture import FoliarMoistureResult
 
-    assert FMCResult._fields == ('latn', 'd0', 'dj', 'nd', 'fmc', 'fme')
+    assert FoliarMoistureResult._fields == ('latn', 'd0', 'dj', 'nd', 'fmc', 'fme')
 
 
 def test_slope_wind_isi_fields_are_wired_into_isi_rsi_be_result():
@@ -1148,15 +1148,15 @@ def test_scalar_parameters_and_replacement_fuel_persist():
 
 
 def test_fmc_cache_reuses_exact_inputs_and_owns_results(monkeypatch):
-    from cffdrs.cffbps.python.equations import fmc
-    real = fmc.calc_fmc
+    from cffdrs.cffbps.python.equations import foliar_moisture as fmc
+    real = fmc.calc_foliar_moisture
     calls = []
 
     def counted(**kw):
         calls.append(None)
         return real(**kw)
 
-    monkeypatch.setattr(fmc, 'calc_fmc', counted)
+    monkeypatch.setattr(fmc, 'calc_foliar_moisture', counted)
     fbp = _model(lat=np.array([55., 55.]))
     fbp.calcFMC()
     expected = [v.copy() for v in fbp.getParams(FMC_OUTPUTS)]

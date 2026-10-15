@@ -15,7 +15,7 @@ from ..common.fmc_inputs import coerce_override, resolve_dj_override
 from ..common.season import getSeasonGrassCuring as getSeasonGrassCuring
 from .equations import consumption as consumption_eq
 from .equations import crown as crown_eq
-from .equations import fmc as fmc_eq
+from .equations import foliar_moisture as fm_eq
 from .equations import growth as growth_eq
 from .equations import ros as ros_eq
 from .equations import slope_wind as sw_eq
@@ -89,7 +89,7 @@ class FBP:
         # foliar moisture effect, which the C-6 crown rate of spread needs. Internal results write ``_fmc``.
         self._fmc = value
         if value is not None:
-            self.fme = fmc_eq.calc_fme(value)
+            self.fme = fm_eq.calc_fme(fmc=value)
 
     @property
     def dj(self):
@@ -610,9 +610,9 @@ class FBP:
             dj_effective = None
             if self._dj_supplied is not None:
                 dj_effective = resolve_dj_override(self._dj_supplied, self.wx_date, self._dj_warned)
-            result = fmc_eq.calc_fmc(
+            result = fm_eq.calc_foliar_moisture(
                 lat=self.lat, long=self.long, elevation=self.elevation, wx_date=self.wx_date,
-                d0=None, dj=None, d0_override=self._d0_supplied, dj_override=dj_effective,
+                d0_override=self._d0_supplied, dj_override=dj_effective,
             )
             # The cache owns private copies; attributes always receive further copies.
             cache = self._fmc_cache = (key, tuple(r.copy() for r in result))

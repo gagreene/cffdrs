@@ -15,7 +15,7 @@ use crate::crown::{
 };
 use crate::fbp::{FbpInput, FbpResult};
 use crate::field::Field;
-use crate::fmc::{calc_fmc, injected_fmc, Fmc};
+use crate::foliar_moisture::{calc_foliar_moisture, injected_fmc, FoliarMoisture};
 use crate::fuel::{CrownFuel, FuelType, RosParams};
 use crate::growth::calc_accel_param;
 use crate::normalize::{invert_wind_aspect, normalize, Normalized};
@@ -202,7 +202,7 @@ impl CellState {
                 // setParams({'fmc': ...}) in place of calcFMC: latn/d0/dj/nd keep
                 // their zero templates and fme is derived from the injected fmc
                 // (see FbpInput::fmc_override)
-                let Fmc {
+                let FoliarMoisture {
                     latn,
                     d0,
                     dj,
@@ -211,7 +211,7 @@ impl CellState {
                     fme,
                 } = match self.fmc_injection {
                     Some(v) => injected_fmc(v),
-                    None => calc_fmc(
+                    None => calc_foliar_moisture(
                         self.get(F::Lat),
                         self.get(F::Long),
                         self.get(F::Elevation),

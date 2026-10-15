@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use crate::fbp::{run, FbpInput, FbpResult};
 use crate::field::Field;
-use crate::fmc::{is_leap_year, is_valid_wx_date};
+use crate::foliar_moisture::{is_leap_year, is_valid_wx_date};
 use crate::fuel::FuelType;
 use crate::stage::Stage;
 use crate::state::CellState;

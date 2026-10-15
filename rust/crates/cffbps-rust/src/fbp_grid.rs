@@ -82,7 +82,7 @@ use std::fmt;
 
 use crate::fbp::{is_valid_wx_date, FbpInput};
 use crate::field::Field;
-use crate::fmc::fme_from_fmc;
+use crate::foliar_moisture::calc_fme;
 use crate::fuel::FuelType;
 use crate::grid::{
     fill_chunks, python_non_modeled, resolve_dj, run_grid_fields, GridError, GridInput, NonModeled,
@@ -966,7 +966,7 @@ impl FbpGrid {
                 if f == Field::Fmc {
                     // a provided fmc also gives the matching foliar moisture effect;
                     // a later set of fme itself replaces it
-                    self.slots[Field::Fme.index()] = Slot::Stored(values.map(fme_from_fmc));
+                    self.slots[Field::Fme.index()] = Slot::Stored(values.map(calc_fme));
                 }
                 self.slots[f.index()] = Slot::Stored(values);
             }
