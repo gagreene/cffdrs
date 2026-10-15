@@ -81,15 +81,13 @@ class FBP:
 
     @property
     def fmc(self):
-        return self._fmc
+        if self._fmc_res is not None:
+            return self._fmc_res
+        return self._fmc_supplied if self._fmc_supplied is not None else self._fmc_template
 
     @fmc.setter
     def fmc(self, value):
-        # A foliar moisture content provided by the user (setParams or assignment) also gives the matching
-        # foliar moisture effect, which the C-6 crown rate of spread needs. Internal results write ``_fmc``.
-        self._fmc = value
-        if value is not None:
-            self.fme = fm_eq.calc_fme(fmc=value)
+        self.set_override('fmc', value)
 
     @property
     def dj(self):
@@ -101,29 +99,43 @@ class FBP:
 
     def set_override(self, name: str, values) -> None:
         """
-        Set or clear an explicit ``d0`` or ``dj`` for the foliar moisture calculation.
+        Set or clear an explicit ``d0``, ``dj`` or ``fmc`` for the foliar moisture calculation.
 
-        An explicit value takes priority over the derived value and persists until it is replaced
-        or cleared (``None``). Scalars, arrays and masked arrays are accepted; NaN and masked cells
-        are missing (that cell's ``fmc`` and ``fme`` are NaN). A ``dj`` is floored and clipped to the
-        days of the year of ``wx_date`` when it is used; ``d0`` is not range-limited.
+        An explicit value takes priority over the derived value and persists (across ``runFBP`` and ``reset``)
+        until it is replaced, cleared (``None``) or a new ``initialize`` is made. Scalars, arrays and masked
+        arrays are accepted; NaN and masked cells are missing (a missing ``d0`` or ``dj`` makes that cell's
+        ``fmc`` and ``fme`` NaN, a missing ``fmc`` makes ``fmc`` and ``fme`` NaN). A ``dj`` is floored and clipped
+        to the days of the year of ``wx_date`` when it is used; ``d0`` and ``fmc`` are not range-limited. The
+        ``fme`` always follows the ``fmc`` that is used, so a given ``fmc`` also gives its ``fme`` at once (the
+        C-6 crown rate of spread needs it even if ``calcFMC`` is skipped).
 
-        :param name: 'd0' or 'dj'
+        :param name: 'd0', 'dj' or 'fmc'
         :param values: the explicit value, or None to return to the derived value
         :return: None
         """
-        if name not in ('d0', 'dj'):
-            raise ValueError("set_override name must be 'd0' or 'dj'")
+        if name not in ('d0', 'dj', 'fmc'):
+            raise ValueError("set_override name must be 'd0', 'dj' or 'fmc'")
         supplied = coerce_override(name, values)
         if name == 'd0':
             self._d0_supplied, self._d0_res = supplied, None
-        else:
+        elif name == 'dj':
             self._dj_supplied, self._dj_res = supplied, None
+        else:
+            self._fmc_supplied, self._fmc_res = supplied, None
+            self._derive_fme_from_the_override()
+
+    def _derive_fme_from_the_override(self) -> None:
+        """Give ``fme`` the value that matches the explicit ``fmc`` (or the template when there is none)."""
+        if self._fmc_supplied is not None:
+            self.fme = fm_eq.calc_fme(fmc=self._fmc_supplied)
+        elif self._fmc_template is not None:
+            self.fme = self._fmc_template
 
     def __init__(self):
         # Explicit d0/dj overrides, their computed results and the foliar moisture result cache
-        self._d0_supplied = self._dj_supplied = None
-        self._d0_res = self._dj_res = None
+        self._d0_supplied = self._dj_supplied = self._fmc_supplied = None
+        self._d0_res = self._dj_res = self._fmc_res = None
+        self._fmc_template = None
         self._fmc_cache = None
         self._dj_warned = set()
 
@@ -200,7 +212,6 @@ class FBP:
         # Initialize foliar moisture content parameters
         self.latn = None
         self.nd = None
-        self._fmc = None
         self.fme = None
 
         # Initialize crown and total fuel consumed parameters
@@ -283,7 +294,8 @@ class FBP:
                    dj: int | None = None,
                    out_request: list | tuple | None = None,
                    convert_fuel_type_codes: bool | None = False,
-                   percentile_growth: float | int | None = 50) -> None:
+                   percentile_growth: float | int | None = 50,
+                   fmc: float | int | np.ndarray | None = None) -> None:
         """
         Initialize the FBP object with the provided parameters.
 
@@ -410,12 +422,16 @@ class FBP:
             scales surface-fire ROS by about 4.6x). Only conifer fuels C-1 to C-7 are adjusted (C-1 in the crown regime
             only, C-5 in the surface regime only); all other fuels return the unadjusted ROS. Values outside
             (0.001, 99.999) are capped to those bounds.
+        :param fmc: foliar moisture content (%), scalar or array (if None, it will be calculated from the distance
+            in days between dj and d0). Like d0 and dj it is an explicit override: it is used by every later
+            calcFMC and runFBP until it is replaced, cleared with None or a new initialize is made; a NaN cell is
+            missing. The foliar moisture effect (fme) is always derived from the fmc that is used.
         """
         # Verify and coerce the inputs (shared with the other backends)
         prepared = inputs.prepare_inputs(
             fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation,
             slope=slope, aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui,
-            pc=pc, pdf=pdf, gfl=gfl, gcf=gcf, d0=d0, dj=dj,
+            pc=pc, pdf=pdf, gfl=gfl, gcf=gcf, d0=d0, dj=dj, fmc=fmc,
             out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes,
         )
         self.return_array = prepared.return_array
@@ -500,8 +516,9 @@ class FBP:
         # Foliar moisture content parameters
         self.latn = template
         self.nd = template
-        self._fmc = template
+        self._fmc_template = template
         self.fme = template
+        self._derive_fme_from_the_override()
 
         # Crown and total fuel consumed parameters
         self.cbh = template
@@ -550,7 +567,7 @@ class FBP:
         if not self.initialized:
             raise ValueError('FBP class must be initialized before running calculations. Call "initialize" first.')
         self._wd_inv = self._aspect_inv = None
-        self._d0_res = self._dj_res = None
+        self._d0_res = self._dj_res = self._fmc_res = None
         self._bind_templates()
 
     def invertWindAspect(self):
@@ -580,6 +597,7 @@ class FBP:
     def calcFMC(self,
                 d0: int | None = None,
                 dj: int | None = None,
+                fmc: float | None = None,
                 lat: float | None = None,
                 long: float | None = None,
                 elevation: float | None = None,
@@ -592,6 +610,8 @@ class FBP:
             self.set_override('d0', d0)
         if dj is not None:
             self.set_override('dj', dj)
+        if fmc is not None:
+            self.set_override('fmc', fmc)
         if lat is not None:
             self.lat = inputs.coerce_input('lat', lat)
         if long is not None:
@@ -603,7 +623,8 @@ class FBP:
 
         # Results always reflect the current inputs: an identical repeat call reuses the previous
         # result, found by an exact fingerprint of every input (content, mask, dtype and shape).
-        key = (fingerprint(self.lat, self.long, self.elevation, self._d0_supplied, self._dj_supplied),
+        key = (fingerprint(self.lat, self.long, self.elevation, self._d0_supplied, self._dj_supplied,
+                           self._fmc_supplied),
                self.wx_date)
         cache = self._fmc_cache
         if cache is None or cache[0] != key:
@@ -612,11 +633,11 @@ class FBP:
                 dj_effective = resolve_dj_override(self._dj_supplied, self.wx_date, self._dj_warned)
             result = fm_eq.calc_foliar_moisture(
                 lat=self.lat, long=self.long, elevation=self.elevation, wx_date=self.wx_date,
-                d0_override=self._d0_supplied, dj_override=dj_effective,
+                d0_override=self._d0_supplied, dj_override=dj_effective, fmc_override=self._fmc_supplied,
             )
             # The cache owns private copies; attributes always receive further copies.
             cache = self._fmc_cache = (key, tuple(r.copy() for r in result))
-        self.latn, self._d0_res, self._dj_res, self.nd, self._fmc, self.fme = (r.copy() for r in cache[1])
+        self.latn, self._d0_res, self._dj_res, self.nd, self._fmc_res, self.fme = (r.copy() for r in cache[1])
         return
 
     def calcISI_RSI_BE(self) -> None:
@@ -860,7 +881,7 @@ class FBP:
         for key, value in sorted(set_dict.items(), key=lambda item: item[0] == 'fme'):
             if not hasattr(self, key):  # Check if the class has the attribute
                 continue
-            if key in ('d0', 'dj'):
+            if key in ('d0', 'dj', 'fmc'):
                 self.set_override(key, value)
             elif key == 'wx_date':
                 self.wx_date = inputs.validate_wx_date(value)
@@ -989,7 +1010,7 @@ class FBP:
             for name in ('d0', 'dj', 'fmc', 'fme'):
                 value = fbp_params[name]
                 missing_date = any(v is not None and np.ma.getmaskarray(v).any()
-                                   for v in (self._d0_supplied, self._dj_supplied))
+                                   for v in (self._d0_supplied, self._dj_supplied, self._fmc_supplied))
                 if missing_date and value is not None and np.ma.getmaskarray(value).any():
                     fbp_params[name] = mask.array([np.nan], mask=False)
             return [

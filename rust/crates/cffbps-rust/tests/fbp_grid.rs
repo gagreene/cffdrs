@@ -90,6 +90,7 @@ impl Data {
             percentile_growth: percentile,
             d0: None,
             dj: None,
+            fmc: None,
         }
     }
 
@@ -298,6 +299,13 @@ fn injection_matches_the_pyrocell_sequence() {
                     assert_eq!(v[i], 0.0);
                     continue;
                 }
+                if matches!(*f, Field::Latn | Field::D0 | Field::Dj | Field::Nd) {
+                    // calcFMC is not in the sequence (the fmc override gives fmc
+                    // and fme at once): these four stay at their templates, the
+                    // run computes them
+                    assert_eq!(v[i], 0.0);
+                    continue;
+                }
                 let w = want.get(f.name()).unwrap();
                 assert!(
                     same(v[i], w),
@@ -308,7 +316,7 @@ fn injection_matches_the_pyrocell_sequence() {
                 );
             }
             if d.fuel[i] == 6 {
-                // the injected fmc gives the matching foliar moisture effect
+                // the given fmc gives the matching foliar moisture effect
                 let fme = got.iter().find(|(f, _)| *f == Field::Fme).unwrap().1[i];
                 let expected = 1000.0 * (1.5 - 0.00275 * fmc[i]).powi(4) / (460.0 + 25.9 * fmc[i]);
                 assert!(same(fme, expected), "fme {fme} vs {expected}");
@@ -692,19 +700,35 @@ fn lifecycle_injections(d: &Data) {
     let n = d.fuel.len();
     let all = outputs();
     let reference = fused(d, 90.0, &all, 1);
-    // injected computed values followed by run_fused are discarded
-    for f in [Field::Fmc, Field::Hros] {
-        let mut g = d.grid(90.0, &all);
-        g.run_stage(Stage::CalcFmc, 1).unwrap();
-        g.set(f, &vec![77.0; n]).unwrap();
-        g.run_fused(1).unwrap();
-        assert_grids_same(
-            &g,
-            &reference,
-            &all,
-            &format!("set({}) then run_fused", f.name()),
-        );
-    }
+    // an injected computed value followed by run_fused is discarded
+    let mut g = d.grid(90.0, &all);
+    g.run_stage(Stage::CalcFmc, 1).unwrap();
+    g.set(Field::Hros, &vec![77.0; n]).unwrap();
+    g.run_fused(1).unwrap();
+    assert_grids_same(&g, &reference, &all, "set(hros) then run_fused");
+
+    // a given fmc is an override: it persists through run_fused, and setting
+    // fmc is the same as setting the override
+    let mut with_override = d.grid(90.0, &all);
+    with_override
+        .set_override(Field::FmcOverride, Some(PerCell::Const(77.0)))
+        .unwrap();
+    with_override.run_fused(1).unwrap();
+    let mut set_fmc = d.grid(90.0, &all);
+    set_fmc.run_stage(Stage::CalcFmc, 1).unwrap();
+    set_fmc.set(Field::Fmc, &vec![77.0; n]).unwrap();
+    set_fmc.run_fused(1).unwrap();
+    assert_grids_same(&set_fmc, &with_override, &all, "set(fmc) then run_fused");
+    assert!(with_override
+        .get(Field::Fmc)
+        .unwrap()
+        .iter()
+        .all(|v| *v == 77.0));
+    assert!(with_override
+        .get(Field::Latn)
+        .unwrap()
+        .iter()
+        .any(|v| *v != 0.0));
 
     // after reset a second run_planned has the same live_bytes trace and frees the same fields
     let trace = |g: &mut FbpGrid| -> (Vec<usize>, Vec<Field>) {
@@ -729,7 +753,6 @@ fn lifecycle_injections(d: &Data) {
     // a Fresh grid: injections followed by run_fused are released
     let mut injected = d.grid(90.0, &all);
     injected.set(Field::Hros, &vec![3.0; n]).unwrap();
-    injected.set(Field::Fmc, &vec![90.0; n]).unwrap();
     injected.run_fused(1).unwrap();
     assert_grids_same(
         &injected,
@@ -771,7 +794,12 @@ fn lifecycle_fuel_and_set_routes(d: &Data) {
             found: 1
         })
     );
-    for f in [Field::FuelType, Field::D0Override, Field::DjOverride] {
+    for f in [
+        Field::FuelType,
+        Field::D0Override,
+        Field::DjOverride,
+        Field::FmcOverride,
+    ] {
         assert_eq!(g.set_const(f, 1.0), Err(StageError::NotSettable(f)));
     }
 }
@@ -869,8 +897,8 @@ fn fmc_follows_its_inputs(d: &Data) {
     assert_staged_equals_fused(&g, "wx_date");
 }
 
-/// (b) an identical repeat does not recompute; (c) an injected `fmc` is
-/// replaced.
+/// (b) an identical repeat does not recompute; (c) a given `fmc` is an
+/// override.
 fn fmc_repeats_are_cached(d: &Data) {
     let n = d.fuel.len();
     let all = outputs();
@@ -889,13 +917,20 @@ fn fmc_repeats_are_cached(d: &Data) {
     calc_fmc(&mut g);
     assert_eq!(g.fmc_computations(), 2, "a changed input recomputes");
 
-    // (c) an injected fmc is replaced by the next calcFMC
+    // (c) a given fmc is an override: calcFMC recomputes with it
     g.set(Field::Fmc, &vec![55.0; n]).unwrap();
     let again = calc_fmc(&mut g);
     assert_eq!(g.fmc_computations(), 3);
     let mut fresh = d.grid(90.0, &all);
     fresh.set(Field::Lat, &new_lat).unwrap();
-    assert_fmc_same(&again, &calc_fmc(&mut fresh), "injected fmc replaced");
+    fresh
+        .set_override(Field::FmcOverride, Some(PerCell::Const(55.0)))
+        .unwrap();
+    assert_fmc_same(&again, &calc_fmc(&mut fresh), "fmc override");
+    assert!(again[4].iter().all(|v| *v == 55.0));
+    assert_eq!(g.fmc_computations(), 3);
+    calc_fmc(&mut g);
+    assert_eq!(g.fmc_computations(), 3, "the override is a cache hit too");
 }
 
 /// (d) constant, per-cell and masked overrides take priority, persist,
@@ -914,7 +949,7 @@ fn fmc_overrides(d: &Data) {
         ("masked", PerCell::Cells(&masked)),
     ];
     for (what, d0) in overrides {
-        for field in [Field::D0Override, Field::DjOverride] {
+        for field in [Field::D0Override, Field::DjOverride, Field::FmcOverride] {
             let mut g = d.grid(90.0, &all);
             calc_fmc(&mut g);
             g.set_override(field, Some(d0)).unwrap();
@@ -925,10 +960,10 @@ fn fmc_overrides(d: &Data) {
                     PerCell::Const(value) => value,
                     PerCell::Cells(cells) => cells[i],
                 };
-                if field == Field::D0Override {
-                    input.d0_override = Some(value);
-                } else {
-                    input.dj_override = Some(value); // in range: floor is a no-op
+                match field {
+                    Field::D0Override => input.d0_override = Some(value),
+                    Field::DjOverride => input.dj_override = Some(value), // in range: floor is a no-op
+                    _ => input.fmc_override = Some(value),
                 }
                 let want = run(&input);
                 for (f, x) in FMC_FIELDS.iter().zip(&got) {
@@ -966,7 +1001,11 @@ fn fmc_overrides(d: &Data) {
             g.reset();
             g.set_override(field, Some(PerCell::Const(150.0))).unwrap();
             let replaced = calc_fmc(&mut g);
-            let col = if field == Field::D0Override { 1 } else { 2 };
+            let col = match field {
+                Field::D0Override => 1,
+                Field::DjOverride => 2,
+                _ => 4,
+            };
             assert!(
                 replaced[col].iter().all(|v| *v == 150.0),
                 "{what}: replaced"

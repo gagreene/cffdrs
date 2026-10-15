@@ -62,6 +62,7 @@ plan to change), **open** (should be revisited), **fixed** (kept for history).
 |---|---|---|
 | BD-F1 | Scalar fuels 10-13 (mixedwood) with missing `lat`, `long` or `elevation` and percentile not 50: Python exports `hros` / `bros` 0.0 (masked), Rust gave NaN | `_scalar_masks.py` growth rule now covers fuels 10-13; test `test_scalar_mixedwood_growth_keeps_the_foliar_moisture_mask` |
 | BD-F2 | A missing `d0` / `dj` override exported 0.0 before `calcFMC` (found by the final scoped review) | `ScalarMasks.set`; test `test_missing_date_override_exports_nan_before_and_after_calcfmc` |
+| BD-F4 | `fmc` became an override like `d0` / `dj` (sticky, `initialize(fmc=...)`, missing cell exports NaN); the CuPy backend has no override and only derives `fme` from a `fmc` given to `setParams` | Python/Rust `set_override('fmc')`; tests `test_fmc_override_*`, `test_override_routes[fmc-*]` |
 | BD-F3 | Fuel dtype / mask / wrap, repeated `runFBP`, stale FMC results, stale injected values, unnormalised updates (five owner-authorised reference changes, D13) | Python reference, `docs/CODEBASE.md` |
 
 ## Where to focus next

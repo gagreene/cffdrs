@@ -198,10 +198,15 @@ fbp.initialize(fuel_type=2, wx_date=20240516, lat=62.2, long=-133.8, elevation=1
                slope=8, aspect=60, ws=24, wd=266, ffmc=92, bui=31,
                out_request=['fmc', 'hros'])
 fbp.invertWindAspect(); fbp.calcSF(); fbp.calcISZ(); fbp.calcFMC()
-fmc = fbp.getParams(['fmc'])[0]          # inspect, or inject with fbp.setParams({'fmc': ...})
+fmc = fbp.getParams(['fmc'])[0]          # inspect, or override with fbp.setParams({'fmc': ...})
 fbp.calcISI_RSI_BE(); fbp.calcROS()
 hros = fbp.getParams(['hros'])[0]
 ```
+
+`initialize(..., d0=..., dj=..., fmc=...)` (or `set_override`, `setParams`, `calcFMC(...)`) override the
+calculated foliar moisture quantities: a value you give is used by every later `runFBP` until you replace
+it, clear it with `None`, or call `initialize` again; anything you do not give is calculated. A given `fmc`
+also gives the matching foliar moisture effect (`fme`), and NaN or masked cells are missing values.
 
 `initialize(..., percentile_growth=p)` takes a percentile (0-100) of the rate-of-spread
 distribution of the Han & Braun (2014) model, not a percent change: 50 (the default)

@@ -129,10 +129,14 @@ impl FbpGrid {
     #[new]
     #[pyo3(signature = (
         fuel_type, lat, long, elevation, slope, aspect, pc, pdf, gfl, gcf,
-        ws, wd, ffmc, bui, wx_date, percentile_growth=50.0, d0=None, dj=None,
+        ws, wd, ffmc, bui, wx_date, percentile_growth=50.0, d0=None, dj=None, fmc=None,
         out_request=None, stages=None, keep=None, threads=1
     ))]
-    #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+    #[allow(
+        clippy::too_many_arguments,
+        clippy::too_many_lines,
+        clippy::needless_pass_by_value
+    )]
     fn new(
         py: Python<'_>,
         fuel_type: &Bound<'_, PyAny>,
@@ -153,6 +157,7 @@ impl FbpGrid {
         percentile_growth: f64,
         d0: Option<&Bound<'_, PyAny>>,
         dj: Option<&Bound<'_, PyAny>>,
+        fmc: Option<&Bound<'_, PyAny>>,
         out_request: Option<Vec<String>>,
         stages: Option<Vec<String>>,
         keep: Option<Vec<String>>,
@@ -197,12 +202,14 @@ impl FbpGrid {
         .collect::<PyResult<Vec<_>>>()?;
         let d0 = d0.map(|v| Snapshot::read(py, v)).transpose()?;
         let dj = dj.map(|v| Snapshot::read(py, v)).transpose()?;
+        let fmc = fmc.map(|v| Snapshot::read(py, v)).transpose()?;
         let shape = if fuel_shape.is_empty() {
             inputs
                 .iter()
                 .map(|(_, v)| v)
                 .chain(d0.iter())
                 .chain(dj.iter())
+                .chain(fmc.iter())
                 .find_map(|v| match v {
                     Snapshot::Cells(_, s) => Some(s.clone()),
                     Snapshot::Const(_) => None,
@@ -219,6 +226,9 @@ impl FbpGrid {
         }
         if let Some(v) = &dj {
             v.check_shape("dj", &shape)?;
+        }
+        if let Some(v) = &fmc {
+            v.check_shape("fmc", &shape)?;
         }
         if fuel_shape.is_empty() {
             fuel.resize(shape.iter().product(), fuel[0]);
@@ -244,6 +254,7 @@ impl FbpGrid {
                     percentile_growth,
                     d0: d0.as_ref().map(Snapshot::per_cell),
                     dj: dj.as_ref().map(Snapshot::per_cell),
+                    fmc: fmc.as_ref().map(Snapshot::per_cell),
                 };
                 let mut grid = CoreGrid::new(&input, &outputs)?;
                 grid.plan(&planned, &keep);
@@ -305,9 +316,10 @@ impl FbpGrid {
         let field = match name {
             "d0" => Field::D0Override,
             "dj" => Field::DjOverride,
+            "fmc" => Field::FmcOverride,
             _ => {
                 return Err(PyValueError::new_err(format!(
-                    "unknown override {name:?}; valid names: d0, dj"
+                    "unknown override {name:?}; valid names: d0, dj, fmc"
                 )))
             }
         };

@@ -20,13 +20,22 @@ class ScalarMasks:
         self.date_nan = set()
         self.produced = set()
         self.overrides = overrides
+        if masked(overrides['fmc']):
+            # the fmc (and the fme it gives) is present before calcFMC runs
+            self.set('fmc', overrides['fmc'])
 
     def set(self, name, value):
         self.fields[name] = masked(value)
         self.date_nan.discard(name)
-        if name in ('d0', 'dj') and self.fields[name]:
-            # a missing date override exports NaN straight away, as in the Python reference
+        if name == 'fmc':
+            # a given fmc also gives the matching fme
+            self.fields['fme'] = self.fields[name]
+            self.date_nan.discard('fme')
+        if name in ('d0', 'dj', 'fmc') and self.fields[name]:
+            # a missing override exports NaN straight away, as in the Python reference
             self.date_nan.add(name)
+            if name == 'fmc':
+                self.date_nan.add('fme')
 
     def stage(self, name, fuel, percentile):
         m = self.fields
@@ -50,11 +59,12 @@ class ScalarMasks:
             put('m fF isz', any_mask('ffmc'))
         elif name == 'calcFMC':
             put('latn', any_mask('long', 'elevation'))
-            d0, dj = (self.overrides[n] for n in ('d0', 'dj'))
+            d0, dj, fmc = (self.overrides[n] for n in ('d0', 'dj', 'fmc'))
             put('d0', masked(d0) if d0 is not None else any_mask('lat', 'latn', 'elevation'))
             put('dj', masked(dj) if dj is not None else any_mask('latn'))
-            put('nd fmc fme', any_mask('d0', 'dj'))
-            if masked(d0) or masked(dj):
+            put('nd', any_mask('d0', 'dj'))
+            put('fmc fme', masked(fmc) if fmc is not None else any_mask('nd'))
+            if masked(d0) or masked(dj) or masked(fmc):
                 self.date_nan.update(n for n in ('d0', 'dj', 'fmc', 'fme') if m[n])
         elif name == 'calcISI_RSI_BE':
             put('a b c q bui0 be_max', False)

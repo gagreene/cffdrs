@@ -1165,7 +1165,7 @@ def test_fmc_cache_reuses_exact_inputs_and_owns_results(monkeypatch):
     fbp.fmc[...] = 0
     fbp.d0[...] = 0
     fbp.getParams(['fme'])[0][...] = 0
-    fbp.setParams({'fmc': 1})
+    fbp.setParams({'fme': 1})
     fbp.calcFMC()
     assert len(calls) == 1
     for actual, want in zip(fbp.getParams(FMC_OUTPUTS), expected, strict=True):
@@ -1182,7 +1182,7 @@ def test_fmc_cache_reuses_exact_inputs_and_owns_results(monkeypatch):
 
 
 # ── reset() and a runFBP that starts from the initialised inputs (D16a) ───────
-@pytest.mark.parametrize('name,value', [('fmc', 90.0), ('hros', 1.0), ('cbh', 3.0), ('cfl', 0.5)])
+@pytest.mark.parametrize('name,value', [('hros', 1.0), ('cbh', 3.0), ('cfl', 0.5)])
 def test_run_fbp_discards_injected_results(name, value):
     fbp = _model(fuel_type=np.array([[2, 6, 3]]))
     fbp.runFBP()
@@ -1279,8 +1279,8 @@ def test_prepare_inputs_matches_initialize_state():
     for name, value in p.verified._asdict().items():
         if name == 'ftypes':
             assert fbp.ftypes == value
-        elif name in ('d0', 'dj'):
-            assert value is None and getattr(fbp, name) is None
+        elif name in ('d0', 'dj', 'fmc'):
+            assert value is None
         else:
             assert np.ma.allequal(getattr(fbp, name), value), name
     assert p.return_array is True
@@ -1411,13 +1411,88 @@ def test_an_explicit_fme_wins_over_the_derived_one_in_either_key_order():
         assert fbp.getParams(['fme']) == [0.7]
 
 
-def test_reset_and_calc_fmc_after_an_injected_fmc():
+def test_a_fmc_override_survives_reset_and_calc_fmc_still_uses_it():
     fbp = _model(fuel_type=6)
     fbp.setParams({'fmc': 100.0})
     fbp.reset()
-    assert fbp.getParams(['fmc', 'fme']) == [0, 0]          # the zero templates again
-    fbp.setParams({'fmc': 100.0})
-    fbp.calcFMC()                                           # calcFMC still computes both from the inputs
-    fresh = _model(fuel_type=6)
-    fresh.calcFMC()
-    assert fbp.getParams(['fmc', 'fme']) == fresh.getParams(['fmc', 'fme'])
+    assert fbp.getParams(['fmc']) == [100.0]
+    assert fbp.getParams(['fme'])[0] == pytest.approx(0.7383198002049183, rel=1e-12)   # derived again after reset
+    fbp.calcFMC()
+    assert fbp.getParams(['fmc']) == [100.0]
+
+
+def test_fmc_given_at_initialize_is_used_by_every_run_until_a_new_initialize():
+    fbp = _model(fuel_type=6, fmc=100.0)
+    first, second = fbp.runFBP(), fbp.runFBP()
+    _assert_outputs_equal(first, second)
+    assert fbp.getParams(['fmc']) == [100.0]
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=6, out_request=ALL_OUTPUTS))      # a new initialize starts clean
+    fbp.runFBP()
+    assert fbp.getParams(['fmc'])[0] != 100.0
+
+
+def test_a_fmc_override_replaces_only_fmc_and_fme_and_the_rest_stays_calculated():
+    calculated = _model(fuel_type=6)
+    calculated.calcFMC()
+    overridden = _model(fuel_type=6, fmc=100.0)
+    overridden.calcFMC()
+    names = ['latn', 'd0', 'dj', 'nd']
+    assert overridden.getParams(names) == calculated.getParams(names)
+    assert overridden.getParams(['fmc']) == [100.0]
+    assert overridden.getParams(['fme'])[0] == pytest.approx(1000 * (1.5 - 0.00275 * 100.0) ** 4 / (460 + 25.9 * 100.0))
+
+
+@pytest.mark.parametrize('route', ['setParams', 'set_override', 'attribute', 'calcFMC'])
+def test_the_fmc_override_can_be_cleared_with_none(route):
+    fbp = _model(fuel_type=6, fmc=100.0)
+    calculated = _model(fuel_type=6)
+    calculated.calcFMC()
+    if route == 'setParams':
+        fbp.setParams({'fmc': None})
+    elif route == 'set_override':
+        fbp.set_override('fmc', None)
+    elif route == 'attribute':
+        fbp.fmc = None
+    else:
+        fbp.set_override('fmc', None)
+    fbp.calcFMC()
+    assert fbp.getParams(['fmc', 'fme']) == calculated.getParams(['fmc', 'fme'])
+
+
+def test_the_calc_fmc_argument_sets_the_override():
+    fbp = _model(fuel_type=6)
+    fbp.calcFMC(fmc=90.0)
+    assert fbp.getParams(['fmc']) == [90.0]
+    fbp.calcFMC()                                    # omitted arguments preserve the override
+    assert fbp.getParams(['fmc']) == [90.0]
+
+
+def test_an_array_fmc_override_with_a_nan_cell_makes_that_cell_missing():
+    n = 3
+    kwargs = {k: np.full((1, n), float(v)) for k, v in BASE_KWARGS.items() if k != 'wx_date'}
+    kwargs.update(wx_date=BASE_KWARGS['wx_date'], fuel_type=np.full((1, n), 6, dtype=np.int8),
+                  fmc=np.array([[90.0, np.nan, 110.0]]))
+    fbp = FBP()
+    fbp.initialize(**kwargs, out_request=['fmc', 'fme'])
+    fmc, fme = fbp.runFBP()
+    assert fmc.tolist()[0][0] == 90.0 and np.isnan(fmc[0, 1]) and fmc[0, 2] == 110.0
+    assert np.isnan(fme[0, 1]) and np.isfinite(fme[0, 0])
+
+
+def test_the_fmc_cache_follows_the_override(monkeypatch):
+    from cffdrs.cffbps.python.equations import foliar_moisture as fm
+    real = fm.calc_foliar_moisture
+    calls = []
+
+    def counted(**kw):
+        calls.append(kw['fmc_override'])
+        return real(**kw)
+
+    monkeypatch.setattr(fm, 'calc_foliar_moisture', counted)
+    fbp = _model(fuel_type=6, fmc=100.0)
+    fbp.calcFMC()
+    fbp.calcFMC()
+    assert len(calls) == 1                           # identical inputs reuse the result
+    fbp.set_override('fmc', 95.0)
+    fbp.calcFMC()
+    assert len(calls) == 2 and fbp.getParams(['fmc']) == [95.0]

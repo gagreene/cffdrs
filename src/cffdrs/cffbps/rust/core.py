@@ -85,11 +85,11 @@ class FBP:
     def initialize(self, fuel_type=None, wx_date=None, lat=None, long=None, elevation=None,
                    slope=None, aspect=None, ws=None, wd=None, ffmc=None, bui=None,
                    pc=50, pdf=35, gfl=0.35, gcf=80, d0=None, dj=None, out_request=None,
-                   convert_fuel_type_codes=False, percentile_growth=50, threads=1):
+                   convert_fuel_type_codes=False, percentile_growth=50, threads=1, fmc=None):
         prepared = inputs.prepare_inputs(
             fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation,
             slope=slope, aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf,
-            gfl=gfl, gcf=gcf, d0=d0, dj=dj, out_request=out_request,
+            gfl=gfl, gcf=gcf, d0=d0, dj=dj, fmc=fmc, out_request=out_request,
             convert_fuel_type_codes=convert_fuel_type_codes)
         verified = prepared.verified
         request = _DEFAULT.copy() if out_request is None else list(out_request)
@@ -98,11 +98,12 @@ class FBP:
             raise ValueError(f'Invalid out_request values: {unknown}. Valid values are: {sorted(valid_outputs)}')
         shape = prepared.ref_array.shape if prepared.return_array else ()
         values = {name: self._boundary(getattr(verified, name), shape) for name in _INPUTS}
-        overrides = {name: getattr(verified, name) for name in ('d0', 'dj')}
+        overrides = {name: getattr(verified, name) for name in ('d0', 'dj', 'fmc')}
         grid = _rust.FbpGrid(
             fuel_type=self._fuel_boundary(verified.fuel_type, shape), **values, wx_date=wx_date,
             percentile_growth=_percentile(percentile_growth),
             d0=self._boundary(overrides['d0'], shape), dj=self._boundary(overrides['dj'], shape),
+            fmc=self._boundary(overrides['fmc'], shape),
             out_request=request, threads=threads)
         object.__setattr__(self, '_grid', grid)
         object.__setattr__(self, 'wx_date', wx_date)
@@ -153,8 +154,8 @@ class FBP:
 
     def set_override(self, name, values):
         self._require()
-        if name not in ('d0', 'dj'):
-            raise ValueError("set_override name must be 'd0' or 'dj'")
+        if name not in ('d0', 'dj', 'fmc'):
+            raise ValueError("set_override name must be 'd0', 'dj' or 'fmc'")
         supplied = coerce_override(name, values)
         self._grid.set_override(name, self._boundary(supplied, self._grid.shape))
         self._overrides[name] = supplied
@@ -183,7 +184,7 @@ class FBP:
 
     def set(self, name, value):
         self._require()
-        if name in ('d0', 'dj'):
+        if name in ('d0', 'dj', 'fmc'):
             self.set_override(name, value)
         elif name in ('wx_date', 'percentile_growth'):
             self.set_param(name, value)
@@ -197,11 +198,6 @@ class FBP:
             self._grid.set(_ALIASES.get(name, name), self._boundary(arr, self._grid.shape))
             if self._scalar_masks is not None:
                 self._scalar_masks.set(_ALIASES.get(name, name), arr)
-            if name == 'fmc':
-                # the grid derived the matching foliar moisture effect from the provided fmc
-                if self._scalar_masks is not None:
-                    self._scalar_masks.set('fme', arr)
-                self._injected.pop('fme', None)
             if name in _INPUTS:
                 self._inputs[name] = arr.copy()
             else:
@@ -269,8 +265,8 @@ class FBP:
         elif name == 'calcSFC':
             self._sfc_done = True
 
-    def calcFMC(self, d0=None, dj=None, lat=None, long=None, elevation=None, wx_date=None):
-        for name, value in [('d0', d0), ('dj', dj), ('lat', lat), ('long', long),
+    def calcFMC(self, d0=None, dj=None, fmc=None, lat=None, long=None, elevation=None, wx_date=None):
+        for name, value in [('d0', d0), ('dj', dj), ('fmc', fmc), ('lat', lat), ('long', long),
                             ('elevation', elevation), ('wx_date', wx_date)]:
             if value is not None:
                 self.set(name, value)
@@ -311,6 +307,10 @@ class FBP:
                 dtype = self._fuel.dtype
             elif name == 'd0' and self._overrides['d0'] is not None:
                 supplied = self._overrides['d0']
+                if not np.ma.getmaskarray(supplied).any():
+                    dtype = supplied.dtype
+            elif name == 'fmc' and self._overrides['fmc'] is not None:
+                supplied = self._overrides['fmc']
                 if not np.ma.getmaskarray(supplied).any():
                     dtype = supplied.dtype
             elif name == 'dj' and self._overrides['dj'] is None and self._fmc_done:

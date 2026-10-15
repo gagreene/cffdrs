@@ -43,6 +43,7 @@ class VerifiedInputs(NamedTuple):
     gcf: MaskedArray
     d0: MaskedArray | None
     dj: MaskedArray | None
+    fmc: MaskedArray | None
 
 
 def convert_grid_codes(fuel_type_array: np.ndarray) -> np.ndarray:
@@ -234,7 +235,7 @@ def verify_inputs(*,
                   wx_date: int,
                   lat, long, elevation, slope, aspect, ws, wd, ffmc, bui,
                   pc, pdf, gfl, gcf, d0, dj, out_request,
-                  convert_fuel_type_codes: bool) -> VerifiedInputs:
+                  convert_fuel_type_codes: bool, fmc=None) -> VerifiedInputs:
     """Validate all inputs and coerce them to masked numpy arrays.
 
     :return: :class:`VerifiedInputs` with the coerced fields plus ``ftypes``
@@ -267,6 +268,7 @@ def verify_inputs(*,
     # d0, dj is floored and clipped to the year at calculation time, see fmc_inputs)
     d0 = coerce_override('d0', d0)
     dj = coerce_override('dj', dj)
+    fmc = coerce_override('fmc', fmc)
 
     # Verify out_request
     if not isinstance(out_request, (list, tuple, type(None))):
@@ -276,7 +278,7 @@ def verify_inputs(*,
         fuel_type=fuel_type, ftypes=ftypes,
         lat=lat, long=long, elevation=elevation, slope=slope, aspect=aspect,
         ws=ws, wd=wd, ffmc=ffmc, bui=bui,
-        pc=pc, pdf=pdf, gfl=gfl, gcf=gcf, d0=d0, dj=dj,
+        pc=pc, pdf=pdf, gfl=gfl, gcf=gcf, d0=d0, dj=dj, fmc=fmc,
     )
 
 
@@ -293,7 +295,7 @@ REQUIRED_INPUTS = ('fuel_type', 'wx_date', 'lat', 'long', 'elevation', 'slope', 
 
 def prepare_inputs(*, fuel_type, wx_date, lat, long, elevation, slope, aspect, ws, wd,
                    ffmc, bui, pc, pdf, gfl, gcf, d0, dj, out_request,
-                   convert_fuel_type_codes) -> PreparedInputs:
+                   convert_fuel_type_codes, fmc=None) -> PreparedInputs:
     """Check the required parameters, detect array input and validate/coerce every input.
 
     :raises ValueError: listing every missing required parameter
@@ -308,5 +310,5 @@ def prepare_inputs(*, fuel_type, wx_date, lat, long, elevation, slope, aspect, w
     verified = verify_inputs(
         fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
         aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf, gfl=gfl, gcf=gcf,
-        d0=d0, dj=dj, out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes)
+        d0=d0, dj=dj, fmc=fmc, out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes)
     return PreparedInputs(verified, return_array, ref_array, ref_int_array)

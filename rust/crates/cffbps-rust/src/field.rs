@@ -2,15 +2,15 @@
 //!
 //! [`Field`] names every value a [`Stage`](crate::stage::Stage) reads or writes:
 //! the 54 outputs of [`FbpResult::named_values`](crate::fbp::FbpResult::named_values)
-//! (in that order), then 12 input-only fields, then 9 internal fields that are
+//! (in that order), then 13 input-only fields, then 9 internal fields that are
 //! not outputs. [`Field::name`] is the Python package's attribute name.
 
 /// One per-cell quantity of the FBP pipeline.
 ///
 /// The variants are the 54 outputs (in [`FbpResult::named_values`] order), the
-/// 12 input-only fields (`lat` .. `aspect_in`; `wd_in` and `aspect_in` are the
-/// raw wind direction and aspect, `d0_override` and `dj_override` the explicit
-/// foliar moisture date overrides) and 9 internal fields (`isz` .. `aspect`;
+/// 13 input-only fields (`lat` .. `aspect_in`; `wd_in` and `aspect_in` are the
+/// raw wind direction and aspect, `d0_override`, `dj_override` and `fmc_override`
+/// the explicit foliar moisture overrides) and 9 internal fields (`isz` .. `aspect`;
 /// `aspect` is the working, inverted aspect). `ws`, `wd`, `ffmc`, `bui` and
 /// `fuel_type` are inputs that are also outputs (their processed values; `wd`
 /// is the inverted wind direction).
@@ -131,7 +131,7 @@ pub enum Field {
     Accel,
     /// `fuel_type`: fuel type code.
     FuelType,
-    // the 12 input-only fields
+    // the 13 input-only fields
     /// `lat`: latitude, decimal degrees.
     Lat,
     /// `long`: magnitude of the longitude, decimal degrees.
@@ -152,6 +152,8 @@ pub enum Field {
     D0Override,
     /// `dj_override`: explicit Julian date (NaN = masked).
     DjOverride,
+    /// `fmc_override`: explicit foliar moisture content, % (NaN = masked).
+    FmcOverride,
     /// `wd_in`: wind direction input, compass degrees.
     WdIn,
     /// `aspect_in`: aspect input as used (normalised), compass degrees.
@@ -181,7 +183,7 @@ pub enum Field {
 
 impl Field {
     /// Number of fields.
-    pub const COUNT: usize = 75;
+    pub const COUNT: usize = 76;
 
     /// Every field, in declaration order (outputs, input-only, internal).
     pub const ALL: [Field; Field::COUNT] = [
@@ -249,6 +251,7 @@ impl Field {
         Field::Gcf,
         Field::D0Override,
         Field::DjOverride,
+        Field::FmcOverride,
         Field::WdIn,
         Field::AspectIn,
         Field::Isz,
@@ -340,6 +343,7 @@ impl Field {
             Field::Gcf => "gcf",
             Field::D0Override => "d0_override",
             Field::DjOverride => "dj_override",
+            Field::FmcOverride => "fmc_override",
             Field::WdIn => "wd_in",
             Field::AspectIn => "aspect_in",
             Field::Isz => "isz",
@@ -394,6 +398,7 @@ impl Field {
             | Field::Gcf
             | Field::D0Override
             | Field::DjOverride
+            | Field::FmcOverride
             | Field::WdIn
             | Field::AspectIn
             | Field::Aspect => f64::NAN,
@@ -408,10 +413,10 @@ mod tests {
     use crate::fbp::FbpResult;
     use std::collections::HashSet;
 
-    /// The 75 field names of the stage and field reference, in its order: the
-    /// 54 outputs, the 12 input-only fields, the 9 internal fields. Typed
+    /// The 76 field names of the stage and field reference, in its order: the
+    /// 54 outputs, the 13 input-only fields, the 9 internal fields. Typed
     /// independently of `Field::name` so a typo in either is caught.
-    const REFERENCE_NAMES: [&str; 75] = [
+    const REFERENCE_NAMES: [&str; 76] = [
         "ws",
         "wd",
         "wse",
@@ -477,6 +482,7 @@ mod tests {
         "gcf",
         "d0_override",
         "dj_override",
+        "fmc_override",
         "wd_in",
         "aspect_in",
         // internal
@@ -492,13 +498,13 @@ mod tests {
     ];
 
     #[test]
-    fn all_has_75_unique_fields_with_unique_names() {
+    fn all_has_76_unique_fields_with_unique_names() {
         assert_eq!(Field::ALL.len(), Field::COUNT);
-        assert_eq!(Field::COUNT, 75);
+        assert_eq!(Field::COUNT, 76);
         let unique: HashSet<Field> = Field::ALL.iter().copied().collect();
-        assert_eq!(unique.len(), 75, "duplicate field in Field::ALL");
+        assert_eq!(unique.len(), 76, "duplicate field in Field::ALL");
         let names: HashSet<&str> = Field::ALL.iter().map(|f| f.name()).collect();
-        assert_eq!(names.len(), 75, "duplicate field name");
+        assert_eq!(names.len(), 76, "duplicate field name");
     }
 
     #[test]
@@ -541,7 +547,9 @@ mod tests {
                 // read as their input until invertWindAspect runs): missing
                 "ffc" | "wfc" | "sfc" | "ws" | "wd" | "ffmc" | "bui" | "fuel_type" | "lat"
                 | "long" | "elevation" | "slope" | "pc" | "pdf" | "gfl" | "gcf" | "d0_override"
-                | "dj_override" | "wd_in" | "aspect_in" | "aspect" => assert!(t.is_nan(), "{f:?}"),
+                | "dj_override" | "fmc_override" | "wd_in" | "aspect_in" | "aspect" => {
+                    assert!(t.is_nan(), "{f:?}");
+                }
                 _ => assert_eq!(t.to_bits(), 0.0_f64.to_bits(), "{f:?}"),
             }
         }

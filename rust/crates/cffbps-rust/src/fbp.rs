@@ -61,12 +61,11 @@ pub struct FbpInput {
     /// Optional caller-supplied Julian date (`initialize(dj=...)`); derived
     /// from `wx_date` when None.
     pub dj_override: Option<f64>,
-    /// Injected foliar moisture (`setParams({'fmc': ...})` in place of
-    /// calcFMC). When Some, calcFMC is skipped: latn/d0/dj/nd keep their zero
-    /// template values, and fme is derived from the injected fmc (as the Python
-    /// package does), so the C-6 crown ROS is the one calcFMC would give for the
-    /// same fmc. This mirrors the recompute sequence fire-growth engines run to
-    /// regenerate output quantities from stamped per-cell weather.
+    /// Optional caller-supplied foliar moisture content, % (`initialize(fmc=...)`);
+    /// derived from the number of days from `d0` when None. It replaces only the
+    /// derived fmc: latn/d0/dj/nd stay calculated, the fme follows the given fmc
+    /// (so the C-6 crown ROS uses it), and the output fmc is the given value. NaN
+    /// is a missing value.
     pub fmc_override: Option<f64>,
     /// Injected head ROS (`setParams({'hros': ...})` after calcROS): replaces
     /// hros before calcCSFI onward; bros and sros keep their computed values,
@@ -427,7 +426,7 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     use crate::crown::{
         calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
     };
-    use crate::foliar_moisture::{calc_foliar_moisture, injected_fmc};
+    use crate::foliar_moisture::calc_foliar_moisture;
     use crate::fuel::{CrownFuel, FuelType, RosParams};
     use crate::growth::calc_accel_param;
     use crate::normalize::{invert_wind_aspect, normalize, Normalized};
@@ -455,20 +454,16 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     // --- calc_isz
     let Isz { m, f_f, isz } = calc_isz(n.ffmc);
 
-    // --- calc_foliar_moisture (or the setParams({'fmc': ...}) injection in its place:
-    // calcFMC never runs, so latn/d0/dj/nd keep their zero templates; fme is
-    // derived from the injected fmc, see FbpInput::fmc_override)
-    let fmc = match input.fmc_override {
-        Some(v) => injected_fmc(v),
-        None => calc_foliar_moisture(
-            lat,
-            abs_long,
-            elevation,
-            input.wx_date,
-            input.d0_override,
-            input.dj_override,
-        ),
-    };
+    // --- calc_foliar_moisture
+    let fmc = calc_foliar_moisture(
+        lat,
+        abs_long,
+        elevation,
+        input.wx_date,
+        input.d0_override,
+        input.dj_override,
+        input.fmc_override,
+    );
 
     // --- calc_isi_rsi_be
     let params = ft.ros_params();

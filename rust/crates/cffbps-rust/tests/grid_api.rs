@@ -62,6 +62,7 @@ fn input<'a>() -> GridInput<'a> {
         percentile_growth: 90.0,
         d0: None,
         dj: None,
+        fmc: None,
     }
 }
 
@@ -93,7 +94,7 @@ fn cell(inp: &GridInput<'_>, i: usize, dj: Option<f64>) -> FbpInput {
         percentile_growth: inp.percentile_growth,
         d0_override: inp.d0.map(|p| at(p, i)),
         dj_override: dj,
-        fmc_override: None,
+        fmc_override: inp.fmc.map(|p| at(p, i)),
         hros_override: None,
     }
 }
@@ -412,8 +413,9 @@ fn input_only_and_internal_fields_are_readable() {
     ];
     inp.d0 = Some((&d0).into());
     inp.dj = Some(PerCell::Const(170.6));
+    inp.fmc = Some(PerCell::Const(101.5));
     let extra: Vec<Field> = Field::ALL.into_iter().filter(|f| !f.is_output()).collect();
-    assert_eq!(extra.len(), 21);
+    assert_eq!(extra.len(), 22);
     let g = run_grid_fields(&inp, &extra, 1, NonModeled::PythonCompat).expect("valid");
     for i in 0..N {
         let mut s = CellState::from_input(&cell(&inp, i, Some(170.0)));
@@ -440,6 +442,11 @@ fn input_only_and_internal_fields_are_readable() {
     assert!(
         view.get(Field::D0Override)[1].is_nan(),
         "a masked d0 override"
+    );
+    assert_eq!(
+        view.get(Field::FmcOverride)[0],
+        101.5,
+        "the fmc override as supplied"
     );
 }
 
@@ -714,6 +721,7 @@ fn big_fields(b: &Big, threads: usize, non_modeled: NonModeled) -> GridFields {
         percentile_growth: 90.0,
         d0: Some(PerCell::Const(150.0)),
         dj: Some((&c[11]).into()),
+        fmc: None,
     };
     run_grid_fields(&input, &outputs(), threads, non_modeled).expect("valid")
 }

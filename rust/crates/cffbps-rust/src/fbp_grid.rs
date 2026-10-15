@@ -64,6 +64,7 @@
 //!     percentile_growth: 50.0,
 //!     d0: None,
 //!     dj: None,
+//!     fmc: None,
 //! };
 //! let mut grid = FbpGrid::new(&input, &[Field::Hros, Field::Hfi]).unwrap();
 //! for stage in Stage::ALL {
@@ -120,7 +121,7 @@ pub enum StageError {
         found: usize,
     },
     /// The field has its own route: `fuel_type` ([`FbpGrid::set_fuel`]),
-    /// `d0_override` and `dj_override` ([`FbpGrid::set_override`]).
+    /// `d0_override`, `dj_override` and `fmc_override` ([`FbpGrid::set_override`]).
     NotSettable(Field),
 }
 
@@ -156,7 +157,7 @@ impl fmt::Display for StageError {
             StageError::NotSettable(field) => write!(
                 f,
                 "{} cannot be set: use set_fuel for fuel_type and set_override for \
-                 d0_override and dj_override",
+                 d0_override, dj_override and fmc_override",
                 field.name()
             ),
         }
@@ -176,7 +177,7 @@ pub enum ParamName {
 }
 
 /// The 13 stored inputs (normalised; never freed). `fuel_type` and the
-/// `d0` / `dj` overrides are held separately.
+/// `d0` / `dj` / `fmc` overrides are held separately.
 const INPUTS: [Field; 13] = [
     Field::Lat,
     Field::Long,
@@ -211,6 +212,7 @@ enum FmcInput {
     Elevation,
     D0,
     Dj,
+    Fmc,
     WxDate,
 }
 
@@ -262,6 +264,7 @@ pub struct FbpGrid {
     percentile_growth: f64,
     d0: Option<OwnedPerCell>,
     dj: Option<DjOverride>,
+    fmc: Option<OwnedPerCell>,
     /// `out_request` (each field once).
     out_request: Vec<Field>,
     /// `out_request` and the `keep` list of [`FbpGrid::plan`].
@@ -271,10 +274,10 @@ pub struct FbpGrid {
     liveness: Liveness,
     phase: Phase,
     /// Version counters of the `calcFMC` inputs, indexed by [`FmcInput`].
-    fmc_versions: [u64; 6],
+    fmc_versions: [u64; 7],
     /// The counters `calcFMC` last computed with, while its outputs are
     /// unmodified.
-    fmc_record: Option<[u64; 6]>,
+    fmc_record: Option<[u64; 7]>,
     fmc_computations: u64,
 }
 
@@ -336,16 +339,18 @@ impl FbpGrid {
             percentile_growth: input.percentile_growth,
             d0: input.d0.map(OwnedPerCell::from),
             dj,
+            fmc: input.fmc.map(OwnedPerCell::from),
             out_request: unique,
             retained: [false; Field::COUNT],
             planned: Stage::ALL.to_vec(),
             liveness: Liveness::new(&Stage::ALL),
             phase: Phase::Fresh,
-            fmc_versions: [0; 6],
+            fmc_versions: [0; 7],
             fmc_record: None,
             fmc_computations: 0,
         };
         grid.plan(&Stage::ALL, &[]);
+        grid.store_fmc_override();
         Ok(grid)
     }
 
@@ -376,7 +381,7 @@ impl FbpGrid {
     /// may run while its inputs are stored.
     ///
     /// `calcFMC` reuses its previous result when none of its inputs (`lat`,
-    /// `long`, `elevation`, the `d0` / `dj` overrides and `wx_date`) changed
+    /// `long`, `elevation`, the `d0` / `dj` / `fmc` overrides and `wx_date`) changed
     /// and its outputs are still stored and were not set since.
     ///
     /// `threads` works as in [`run_grid_with_threads`](crate::grid::run_grid_with_threads)
@@ -502,7 +507,8 @@ impl FbpGrid {
     /// On a computed field the value is stored (un-freeing it) until a stage
     /// writes it, [`FbpGrid::reset`] or [`FbpGrid::run_fused`] discards it;
     /// `set(Hros, ..)` also resets the `hros_growth_nan` provenance to 0,
-    /// and setting a `calcFMC` output makes the next `calcFMC` recompute. On
+    /// and setting a `calcFMC` output makes the next `calcFMC` recompute. Setting
+    /// `fmc` sets the `fmc` override (see [`FbpGrid::set_override`]). On
     /// an input (`lat long elevation slope pc pdf gfl gcf ws ffmc bui`) it
     /// replaces the stored input, normalised like [`FbpGrid::new`], and
     /// persists across `reset` and `run_fused`. `wd` / `wd_in` and `aspect` /
@@ -513,8 +519,8 @@ impl FbpGrid {
     /// # Errors
     ///
     /// [`StageError::LengthMismatch`] unless there is one value per cell;
-    /// [`StageError::NotSettable`] for `fuel_type`, `d0_override` and
-    /// `dj_override`. Nothing changes on an error.
+    /// [`StageError::NotSettable`] for `fuel_type`, `d0_override`,
+    /// `dj_override` and `fmc_override`. Nothing changes on an error.
     pub fn set(&mut self, field: Field, values: &[f64]) -> Result<(), StageError> {
         if values.len() != self.n {
             return Err(StageError::LengthMismatch {
@@ -588,11 +594,13 @@ impl FbpGrid {
         Ok(())
     }
 
-    /// Store an explicit `d0` ([`Field::D0Override`]) or `dj`
-    /// ([`Field::DjOverride`]) for `calcFMC`, a constant or one value per
-    /// cell (NaN = masked: that cell's `fmc` and `fme` are NaN), or clear it
-    /// with `None` (back to the derived value). `d0` is used as given (no
-    /// range limit). `dj` is kept as supplied and used floored, then clipped
+    /// Store an explicit `d0` ([`Field::D0Override`]), `dj`
+    /// ([`Field::DjOverride`]) or `fmc` ([`Field::FmcOverride`]) for `calcFMC`,
+    /// a constant or one value per cell (NaN = masked: that cell's `fmc` and
+    /// `fme` are NaN), or clear it with `None` (back to the derived value).
+    /// `d0` and `fmc` are used as given (no range limit); a given `fmc` is
+    /// stored in `fmc` at once and gives the matching `fme`, so the C-6 crown
+    /// rate of spread has it even when `calcFMC` is skipped. `dj` is kept as supplied and used floored, then clipped
     /// to 1..365 (1..366 in a leap year) of `wx_date`, re-resolved whenever
     /// `wx_date` changes; see [`FbpGrid::dj_override_clipped`]. Overrides
     /// persist across stages, `reset` and `run_fused` until replaced or
@@ -601,7 +609,7 @@ impl FbpGrid {
     /// # Errors
     ///
     /// [`GridError::NotAnOverride`] for any other field,
-    /// [`GridError::LengthMismatch`] (name `d0` / `dj`) for a per-cell
+    /// [`GridError::LengthMismatch`] (name `d0` / `dj` / `fmc`) for a per-cell
     /// override of the wrong length, [`GridError::InfiniteDj`] for an
     /// infinite `dj`. Nothing changes on an error.
     pub fn set_override(
@@ -612,6 +620,7 @@ impl FbpGrid {
         let name = match field {
             Field::D0Override => "d0",
             Field::DjOverride => "dj",
+            Field::FmcOverride => "fmc",
             _ => return Err(GridError::NotAnOverride(field)),
         };
         if let Some(PerCell::Cells(v)) = values {
@@ -623,7 +632,9 @@ impl FbpGrid {
                 });
             }
         }
-        if field == Field::D0Override {
+        if field == Field::FmcOverride {
+            self.set_fmc_override(values.map(OwnedPerCell::from));
+        } else if field == Field::D0Override {
             self.d0 = values.map(OwnedPerCell::from);
             self.bump(FmcInput::D0);
         } else {
@@ -658,8 +669,8 @@ impl FbpGrid {
     /// template ([`Field::template_value`]) of a field never computed (`wd`
     /// and `aspect` read as their inputs until `invertWindAspect` runs).
     /// `fuel_type` is the stored code, 0 for an invalid code (as the Python
-    /// package exports it); `d0_override` is the supplied and `dj_override`
-    /// the resolved override (NaN without one).
+    /// package exports it); `d0_override` and `fmc_override` are the supplied and
+    /// `dj_override` the resolved override (NaN without one).
     ///
     /// # Errors
     ///
@@ -702,6 +713,7 @@ impl FbpGrid {
             })
             .sum();
         let overrides = self.d0.as_ref().map_or(0, OwnedPerCell::bytes)
+            + self.fmc.as_ref().map_or(0, OwnedPerCell::bytes)
             + self
                 .dj
                 .as_ref()
@@ -746,6 +758,11 @@ impl FbpGrid {
         match field {
             Field::D0Override => Some(
                 self.d0
+                    .as_ref()
+                    .map_or(PerCell::Const(f64::NAN), OwnedPerCell::as_per_cell),
+            ),
+            Field::FmcOverride => Some(
+                self.fmc
                     .as_ref()
                     .map_or(PerCell::Const(f64::NAN), OwnedPerCell::as_per_cell),
             ),
@@ -796,6 +813,7 @@ impl FbpGrid {
             percentile_growth: self.percentile_growth,
             d0: self.d0.as_ref().map(OwnedPerCell::as_per_cell),
             dj: self.dj.as_ref().map(|d| d.supplied.as_per_cell()),
+            fmc: self.fmc.as_ref().map(OwnedPerCell::as_per_cell),
         }
     }
 
@@ -861,6 +879,7 @@ impl FbpGrid {
             // the has-override flags; the values are loaded per cell
             d0: self.d0.as_ref().map(|_| f64::NAN),
             dj: self.dj.as_ref().map(|_| f64::NAN),
+            fmc: self.fmc.as_ref().map(|_| f64::NAN),
         };
         let (ffmc, slope, bui) = (
             self.input(Field::Ffmc),
@@ -931,8 +950,13 @@ impl FbpGrid {
     /// The routes of [`FbpGrid::set`] and [`FbpGrid::set_const`].
     fn store(&mut self, field: Field, values: OwnedPerCell) -> Result<(), StageError> {
         match field {
-            Field::FuelType | Field::D0Override | Field::DjOverride => {
+            Field::FuelType | Field::D0Override | Field::DjOverride | Field::FmcOverride => {
                 return Err(StageError::NotSettable(field));
+            }
+            Field::Fmc => {
+                // a provided fmc is the fmc override: it also gives the matching
+                // foliar moisture effect and persists until replaced or cleared
+                self.set_fmc_override(Some(values));
             }
             Field::Wd | Field::WdIn | Field::Aspect | Field::AspectIn => {
                 let input = if matches!(field, Field::Wd | Field::WdIn) {
@@ -963,11 +987,6 @@ impl FbpGrid {
                 if FMC_OUTPUTS.contains(&f) {
                     self.fmc_record = None;
                 }
-                if f == Field::Fmc {
-                    // a provided fmc also gives the matching foliar moisture effect;
-                    // a later set of fme itself replaces it
-                    self.slots[Field::Fme.index()] = Slot::Stored(values.map(calc_fme));
-                }
                 self.slots[f.index()] = Slot::Stored(values);
             }
         }
@@ -984,6 +1003,29 @@ impl FbpGrid {
         self.fmc_versions[input as usize] += 1;
     }
 
+    /// Replace the `fmc` override (`None` clears it) and bring `fmc` and `fme`
+    /// in line with it.
+    fn set_fmc_override(&mut self, values: Option<OwnedPerCell>) {
+        let cleared = values.is_none();
+        self.fmc = values;
+        self.bump(FmcInput::Fmc);
+        if cleared {
+            self.slots[Field::Fmc.index()] = Slot::Never;
+            self.slots[Field::Fme.index()] = Slot::Never;
+        }
+        self.store_fmc_override();
+    }
+
+    /// Store the `fmc` override (if any) in `fmc` and its effect in `fme`, so
+    /// both hold it before `calcFMC` runs (and when it is skipped).
+    fn store_fmc_override(&mut self) {
+        if let Some(fmc) = &self.fmc {
+            let fme = Slot::Stored(fmc.map(calc_fme));
+            self.slots[Field::Fmc.index()] = Slot::Stored(fmc.clone());
+            self.slots[Field::Fme.index()] = fme;
+        }
+    }
+
     /// Every computed field back to its template, the liveness bookkeeping
     /// restarted and the `calcFMC` record dropped.
     fn discard_computed(&mut self) {
@@ -994,6 +1036,7 @@ impl FbpGrid {
         }
         self.liveness.restart();
         self.fmc_record = None;
+        self.store_fmc_override();
     }
 }
 
@@ -1003,7 +1046,7 @@ fn is_computed(field: Field) -> bool {
     !INPUTS.contains(&field)
         && !matches!(
             field,
-            Field::FuelType | Field::D0Override | Field::DjOverride
+            Field::FuelType | Field::D0Override | Field::DjOverride | Field::FmcOverride
         )
 }
 
@@ -1027,7 +1070,7 @@ mod tests {
             .into_iter()
             .filter(|f| !is_computed(*f))
             .collect();
-        assert_eq!(not_computed.len(), INPUTS.len() + 3);
+        assert_eq!(not_computed.len(), INPUTS.len() + 4);
         for f in INPUTS {
             assert!(
                 !f.is_output() || matches!(f, Field::Ws | Field::Ffmc | Field::Bui),

@@ -143,7 +143,9 @@ pub(crate) fn calc_fme(fmc: f64) -> f64 {
 }
 
 /// `foliar_moisture.calc_foliar_moisture`: the chain of the functions above.
-/// An explicit `d0_override` or `dj_override` replaces the derived value.
+/// An explicit `d0_override`, `dj_override` or `fmc_override` replaces the
+/// derived value; the fme follows the fmc that is used. `Some(NaN)` is a
+/// missing value.
 pub(crate) fn calc_foliar_moisture(
     lat: f64,
     abs_long: f64,
@@ -151,12 +153,13 @@ pub(crate) fn calc_foliar_moisture(
     wx_date: i64,
     d0_override: Option<f64>,
     dj_override: Option<f64>,
+    fmc_override: Option<f64>,
 ) -> FoliarMoisture {
     let latn = calc_latn(elevation, abs_long);
     let d0 = d0_override.unwrap_or_else(|| calc_d0(lat, latn, elevation));
     let dj = dj_override.unwrap_or_else(|| calc_dj(latn, wx_date));
     let nd = calc_nd(dj, d0);
-    let fmc = calc_fmc(nd);
+    let fmc = fmc_override.unwrap_or_else(|| calc_fmc(nd));
     let fme = calc_fme(fmc);
     FoliarMoisture {
         latn,
@@ -165,21 +168,6 @@ pub(crate) fn calc_foliar_moisture(
         nd,
         fmc,
         fme,
-    }
-}
-
-/// The `setParams({'fmc': ...})` injection in place of
-/// [`calc_foliar_moisture`]: calcFMC never runs, so latn/d0/dj/nd keep their
-/// zero templates, but the foliar moisture effect is derived from the provided
-/// fmc (the C-6 crown rate of spread needs it), see `FbpInput::fmc_override`.
-pub(crate) fn injected_fmc(fmc: f64) -> FoliarMoisture {
-    FoliarMoisture {
-        latn: 0.0,
-        d0: 0.0,
-        dj: 0.0,
-        nd: 0.0,
-        fmc,
-        fme: calc_fme(fmc),
     }
 }
 
@@ -279,23 +267,34 @@ mod tests {
 
     #[test]
     fn the_orchestrator_chains_the_functions_and_honours_explicit_overrides() {
-        let r = calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, None, None);
+        let r = calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, None, None, None);
         assert_eq!((r.d0, r.dj, r.nd), (161.0, 166.0, 5.0));
         assert!((r.fmc - 85.4725).abs() < 1e-12);
         assert_eq!(r.fme, calc_fme(r.fmc));
-        let o = calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, Some(150.0), Some(170.0));
+        let o = calc_foliar_moisture(
+            55.0,
+            110.0,
+            500.0,
+            20_230_615,
+            Some(150.0),
+            Some(170.0),
+            None,
+        );
         assert_eq!((o.d0, o.dj, o.nd), (150.0, 170.0, 20.0));
-        let missing = calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, Some(f64::NAN), None);
+        let missing =
+            calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, Some(f64::NAN), None, None);
         assert!(missing.nd.is_nan() && missing.fmc.is_nan() && missing.fme.is_nan());
     }
 
     #[test]
-    fn an_injected_fmc_keeps_the_templates_and_derives_fme() {
-        let r = injected_fmc(100.0);
-        assert_eq!(
-            (r.latn, r.d0, r.dj, r.nd, r.fmc),
-            (0.0, 0.0, 0.0, 0.0, 100.0)
-        );
+    fn an_fmc_override_replaces_the_derived_fmc_and_fme_follows_it() {
+        let r = calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, None, None, Some(100.0));
+        assert_eq!((r.d0, r.dj, r.nd), (161.0, 166.0, 5.0));
+        assert_eq!(r.fmc, 100.0);
         assert_eq!(r.fme, calc_fme(100.0));
+        let missing =
+            calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, None, None, Some(f64::NAN));
+        assert!(missing.fmc.is_nan() && missing.fme.is_nan());
+        assert_eq!(missing.nd, 5.0);
     }
 }

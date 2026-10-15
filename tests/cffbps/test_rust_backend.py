@@ -158,7 +158,7 @@ def test_updates(name, value, route):
     equal(model.runFBP(), make('python', **{name: value}).runFBP(), scalar=True)
 
 
-@pytest.mark.parametrize('name', ['d0', 'dj'])
+@pytest.mark.parametrize('name', ['d0', 'dj', 'fmc'])
 @pytest.mark.parametrize('route', ['initialize', 'calcFMC', 'setParams', 'attribute', 'set_override'])
 def test_override_routes(name, route):
     values = np.ma.array([0., 166.9, 400.], mask=[False, False, True])
@@ -200,7 +200,7 @@ def test_dj_warning_and_values(value, year):
     equal(actual, expected, scalar=True)
 
 
-@pytest.mark.parametrize('name', ['d0', 'dj'])
+@pytest.mark.parametrize('name', ['d0', 'dj', 'fmc'])
 def test_scalar_missing_fmc(name):
     for backend in ['python', 'rust']:
         model = make(backend, **{name: np.nan})
@@ -208,6 +208,41 @@ def test_scalar_missing_fmc(name):
         assert np.isnan(model.getParams(['fmc'])[0])
         assert np.isnan(model.getParams(['fme'])[0])
         assert np.isnan(model.getParams([name])[0])
+
+
+@pytest.mark.parametrize('fmc', [95, 95.5, np.float32(101.25)])
+def test_fmc_override_is_sticky_and_gives_fme_before_calcfmc(fmc):
+    a, b = make(fmc=fmc), make('python', fmc=fmc)
+    # fmc and fme are the override straight away, before calcFMC runs
+    equal(a.getParams(ALL), b.getParams(ALL), scalar=True)
+    for _ in range(2):
+        equal(a.runFBP(), b.runFBP(), scalar=True)
+    assert a.getParams(['fmc'])[0] == b.getParams(['fmc'])[0] == float(fmc)
+    # a given fmc replaces only fmc and fme: latn, d0, dj and nd are still calculated
+    derived = make('python')
+    derived.runFBP()
+    for name in ('latn', 'd0', 'dj', 'nd'):
+        assert a.getParams([name])[0] == derived.getParams([name])[0] != 0
+    # skipping calcFMC still has the fme of the given fmc (needed by the C-6 crown rate of spread)
+    c6a, c6b = make(fuel_type=6, fmc=fmc), make('python', fuel_type=6, fmc=fmc)
+    for model in (c6a, c6b):
+        model.calcSF()
+        model.calcISZ()
+        model.calcISI_RSI_BE()
+        model.calcROS()
+    equal(c6a.runFBP(), c6b.runFBP(), scalar=True)
+
+
+def test_fmc_override_array_with_a_missing_cell_and_clearing():
+    fmc = np.ma.array([88., 120., 100.], mask=[False, False, True])
+    kw = dict(fuel_type=np.full(3, 6), fmc=fmc)
+    a, b = make(**kw), make('python', **kw)
+    equal(a.runFBP(), b.runFBP())
+    assert np.isnan(a.getParams(['fmc'])[0][2]) and np.isnan(a.getParams(['fme'])[0][2])
+    a.setParams({'fmc': None})
+    b.setParams({'fmc': None})
+    equal(a.runFBP(), b.runFBP())
+    equal(a.runFBP(), make('python', fuel_type=np.full(3, 6)).runFBP())
 
 
 @pytest.mark.parametrize('kw', [dict(lat=83, long=-52, elevation=5959),
@@ -252,8 +287,12 @@ def test_fmc_input_update_and_injected_reset():
     for a, b in zip(model.getParams(['fmc', 'fme', 'd0', 'dj']),
                     reference.getParams(['fmc', 'fme', 'd0', 'dj']), strict=True):
         np.testing.assert_allclose(a, b, rtol=1e-9)
-    model.setParams({'fmc': 9, 'hros': np.nan, 'cbh': 90})
+    # the injected hros and cbh are discarded by runFBP; the fmc is an override and persists
+    for each in (model, reference):
+        each.setParams({'fmc': 9, 'hros': np.nan, 'cbh': 90})
     equal(model.runFBP(), reference.runFBP(), scalar=True)
+    equal(model.runFBP(), reference.runFBP(), scalar=True)
+    assert model.getParams(['fmc'])[0] == reference.getParams(['fmc'])[0] == 9
     model.initialize(**BASE, out_request=ALL)
     equal(model.runFBP(), make('python').runFBP(), scalar=True)
 

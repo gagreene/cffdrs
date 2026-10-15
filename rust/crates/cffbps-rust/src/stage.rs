@@ -151,7 +151,14 @@ impl Stage {
             Stage::InvertWindAspect => &[F::WdIn, F::AspectIn],
             Stage::CalcSf => &[F::Slope],
             Stage::CalcIsz => &[F::Ffmc],
-            Stage::CalcFmc => &[F::Lat, F::Long, F::Elevation, F::D0Override, F::DjOverride],
+            Stage::CalcFmc => &[
+                F::Lat,
+                F::Long,
+                F::Elevation,
+                F::D0Override,
+                F::DjOverride,
+                F::FmcOverride,
+            ],
             Stage::CalcIsiRsiBe => &[
                 F::FuelType,
                 F::Gcf,
@@ -276,7 +283,14 @@ mod tests {
         ("calcISZ", &["ffmc"], &["m", "fF", "isz"]),
         (
             "calcFMC",
-            &["lat", "long", "elevation", "d0_override", "dj_override"],
+            &[
+                "lat",
+                "long",
+                "elevation",
+                "d0_override",
+                "dj_override",
+                "fmc_override",
+            ],
             &["latn", "d0", "dj", "nd", "fmc", "fme"],
         ),
         (

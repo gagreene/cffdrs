@@ -110,6 +110,7 @@ fn a_template_holds_the_python_initialize_values() {
             percentile_growth: 50.0,
             d0: None,
             dj: None,
+            fmc: None,
         },
     );
     for f in Field::ALL {

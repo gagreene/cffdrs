@@ -263,7 +263,7 @@ The aliases used for injection are `bfW` and `accel_param`; exports use `bfw` an
 
 ### Fields and stages
 
-There are 75 per-cell fields: 54 public outputs, 12 input-only fields and nine internal fields.
+There are 76 per-cell fields: 54 public outputs, 13 input-only fields and nine internal fields.
 The following reference follows the current `field.rs` and `stage.rs`; their tests
 validate read/write completeness. `wx_date` and `percentile_growth` are scalar
 parameters, not per-cell fields.
@@ -271,7 +271,7 @@ parameters, not per-cell fields.
 | Group | Names |
 |---|---|
 | Public outputs (54) | `ws wd wse wse1 wse2 wsx wsy wsv raz m fF fW ffmc isi bui a b c q bui0 be be_max sf rsz rsf isf rsi latn dj d0 nd fmc fme ffc wfc sfc cfl cfc tfc cbh csfi rso cfb fire_type hros sros cros bfw bisi bros hfi fi_class accel fuel_type` |
-| Input-only (12) | `lat long elevation slope pc pdf gfl gcf d0_override dj_override wd_in aspect_in` |
+| Input-only (13) | `lat long elevation slope pc pdf gfl gcf d0_override dj_override fmc_override wd_in aspect_in` |
 | Internal (9) | `isz brsi c6_blend_cfb c6_blend_cfc percentile_cfb percentile_bros_cfb bros_cfb hros_growth_nan aspect` |
 
 `wd_in`/`aspect_in` are raw angles; `wd`/`aspect` are inverted working values.
@@ -284,7 +284,7 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
 | `invertWindAspect` | wd_in, aspect_in | wd, aspect |
 | `calcSF` | slope | sf |
 | `calcISZ` | ffmc | m, fF, isz |
-| `calcFMC` | lat, long, elevation, d0_override, dj_override | latn, d0, dj, nd, fmc, fme |
+| `calcFMC` | lat, long, elevation, d0_override, dj_override, fmc_override | latn, d0, dj, nd, fmc, fme |
 | `calcISI_RSI_BE` | fuel_type, gcf, isz, sf, pc, pdf, bui, fF, wd, aspect, ws | a, b, c, q, bui0, be_max, rsz, rsf, isf, rsi, brsi, be, wse1, wse2, wse, wsx, wsy, wsv, raz, fW, bfw, isi, bisi |
 | `calcROS` | rsi, brsi, be, bui, sros, fuel_type | hros, bros, sros, hros_growth_nan |
 | `calcSFC` | fuel_type, ffmc, bui, pc, gfl | ffc, wfc, sfc |
@@ -420,14 +420,21 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
   applies the same rule in its `calcTFC`, checked only through a NumPy stand-in for `cupy`
   (`tests/cffbps/test_cupy_consumption.py`), not on a GPU.
 
-- **A provided `fmc` gives the matching `fme`.** Foliar moisture content given by the user
-  (`setParams({'fmc': ...})`, assigning `fbp.fmc`, `FbpGrid.set(Fmc, ...)` or the crate's
-  `FbpInput::fmc_override`) also sets the foliar moisture effect from the same formula, so the C-6
-  crown rate of spread (the only user of `fme`) is the one `calcFMC` would give for that `fmc`. Before,
-  injecting `fmc` instead of running `calcFMC` left `fme` at its zero template and collapsed C-6 crown
-  results (crown cells came out as surface fire). `latn`, `d0`, `dj` and `nd` still keep their templates;
-  an explicit `fme` in the same `setParams` call wins; a later `calcFMC` computes both again. Python:
-  `foliar_moisture.calc_fme` and the `fmc` property; Rust: `foliar_moisture::calc_fme`; CuPy: `setParams` (stand-in test only).
+- **`fmc` is an override, like `d0` and `dj`.** A foliar moisture content given by the user
+  (`initialize(fmc=...)`, `set_override('fmc', ...)`, `setParams({'fmc': ...})`, assigning `fbp.fmc`,
+  `calcFMC(fmc=...)`, `FbpGrid.set_override(FmcOverride, ...)` or the crate's `FbpInput::fmc_override`)
+  replaces only the derived `fmc`. It is used by every later `runFBP` until it is replaced, cleared with
+  `None`, or a new `initialize` is made; without a given value the calculated one is used. The `fme`
+  always follows the `fmc` that is used (same formula), so the C-6 crown rate of spread (the only user
+  of `fme`) is the one the calculated chain would give for that `fmc`; the given `fmc` and its `fme` are
+  there at once, so skipping `calcFMC` (the PyroCell sequence) still works. `latn`, `d0`, `dj` and `nd`
+  stay calculated whenever `calcFMC` runs (or `runFBP`), and a missing (NaN or masked) cell makes that
+  cell's `fmc` and `fme` missing. An explicit `fme` in the same `setParams` call wins. Before, injecting
+  `fmc` left `fme` at its zero template (C-6 crown cells came out as surface fire), and a later
+  `runFBP` discarded the injected value. Python: `foliar_moisture.calc_foliar_moisture(fmc_override=...)`,
+  `set_override`; Rust: `foliar_moisture::calc_foliar_moisture`, `Field::FmcOverride`,
+  `GridInput::fmc`; the experimental CuPy backend only derives `fme` from a `fmc` given in `setParams`
+  (no override semantics; stand-in test only).
 
 ## Outputs and intentional differences
 
@@ -447,7 +454,7 @@ invalid `out_request` values are rejected by the full-run interface.
 All-scalar exports are Python scalars, with measured legacy exceptions: invalid
 fuel and selected masked computations can export float zero rather than nominal
 integer values. Inapplicable scalar FFC/WFC may export zero; non-fuel/water
-CBH/CFL/CFC remain NaN. An explicit missing date exports NaN for d0/dj/FMC/FME.
+CBH/CFL/CFC remain NaN. An explicit missing d0, dj or fmc exports NaN for d0/dj/FMC/FME.
 Classification uses the mask of the HFI actually consumed: masked scalar HFI can
 export float zero, whereas unmasked infinite or finite injected HFI retains its
 integer classification. Acceleration likewise follows the produced field and
@@ -478,12 +485,13 @@ contract, reset/full-run lifecycle, and normalization of updated inputs. The nin
 normalized inputs (`slope aspect ws ffmc bui pc pdf gfl gcf`) use the same rules
 through initialize, assignment, setters and stage arguments.
 
-`set_override('d0', value)` and `set_override('dj', value)` accept scalars, arrays,
-masked arrays or None to clear. `setParams`, assignments and `calcFMC` date arguments
-use those routes; omitted arguments preserve overrides. `dj` is floored and clipped
+`set_override('d0', value)`, `set_override('dj', value)` and `set_override('fmc', value)` accept
+scalars, arrays, masked arrays or None to clear. `initialize`, `setParams`, assignments and the
+`calcFMC` arguments use those routes; omitted arguments preserve overrides, and an override given
+at `initialize` or later is used by each `runFBP` until replaced, cleared or re-initialised. `dj` is floored and clipped
 to 1..365 or 1..366 for the weather year, with the shared clipping warning once per
 supplied-value/year pair; infinity is rejected and missing cells remain missing.
-`d0` is a model parameter and is deliberately not calendar-clipped.
+`d0` is a model parameter and is deliberately not calendar-clipped, and `fmc` is not range-limited.
 
 ## Breaking changes in 0.2.0
 
@@ -502,7 +510,7 @@ There are no deep-import compatibility shims. The root FBP import now selects th
 backend once at initialization; explicit Python/Rust imports remain available.
 The distribution version is 0.2.0 (`cffdrs-py`); the core API version is 0.3.0.
 `GridInput` numeric fields use `PerCell::Const` or `PerCell::Cells`, and optional
-per-cell d0/dj overrides. Its fuel field remains a code slice. Consumers of the
+per-cell d0/dj/fmc overrides. Its fuel field remains a code slice. Consumers of the
 old scalar/slice struct shape must adapt; `run_grid_fields` can select arbitrary fields.
 
 Rust does not implement per-instance table calibration, Python result attribute

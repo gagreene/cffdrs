@@ -15,7 +15,7 @@ use crate::crown::{
 };
 use crate::fbp::{FbpInput, FbpResult};
 use crate::field::Field;
-use crate::foliar_moisture::{calc_foliar_moisture, injected_fmc, FoliarMoisture};
+use crate::foliar_moisture::{calc_foliar_moisture, FoliarMoisture};
 use crate::fuel::{CrownFuel, FuelType, RosParams};
 use crate::growth::calc_accel_param;
 use crate::normalize::{invert_wind_aspect, normalize, Normalized};
@@ -39,6 +39,8 @@ pub struct StageParams {
     pub d0: Option<f64>,
     /// As `d0`, for `dj` and [`Field::DjOverride`].
     pub dj: Option<f64>,
+    /// As `d0`, for `fmc` and [`Field::FmcOverride`].
+    pub fmc: Option<f64>,
 }
 
 /// The values of every [`Field`] for one cell, plus the scalar
@@ -54,8 +56,6 @@ pub struct CellState {
     values: [f64; Field::COUNT],
     ft: FuelType,
     params: StageParams,
-    /// `FbpInput::fmc_override`: `calcFMC` stores it instead of computing.
-    fmc_injection: Option<f64>,
     /// `FbpInput::hros_override`: `calcROS` replaces its head ROS with it.
     hros_injection: Option<f64>,
 }
@@ -63,8 +63,8 @@ pub struct CellState {
 impl CellState {
     /// A state with every input missing (NaN) and every computed field at its
     /// [`Field::template_value`], for fuel code `fuel_type`. The explicit
-    /// `d0` / `dj` values of `params`, if any, are stored in
-    /// [`Field::D0Override`] / [`Field::DjOverride`].
+    /// `d0` / `dj` / `fmc` values of `params`, if any, are stored in
+    /// [`Field::D0Override`] / [`Field::DjOverride`] / [`Field::FmcOverride`].
     #[must_use]
     pub fn template(fuel_type: i32, params: StageParams) -> Self {
         let mut values = [0.0; Field::COUNT];
@@ -75,20 +75,19 @@ impl CellState {
             values,
             ft: FuelType::from_code(fuel_type),
             params,
-            fmc_injection: None,
             hros_injection: None,
         };
         s.set(Field::FuelType, f64::from(fuel_type));
         s.set(Field::D0Override, params.d0.unwrap_or(f64::NAN));
         s.set(Field::DjOverride, params.dj.unwrap_or(f64::NAN));
+        s.set(Field::FmcOverride, params.fmc.unwrap_or(f64::NAN));
         s
     }
 
     /// The state [`fbp::run`](crate::fbp::run) starts from: the template with
     /// the inputs of `input`, normalised as `FBP.initialize` does (`long` is
     /// stored as its magnitude; `wd` and `aspect` hold the inputs until
-    /// `invertWindAspect` runs). `fmc_override` replaces `calcFMC`'s work and
-    /// `hros_override` replaces `calcROS`'s head ROS, as in [`FbpInput`].
+    /// `invertWindAspect` runs). `hros_override` replaces `calcROS`'s head ROS, as in [`FbpInput`].
     #[must_use]
     pub fn from_input(input: &FbpInput) -> Self {
         let mut s = Self::template(
@@ -98,6 +97,7 @@ impl CellState {
                 percentile_growth: input.percentile_growth,
                 d0: input.d0_override,
                 dj: input.dj_override,
+                fmc: input.fmc_override,
             },
         );
         let n = normalize(input);
@@ -120,7 +120,6 @@ impl CellState {
         ] {
             s.set(f, v);
         }
-        s.fmc_injection = input.fmc_override;
         s.hros_injection = input.hros_override;
         s
     }
@@ -199,9 +198,6 @@ impl CellState {
                 self.set(F::Isz, isz);
             }
             Stage::CalcFmc => {
-                // setParams({'fmc': ...}) in place of calcFMC: latn/d0/dj/nd keep
-                // their zero templates and fme is derived from the injected fmc
-                // (see FbpInput::fmc_override)
                 let FoliarMoisture {
                     latn,
                     d0,
@@ -209,17 +205,15 @@ impl CellState {
                     nd,
                     fmc,
                     fme,
-                } = match self.fmc_injection {
-                    Some(v) => injected_fmc(v),
-                    None => calc_foliar_moisture(
-                        self.get(F::Lat),
-                        self.get(F::Long),
-                        self.get(F::Elevation),
-                        self.params.wx_date,
-                        self.params.d0.map(|_| self.get(F::D0Override)),
-                        self.params.dj.map(|_| self.get(F::DjOverride)),
-                    ),
-                };
+                } = calc_foliar_moisture(
+                    self.get(F::Lat),
+                    self.get(F::Long),
+                    self.get(F::Elevation),
+                    self.params.wx_date,
+                    self.params.d0.map(|_| self.get(F::D0Override)),
+                    self.params.dj.map(|_| self.get(F::DjOverride)),
+                    self.params.fmc.map(|_| self.get(F::FmcOverride)),
+                );
                 for (f, v) in [
                     (F::Latn, latn),
                     (F::D0, d0),
@@ -518,6 +512,7 @@ mod tests {
             percentile_growth: 50.0,
             d0: None,
             dj: None,
+            fmc: None,
         }
     }
 

@@ -79,7 +79,7 @@ class AutoFBP:
     def initialize(self, fuel_type=None, wx_date=None, lat=None, long=None, elevation=None,
                    slope=None, aspect=None, ws=None, wd=None, ffmc=None, bui=None,
                    pc=50, pdf=35, gfl=0.35, gcf=80, d0=None, dj=None, out_request=None,
-                   convert_fuel_type_codes=False, percentile_growth=50, *, backend='auto', threads=1):
+                   convert_fuel_type_codes=False, percentile_growth=50, fmc=None, *, backend='auto', threads=1):
         """Initialize with Python's inputs plus a fixed backend and Rust threads.
 
         Auto silently uses Python when Rust is unavailable or a calibration table
@@ -116,7 +116,7 @@ class AutoFBP:
         kwargs = dict(
             fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation,
             slope=slope, aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf,
-            gfl=gfl, gcf=gcf, d0=d0, dj=dj, out_request=out_request,
+            gfl=gfl, gcf=gcf, d0=d0, dj=dj, fmc=fmc, out_request=out_request,
             convert_fuel_type_codes=convert_fuel_type_codes, percentile_growth=percentile_growth,
         )
         if chosen == 'rust':

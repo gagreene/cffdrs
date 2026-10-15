@@ -200,6 +200,11 @@ pub struct GridInput<'a> {
     /// ([`GridError::InfiniteDj`]). A NaN value is a masked override: that
     /// cell's `dj`, `nd`, `fmc` and `fme` are NaN.
     pub dj: Option<PerCell<'a>>,
+    /// Explicit foliar moisture content (`fmc`, %), used as given (no range
+    /// limit) instead of the derived value; `None` derives it. The `fme`
+    /// follows it. A NaN value is a masked override: that cell's `fmc` and
+    /// `fme` are NaN.
+    pub fmc: Option<PerCell<'a>>,
 }
 
 /// Why a grid run was rejected before any cell was computed (returned by
@@ -223,7 +228,7 @@ pub enum GridError {
     /// day of year (it is rejected, not clipped).
     InfiniteDj,
     /// [`crate::fbp_grid::FbpGrid::set_override`] was given a field other
-    /// than [`Field::D0Override`] or [`Field::DjOverride`].
+    /// than [`Field::D0Override`], [`Field::DjOverride`] or [`Field::FmcOverride`].
     NotAnOverride(Field),
 }
 
@@ -243,7 +248,7 @@ impl fmt::Display for GridError {
             }
             GridError::NotAnOverride(field) => write!(
                 f,
-                "{} is not an override: use d0_override or dj_override",
+                "{} is not an override: use d0_override, dj_override or fmc_override",
                 field.name()
             ),
         }
@@ -410,6 +415,7 @@ impl GridInput<'_> {
             ("bui", Some(self.bui)),
             ("d0", self.d0),
             ("dj", self.dj),
+            ("fmc", self.fmc),
         ] {
             if let Some(p) = input {
                 if !p.check_len(expected) {
@@ -466,7 +472,7 @@ impl Pass<'_, '_> {
             percentile_growth: g.percentile_growth,
             d0_override: g.d0.map(|d0| d0.at(i)),
             dj_override: self.dj.as_ref().map(|dj| dj.at(i)),
-            fmc_override: None,
+            fmc_override: g.fmc.map(|fmc| fmc.at(i)),
             hros_override: None,
         }
     }
@@ -775,6 +781,7 @@ pub(crate) fn python_non_modeled(f: Field, ft: FuelType, cell: &FbpInput, comput
 ///     percentile_growth: 50.0,
 ///     d0: None,
 ///     dj: Some(PerCell::Const(166.7)), // floored to day 166
+///     fmc: None,
 /// };
 /// let out = run_grid_fields(&input, &[Field::Hros, Field::Dj, Field::FireType], 1, NonModeled::PythonCompat)
 ///     .unwrap();
@@ -918,6 +925,7 @@ pub(crate) fn fill_chunks(
 ///     percentile_growth: 50.0,
 ///     d0: None,
 ///     dj: None,
+///     fmc: None,
 /// };
 /// let grids = run_grid(&input).unwrap();
 /// assert_eq!(grids.hros.len(), 2);

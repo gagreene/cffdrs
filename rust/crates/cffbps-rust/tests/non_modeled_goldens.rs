@@ -66,6 +66,7 @@ fn grid<'a>(fuel: &'a [i32], s: &Scenario, wx_date: i64) -> GridInput<'a> {
         percentile_growth: number(&s.inputs["percentile_growth"]),
         d0: s.override_of("d0"),
         dj: s.override_of("dj"),
+        fmc: None,
     }
 }
 

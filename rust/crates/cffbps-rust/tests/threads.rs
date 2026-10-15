@@ -62,6 +62,7 @@ fn grids_for(c: &Cells, threads: Option<usize>) -> BehaviourGrids {
         percentile_growth: 90.0,
         d0: None,
         dj: None,
+        fmc: None,
     };
     match threads {
         None => run_grid(&input).unwrap(),

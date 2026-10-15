@@ -13,7 +13,7 @@
 //! | Module | Responsibility | Python counterpart |
 //! |---|---|---|
 //! | [`fbp`] | [`fbp::FbpInput`], [`fbp::FbpResult`], [`fbp::run`] composing the stages | `FBP.runFBP` (`python/core.py`) |
-//! | [`field`] | [`field::Field`]: the 75 per-cell quantities (54 outputs, 12 input-only, 9 internal) | `FBP` attributes |
+//! | [`field`] | [`field::Field`]: the 76 per-cell quantities (54 outputs, 13 input-only, 9 internal) | `FBP` attributes |
 //! | [`stage`] | [`stage::Stage`]: the 23 pipeline stages, their order and the fields each reads and writes | `FBP.calcX` methods |
 //! | [`state`] | [`state::CellState`], [`state::StageParams`]: one cell's fields and the stage bodies | an initialised `FBP` |
 //! | [`grid`] | [`grid::GridInput`] of [`grid::PerCell`] inputs, [`grid::run_grid_fields`] (any requested [`field::Field`]s, [`grid::NonModeled`] choice), [`grid::GridError`], [`grid::BehaviourGrids`], [`grid::run_grid`] | `cffdrs._rust.run_fbp_grid` (compiled grid pass); `fbpMultiprocessArray` in `python/parallel.py` |

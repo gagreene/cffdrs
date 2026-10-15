@@ -130,11 +130,13 @@ def calc_foliar_moisture(*,
                          wx_date: int,
                          d0_override: MaskedArray | int | None = None,
                          dj_override: MaskedArray | int | None = None,
+                         fmc_override: MaskedArray | float | None = None,
                          ) -> FoliarMoistureResult:
     """Compute the foliar moisture quantities by chaining the functions of this module.
 
-    An explicit ``d0_override`` or ``dj_override`` replaces the derived D0 or DJ; when it is ``None`` the value
-    is derived from latitude, elevation and ``wx_date``.
+    An explicit ``d0_override``, ``dj_override`` or ``fmc_override`` replaces the derived D0, DJ or FMC; when it is
+    ``None`` the value is derived (D0 and DJ from latitude, elevation and ``wx_date``, FMC from ND). The FME always
+    follows the FMC that is used. A NaN or masked cell in an override is a missing value.
 
     :param lat: latitude (decimal degrees)
     :param long: longitude (decimal degrees)
@@ -142,12 +144,13 @@ def calc_foliar_moisture(*,
     :param wx_date: weather date as YYYYMMDD
     :param d0_override: explicit D0, or None to derive it
     :param dj_override: explicit DJ, or None to derive it
+    :param fmc_override: explicit FMC (%), or None to derive it
     :return: latn, d0, dj, nd, fmc and fme
     """
     latn = calc_latn(long=long, elevation=elevation)
     d0 = calc_d0(lat=lat, latn=latn, elevation=elevation) if d0_override is None else _as_masked(d0_override)
     dj = calc_dj(latn=latn, wx_date=wx_date) if dj_override is None else _as_masked(dj_override)
     nd = calc_nd(dj=dj, d0=d0)
-    fmc = calc_fmc(nd=nd)
+    fmc = calc_fmc(nd=nd) if fmc_override is None else _as_masked(fmc_override)
     fme = calc_fme(fmc=fmc)
     return FoliarMoistureResult(latn=latn, d0=d0, dj=dj, nd=nd, fmc=fmc, fme=fme)
