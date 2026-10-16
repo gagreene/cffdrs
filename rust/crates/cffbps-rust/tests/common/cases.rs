@@ -111,5 +111,30 @@ pub fn cases() -> Vec<(i32, f64, FbpInput)> {
             }
         }
     }
+    // Appended after every original run (so their rows keep their index and their random draws):
+    // negative d0 / dj / fmc overrides ask for the derived value, 4 per fuel code, from the plain
+    // percentile-50 inputs of cells 0 and 24.
+    let per_fuel = 48 * 6;
+    for (f, &fuel) in fuels.iter().enumerate() {
+        let plain = |cell: usize| out[f * per_fuel + cell * 6].2.clone();
+        let (a, b) = (plain(0), plain(24));
+        let mut d0 = a.clone();
+        d0.d0_override = Some(-1.0);
+        let mut dj = a;
+        dj.dj_override = Some(-999.0);
+        let mut fmc = b.clone();
+        fmc.fmc_override = Some(-1.0);
+        let mut mixed = b;
+        mixed.d0_override = Some(150.0);
+        mixed.dj_override = Some(-5.0);
+        mixed.fmc_override = Some(-0.5);
+        for i in [d0, dj, fmc, mixed] {
+            out.push((fuel, 50.0, i));
+        }
+    }
     out
 }
+
+/// The number of runs of [`cases`].
+#[allow(dead_code)]
+pub const CASE_COUNT: usize = 25 * 48 * 6 + 25 * 4;

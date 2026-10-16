@@ -10,6 +10,8 @@ from typing import NamedTuple
 import numpy as np
 from numpy import ma as mask
 
+from ...common.fmc_inputs import CALCULATE
+
 MaskedArray = mask.MaskedArray
 
 
@@ -29,6 +31,18 @@ def _as_masked(value) -> MaskedArray:
     if data.dtype.kind == 'f':
         return mask.array(data, mask=np.ma.getmaskarray(value) | np.isnan(data))
     return mask.array(data, mask=np.ma.getmaskarray(value))
+
+
+def _resolve(override, derived: MaskedArray) -> MaskedArray:
+    """An explicit override where it is given, the derived value in the cells that ask for a calculation.
+
+    A cell holding ``CALCULATE`` (-1) takes the derived value; masked and NaN override cells stay missing.
+    """
+    given = _as_masked(override)
+    calculate = (np.ma.getdata(given) == CALCULATE) & ~np.ma.getmaskarray(given)
+    if not calculate.any():
+        return given
+    return mask.where(calculate, derived, given)
 
 
 def calc_latn(*,
@@ -135,8 +149,9 @@ def calc_foliar_moisture(*,
     """Compute the foliar moisture quantities by chaining the functions of this module.
 
     An explicit ``d0_override``, ``dj_override`` or ``fmc_override`` replaces the derived D0, DJ or FMC; when it is
-    ``None`` the value is derived (D0 and DJ from latitude, elevation and ``wx_date``, FMC from ND). The FME always
-    follows the FMC that is used. A NaN or masked cell in an override is a missing value.
+    ``None`` the value is derived (D0 and DJ from latitude, elevation and ``wx_date``, FMC from ND). In an override
+    array a cell holding -1 (``CALCULATE``) is derived like the cells of no override. The FME always follows the FMC
+    that is used. A NaN or masked cell in an override is a missing value.
 
     :param lat: latitude (decimal degrees)
     :param long: longitude (decimal degrees)
@@ -148,9 +163,15 @@ def calc_foliar_moisture(*,
     :return: latn, d0, dj, nd, fmc and fme
     """
     latn = calc_latn(long=long, elevation=elevation)
-    d0 = calc_d0(lat=lat, latn=latn, elevation=elevation) if d0_override is None else _as_masked(d0_override)
-    dj = calc_dj(latn=latn, wx_date=wx_date) if dj_override is None else _as_masked(dj_override)
+    d0 = calc_d0(lat=lat, latn=latn, elevation=elevation)
+    if d0_override is not None:
+        d0 = _resolve(d0_override, d0)
+    dj = calc_dj(latn=latn, wx_date=wx_date)
+    if dj_override is not None:
+        dj = _resolve(dj_override, dj)
     nd = calc_nd(dj=dj, d0=d0)
-    fmc = calc_fmc(nd=nd) if fmc_override is None else _as_masked(fmc_override)
+    fmc = calc_fmc(nd=nd)
+    if fmc_override is not None:
+        fmc = _resolve(fmc_override, fmc)
     fme = calc_fme(fmc=fmc)
     return FoliarMoistureResult(latn=latn, d0=d0, dj=dj, nd=nd, fmc=fmc, fme=fme)

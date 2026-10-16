@@ -142,10 +142,18 @@ pub(crate) fn calc_fme(fmc: f64) -> f64 {
     1000.0 * (1.5 - 0.00275 * fmc).powi(4) / (460.0 + 25.9 * fmc)
 }
 
+/// An override value as the calculation uses it: a negative value (documented as -1) asks for the
+/// derived value, so it is no override; NaN is a missing value and stays one.
+#[inline]
+fn given(override_value: Option<f64>) -> Option<f64> {
+    override_value.filter(|v| v.is_nan() || *v >= 0.0)
+}
+
 /// `foliar_moisture.calc_foliar_moisture`: the chain of the functions above.
 /// An explicit `d0_override`, `dj_override` or `fmc_override` replaces the
 /// derived value; the fme follows the fmc that is used. `Some(NaN)` is a
-/// missing value.
+/// missing value and a negative value (documented as -1) asks for the
+/// derived value, as `None` does.
 pub(crate) fn calc_foliar_moisture(
     lat: f64,
     abs_long: f64,
@@ -156,10 +164,10 @@ pub(crate) fn calc_foliar_moisture(
     fmc_override: Option<f64>,
 ) -> FoliarMoisture {
     let latn = calc_latn(elevation, abs_long);
-    let d0 = d0_override.unwrap_or_else(|| calc_d0(lat, latn, elevation));
-    let dj = dj_override.unwrap_or_else(|| calc_dj(latn, wx_date));
+    let d0 = given(d0_override).unwrap_or_else(|| calc_d0(lat, latn, elevation));
+    let dj = given(dj_override).unwrap_or_else(|| calc_dj(latn, wx_date));
     let nd = calc_nd(dj, d0);
-    let fmc = fmc_override.unwrap_or_else(|| calc_fmc(nd));
+    let fmc = given(fmc_override).unwrap_or_else(|| calc_fmc(nd));
     let fme = calc_fme(fmc);
     FoliarMoisture {
         latn,
@@ -284,6 +292,48 @@ mod tests {
         let missing =
             calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, Some(f64::NAN), None, None);
         assert!(missing.nd.is_nan() && missing.fmc.is_nan() && missing.fme.is_nan());
+    }
+
+    #[test]
+    fn a_negative_override_asks_for_the_derived_value_and_nan_stays_missing() {
+        let base = calc_foliar_moisture(55.0, 110.0, 500.0, 20_230_615, None, None, None);
+        for negative in [-1.0, -5.0, -0.5, -999.0] {
+            let r = calc_foliar_moisture(
+                55.0,
+                110.0,
+                500.0,
+                20_230_615,
+                Some(negative),
+                Some(negative),
+                Some(negative),
+            );
+            assert_eq!((r.d0, r.dj, r.nd), (base.d0, base.dj, base.nd));
+            assert_eq!((r.fmc, r.fme), (base.fmc, base.fme));
+        }
+        // a calculate request beside a given value: each is its own cell's business
+        let r = calc_foliar_moisture(
+            55.0,
+            110.0,
+            500.0,
+            20_230_615,
+            Some(-1.0),
+            Some(170.0),
+            None,
+        );
+        assert_eq!((r.d0, r.dj), (base.d0, 170.0));
+        let r = calc_foliar_moisture(
+            55.0,
+            110.0,
+            500.0,
+            20_230_615,
+            Some(f64::NAN),
+            None,
+            Some(-1.0),
+        );
+        assert!(
+            r.d0.is_nan() && r.nd.is_nan() && r.fmc.is_nan(),
+            "a NaN d0 is missing, not calculated"
+        );
     }
 
     #[test]

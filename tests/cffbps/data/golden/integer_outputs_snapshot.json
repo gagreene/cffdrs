@@ -9,11 +9,11 @@
       "dtype": "int64"
     },
     "dj": {
-      "value": 166,
+      "value": 0,
       "dtype": "int64"
     },
     "fuel_type": {
-      "value": 2,
+      "value": 0,
       "dtype": "int8"
     }
   },
@@ -189,7 +189,7 @@
       "dtype": "int64"
     },
     "dj": {
-      "value": 166,
+      "value": 0,
       "dtype": "int64"
     },
     "fuel_type": {
@@ -207,8 +207,8 @@
       "dtype": "float"
     },
     "dj": {
-      "value": 166,
-      "dtype": "int"
+      "value": 0.0,
+      "dtype": "float"
     },
     "fuel_type": {
       "value": 0.0,
@@ -297,7 +297,7 @@
       "dtype": "int64"
     },
     "dj": {
-      "value": 166,
+      "value": 0,
       "dtype": "int64"
     },
     "fuel_type": {
@@ -315,8 +315,8 @@
       "dtype": "float"
     },
     "dj": {
-      "value": 166,
-      "dtype": "int"
+      "value": 0.0,
+      "dtype": "float"
     },
     "fuel_type": {
       "value": 0.0,
@@ -333,7 +333,7 @@
       "dtype": "int64"
     },
     "dj": {
-      "value": 166,
+      "value": 0,
       "dtype": "int64"
     },
     "fuel_type": {
@@ -351,8 +351,8 @@
       "dtype": "float"
     },
     "dj": {
-      "value": 166,
-      "dtype": "int"
+      "value": 0.0,
+      "dtype": "float"
     },
     "fuel_type": {
       "value": 0.0,

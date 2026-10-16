@@ -63,6 +63,8 @@ plan to change), **open** (should be revisited), **fixed** (kept for history).
 | BD-F1 | Scalar fuels 10-13 (mixedwood) with missing `lat`, `long` or `elevation` and percentile not 50: Python exports `hros` / `bros` 0.0 (masked), Rust gave NaN | `_scalar_masks.py` growth rule now covers fuels 10-13; test `test_scalar_mixedwood_growth_keeps_the_foliar_moisture_mask` |
 | BD-F2 | A missing `d0` / `dj` override exported 0.0 before `calcFMC` (found by the final scoped review) | `ScalarMasks.set`; test `test_missing_date_override_exports_nan_before_and_after_calcfmc` |
 | BD-F4 | `fmc` became an override like `d0` / `dj` (sticky, `initialize(fmc=...)`, missing cell exports NaN); the CuPy backend has no override and only derives `fme` from a `fmc` given to `setParams` | Python/Rust `set_override('fmc')`; tests `test_fmc_override_*`, `test_override_routes[fmc-*]` |
+| BD-F5 | Negative `d0`/`dj`/`fmc` override cells (documented -1) ask for a calculation; a negative scalar is `None`; array cells of `fmc`/`fme` are NaN until `calcFMC`; the CuPy backend has no such override | `common/fmc_inputs.py`, `foliar_moisture.rs`; tests `test_calculate_sentinel.py`, `test_calculate_cells_match_python` |
+| BD-F6 | The fuel mask applies to every input and override (fuel-masked cells are missing everywhere; `fuel_type` exports 0; `dj` 0); the CuPy backend is unchanged | `inputs.apply_fuel_mask`; tests `test_fuel_mask.py` |
 | BD-F3 | Fuel dtype / mask / wrap, repeated `runFBP`, stale FMC results, stale injected values, unnormalised updates (five owner-authorised reference changes, D13) | Python reference, `docs/CODEBASE.md` |
 
 ## Where to focus next

@@ -486,3 +486,79 @@ def test_rust_unsupported_operations_advise_python(operation):
             model.runFBP(block=1)
         else:
             model.getCBH_CFL(cbh=3.)
+
+
+# --- negative override cells ask for a calculation (documented as -1) ------------------------------------------
+
+CALC_ARRAYS = {'d0': np.array([-1., 150., -999., 130.]), 'dj': np.array([-1., 170., -5., 0.]),
+               'fmc': np.array([-1., 99., -999., 101.])}
+
+
+@pytest.mark.parametrize('name', ['d0', 'dj', 'fmc'])
+@pytest.mark.parametrize('route', ['initialize', 'set_override', 'setParams', 'calcFMC'])
+def test_calculate_cells_match_python(name, route):
+    kw = dict(fuel_type=np.full(4, 6))
+    a, b = make(**kw), make('python', **kw)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        if route == 'initialize':
+            a, b = make(**kw, **{name: CALC_ARRAYS[name]}), make('python', **kw, **{name: CALC_ARRAYS[name]})
+        else:
+            for model in (a, b):
+                if route == 'set_override':
+                    model.set_override(name, CALC_ARRAYS[name])
+                elif route == 'setParams':
+                    model.setParams({name: CALC_ARRAYS[name]})
+                else:
+                    model.calcFMC(**{name: CALC_ARRAYS[name]})
+        equal(a.runFBP(), b.runFBP())
+
+
+def test_calculate_cells_mix_with_missing_and_all_three_overrides():
+    kw = dict(fuel_type=np.full(4, 6), d0=np.array([-1., 150., np.nan, 130.]), dj=np.array([170., -1., 170., -7.]),
+              fmc=np.array([-1., -1., 90., 95.]))
+    equal(make(**kw).runFBP(), make('python', **kw).runFBP())
+
+
+def test_the_dj_warning_counts_only_clipped_cells_and_ignores_calculate_cells():
+    kw = dict(fuel_type=np.full(4, 6), dj=np.array([-1., -5., 0., 400.]))
+    with warnings.catch_warnings(record=True) as native:
+        warnings.simplefilter('always')
+        actual = make(**kw).runFBP()
+    with warnings.catch_warnings(record=True) as reference:
+        warnings.simplefilter('always')
+        expected = make('python', **kw).runFBP()
+    assert [str(w.message) for w in native] == [str(w.message) for w in reference] == [
+        'dj override: 2 value(s) outside 1..365 (year 2023) were clipped']
+    equal(actual, expected)
+
+
+@pytest.mark.parametrize('name', ['d0', 'dj', 'fmc'])
+@pytest.mark.parametrize('value', [-1, -5, -0.5])
+def test_a_scalar_negative_is_no_override_on_both_backends(name, value):
+    for backend in ('python', 'rust'):
+        equal(make(backend, **{name: value}).runFBP(), make(backend).runFBP(), scalar=True)
+    for kw in (dict(lat=np.nan), dict(long=np.nan), dict(elevation=np.nan)):
+        equal(make(**kw, **{name: value}).runFBP(), make('python', **kw).runFBP(), scalar=True)
+
+
+def test_array_calculate_cells_are_missing_before_calcfmc_and_c6_follows():
+    fmc = np.array([-1., 99., 101., -1.])
+    a, b = make(fuel_type=np.full(4, 6), fmc=fmc), make('python', fuel_type=np.full(4, 6), fmc=fmc)
+    same = ['latn', 'd0', 'dj', 'nd', 'fmc', 'fme', 'csfi', 'rso', 'cros', 'hros']
+
+    def compare():
+        for x, y in zip(a.getParams(same), b.getParams(same), strict=True):
+            np.testing.assert_allclose(x, np.broadcast_to(y, np.shape(x)), rtol=1e-9, equal_nan=True)  # BD-01
+
+    compare()
+    assert np.isnan(a.getParams(['fmc', 'fme'])[0][[0, 3]]).all()
+    for model in (a, b):
+        for stage in ['invertWindAspect', 'calcSF', 'calcISZ', 'calcISI_RSI_BE', 'calcROS', 'calcSFC', 'getCBH_CFL',
+                      'calcCSFI', 'calcRSO', 'calcC6BlendCFB', 'calcC6BlendCFC', 'calcC6CROS', 'calcC6HROS']:
+            getattr(model, stage)()
+    compare()
+    assert np.isnan(a.getParams(['hros'])[0][[0, 3]]).all() and np.isfinite(a.getParams(['hros'])[0][[1, 2]]).all()
+    a.calcFMC()
+    b.calcFMC()
+    compare()

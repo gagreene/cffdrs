@@ -1037,7 +1037,8 @@ def test_dj_floor_clip_and_masks_on_every_route(route, year):
                               lat=np.full(supplied.shape, 55.))
         fbp.calcFMC()
         fbp.calcFMC()
-    count = 4 if top == 366 else 6
+    # the -5 cell is a calculate request (derived day 1 on 1 January), not a clipped value
+    count = 3 if top == 366 else 5
     assert [str(w.message) for w in seen] == [
         f'dj override: {count} value(s) outside 1..{top} (year {year}) were clipped']
     actual = fbp.getParams(['dj'])[0]
@@ -1065,7 +1066,7 @@ def test_dj_in_range_fraction_and_missing_do_not_warn(value):
         fbp.calcFMC()
 
 
-@pytest.mark.parametrize('value', [0., -5., 366., 367., 400.])
+@pytest.mark.parametrize('value', [0., 366., 367., 400.])
 def test_dj_clipping_is_a_user_warning(value):
     import warnings
     with warnings.catch_warnings():

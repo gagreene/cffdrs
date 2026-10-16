@@ -192,7 +192,10 @@ pub struct GridInput<'a> {
     pub percentile_growth: f64,
     /// Explicit date of minimum foliar moisture (`d0`), used as given (no
     /// range limit); `None` derives it from latitude and elevation. A NaN value
-    /// is a masked override: that cell's `d0`, `nd`, `fmc` and `fme` are NaN.
+    /// is a masked override: that cell's `d0`, `nd`, `fmc` and `fme` are NaN. A
+    /// negative value (documented as -1) in a cell asks for that cell to be
+    /// calculated; a constant negative is no override. The same holds for `dj`
+    /// and `fmc`.
     pub d0: Option<PerCell<'a>>,
     /// Explicit day of year of the fire (`dj`); `None` derives it from
     /// `wx_date`. A supplied value is floored and then clipped to 1..365
@@ -348,7 +351,9 @@ const BEHAVIOUR_FIELDS: [Field; 10] = [
 
 /// A supplied `dj` override resolved to the days of the year of `wx_date`
 /// (D15.6 of the FMC contract): each value is floored, then clipped to 1..365,
-/// or 1..366 in a leap year; NaN stays NaN (a masked override). Returns the
+/// or 1..366 in a leap year; NaN stays NaN (a masked override) and a negative
+/// value (a request to calculate that cell) is kept as given: it is neither
+/// floored, clipped nor counted. Returns the
 /// resolved values and how many supplied values clipping changed (flooring a
 /// fraction does not count; a `Const` is one value).
 ///
@@ -369,6 +374,9 @@ pub(crate) fn resolve_dj(
         if v.is_infinite() {
             return Err(GridError::InfiniteDj);
         }
+        if v < 0.0 {
+            return Ok((v, false));
+        }
         let day = v.floor();
         let clipped = day.clamp(1.0, last_day);
         Ok((clipped, clipped != day && !v.is_nan()))
@@ -388,6 +396,15 @@ pub(crate) fn resolve_dj(
             }
             Ok((OwnedPerCell::Cells(days), changed))
         }
+    }
+}
+
+/// A constant negative override asks for every cell to be calculated, which is what no
+/// override does: it is dropped. Arrays keep their negative cells (calculated one by one).
+pub(crate) fn without_constant_request(values: Option<PerCell<'_>>) -> Option<PerCell<'_>> {
+    match values {
+        Some(PerCell::Const(v)) if v < 0.0 && v.is_finite() => None,
+        other => other,
     }
 }
 

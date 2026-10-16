@@ -11,7 +11,7 @@ from numpy import ma as mask
 
 from ..common import constants, inputs
 from ..common.fingerprint import fingerprint
-from ..common.fmc_inputs import coerce_override, resolve_dj_override
+from ..common.fmc_inputs import CALCULATE, coerce_override, resolve_dj_override
 from ..common.season import getSeasonGrassCuring as getSeasonGrassCuring
 from .equations import consumption as consumption_eq
 from .equations import crown as crown_eq
@@ -32,7 +32,23 @@ class _Normalised:
         return self if obj is None else getattr(obj, self.slot)
 
     def __set__(self, obj, value):
-        setattr(obj, self.slot, None if value is None else inputs.normalize_input(self.name, value))
+        normalised = None if value is None else inputs.normalize_input(self.name, value)
+        obj._raw[self.name] = normalised
+        setattr(obj, self.slot, obj._fuel_masked(normalised))
+
+
+class _Input:
+    """Attribute that carries the fuel mask: the value as given is kept apart from the one the model uses."""
+
+    def __set_name__(self, owner, name):
+        self.name, self.slot = name, '_' + name
+
+    def __get__(self, obj, objtype=None):
+        return self if obj is None else getattr(obj, self.slot)
+
+    def __set__(self, obj, value):
+        obj._raw[self.name] = value
+        setattr(obj, self.slot, obj._fuel_masked(value))
 
 
 ##################################################################################################
@@ -52,6 +68,10 @@ class FBP:
     pdf = _Normalised()
     gfl = _Normalised()
     gcf = _Normalised()
+    # Inputs that are kept as given (``wd`` and ``aspect`` are properties below)
+    lat = _Input()
+    long = _Input()
+    elevation = _Input()
 
     @property
     def wd(self):
@@ -59,7 +79,8 @@ class FBP:
 
     @wd.setter
     def wd(self, value):
-        self._wd_in = value
+        self._raw['wd'] = value
+        self._wd_in = self._fuel_masked(value)
         self._wd_inv = self._aspect_inv = None
 
     @property
@@ -68,7 +89,9 @@ class FBP:
 
     @aspect.setter
     def aspect(self, value):
-        self._aspect_in = None if value is None else inputs.normalize_input('aspect', value)
+        normalised = None if value is None else inputs.normalize_input('aspect', value)
+        self._raw['aspect'] = normalised
+        self._aspect_in = self._fuel_masked(normalised)
         self._wd_inv = self._aspect_inv = None
 
     @property
@@ -83,7 +106,8 @@ class FBP:
     def fmc(self):
         if self._fmc_res is not None:
             return self._fmc_res
-        return self._fmc_supplied if self._fmc_supplied is not None else self._fmc_template
+        given = self._fmc_given()
+        return given if given is not None else self._fmc_template
 
     @fmc.setter
     def fmc(self, value):
@@ -107,7 +131,9 @@ class FBP:
         ``fmc`` and ``fme`` NaN, a missing ``fmc`` makes ``fmc`` and ``fme`` NaN). A ``dj`` is floored and clipped
         to the days of the year of ``wx_date`` when it is used; ``d0`` and ``fmc`` are not range-limited. The
         ``fme`` always follows the ``fmc`` that is used, so a given ``fmc`` also gives its ``fme`` at once (the
-        C-6 crown rate of spread needs it even if ``calcFMC`` is skipped).
+        C-6 crown rate of spread needs it even if ``calcFMC`` is skipped). In an array a negative cell (use -1) asks
+        for that cell to be calculated by ``calcFMC``/``runFBP`` (``fmc`` and ``fme`` are NaN there until then); a
+        negative scalar is the same as ``None``.
 
         :param name: 'd0', 'dj' or 'fmc'
         :param values: the explicit value, or None to return to the derived value
@@ -115,7 +141,9 @@ class FBP:
         """
         if name not in ('d0', 'dj', 'fmc'):
             raise ValueError("set_override name must be 'd0', 'dj' or 'fmc'")
-        supplied = coerce_override(name, values)
+        raw = coerce_override(name, values)
+        self._raw[name] = raw
+        supplied = self._fuel_masked(raw)
         if name == 'd0':
             self._d0_supplied, self._d0_res = supplied, None
         elif name == 'dj':
@@ -124,14 +152,61 @@ class FBP:
             self._fmc_supplied, self._fmc_res = supplied, None
             self._derive_fme_from_the_override()
 
+    def _fuel_masked(self, value):
+        """``value`` with the mask of the fuel grid applied: a cell whose fuel is masked or invalid is missing."""
+        return inputs.apply_fuel_mask(value, inputs.fuel_mask_of(self.fuel_type))
+
+    def _set_fuel(self, value) -> None:
+        """Replace the fuel grid and mask (or unmask) every input and override in the cells that changed."""
+        old = inputs.fuel_mask_of(self.fuel_type)
+        self.fuel_type, self.ftypes = inputs.prepare_fuel_type(value, self.convert_fuel_type_codes)
+        if old is None and inputs.fuel_mask_of(self.fuel_type) is None:
+            return
+        for name, raw in self._raw.items():
+            if name in inputs.NORMALISED_INPUTS and name != 'aspect':
+                setattr(self, '_' + name, self._fuel_masked(raw))
+            elif name == 'aspect':
+                self._aspect_in = self._fuel_masked(raw)
+            elif name == 'wd':
+                self._wd_in = self._fuel_masked(raw)
+            elif name in ('lat', 'long', 'elevation'):
+                setattr(self, '_' + name, self._fuel_masked(raw))
+            elif name == 'd0':
+                self._d0_supplied, self._d0_res = self._fuel_masked(raw), None
+            elif name == 'dj':
+                self._dj_supplied, self._dj_res = self._fuel_masked(raw), None
+            elif name == 'fmc':
+                self._fmc_supplied, self._fmc_res = self._fuel_masked(raw), None
+        self._wd_inv = self._aspect_inv = None
+        self._derive_fme_from_the_override()
+
+    def _fmc_given(self):
+        """The explicit ``fmc`` as it stands before ``calcFMC`` runs, or None without an override.
+
+        A cell that asks for a calculation (a negative value, normalised to -1) has no value yet: it is missing
+        until ``calcFMC`` (or ``runFBP``) calculates it, so it never passes as a real foliar moisture content.
+        """
+        supplied = self._fmc_supplied
+        if supplied is None:
+            return None
+        calculate = (np.ma.getdata(supplied) == CALCULATE) & ~np.ma.getmaskarray(supplied)
+        if not calculate.any():
+            return supplied
+        return mask.array(np.ma.getdata(supplied).astype(np.float64), mask=np.ma.getmaskarray(supplied) | calculate)
+
     def _derive_fme_from_the_override(self) -> None:
         """Give ``fme`` the value that matches the explicit ``fmc`` (or the template when there is none)."""
-        if self._fmc_supplied is not None:
-            self.fme = fm_eq.calc_fme(fmc=self._fmc_supplied)
+        given = self._fmc_given()
+        if given is not None:
+            self.fme = fm_eq.calc_fme(fmc=given)
         elif self._fmc_template is not None:
             self.fme = self._fmc_template
 
     def __init__(self):
+        # The inputs as given (before the fuel mask); the model uses them with the fuel mask applied
+        self._raw = {}
+        self.fuel_type = None
+
         # Explicit d0/dj overrides, their computed results and the foliar moisture result cache
         self._d0_supplied = self._dj_supplied = self._fmc_supplied = None
         self._d0_res = self._dj_res = self._fmc_res = None
@@ -140,7 +215,6 @@ class FBP:
         self._dj_warned = set()
 
         # Initialize CFFBPS input parameters
-        self.fuel_type = None
         self.wx_date = None
         self.lat = None
         self.long = None
@@ -334,8 +408,10 @@ class FBP:
         :param pdf: Percent dead fir (%, value from 0-100)
         :param gfl: Grass fuel load (kg/m^2)
         :param gcf: Grass curing factor (%, value from 0-100)
-        :param d0: Julian date of minimum foliar moisture content (if None, it will be calculated based on latitude)
-        :param dj: Julian date of modelled fire (if None, it will be calculated from wx_date)
+        :param d0: Julian date of minimum foliar moisture content (if None, it will be calculated based on latitude).
+            In an array a negative cell (use -1) is calculated; a negative scalar is the same as None
+        :param dj: Julian date of modelled fire (if None, it will be calculated from wx_date). In an array a negative
+            cell (use -1) is calculated; a negative scalar is the same as None
         :param out_request: Tuple or list of CFFBPS output variables
             # Default output variables
             fire_type = Type of fire predicted to occur (surface, intermittent crown, active crown)
@@ -425,7 +501,11 @@ class FBP:
         :param fmc: foliar moisture content (%), scalar or array (if None, it will be calculated from the distance
             in days between dj and d0). Like d0 and dj it is an explicit override: it is used by every later
             calcFMC and runFBP until it is replaced, cleared with None or a new initialize is made; a NaN cell is
-            missing. The foliar moisture effect (fme) is always derived from the fmc that is used.
+            missing. The foliar moisture effect (fme) is always derived from the fmc that is used. In an array a
+            negative cell (use -1) is calculated by calcFMC/runFBP (NaN before that); a negative scalar is None.
+
+        Missing data must be masked (masked arrays or NaN); nodata values such as -999 are ordinary numbers. The mask of
+        fuel_type (masked, invalid or fractional codes) is applied to every other input and override.
         """
         # Verify and coerce the inputs (shared with the other backends)
         prepared = inputs.prepare_inputs(
@@ -447,6 +527,7 @@ class FBP:
                 setattr(self, '_' + key, value)
             else:
                 setattr(self, key, value)
+        self._raw = dict(prepared.raw)
         self._wd_inv = self._aspect_inv = None
         self.wx_date = wx_date
         self.out_request = out_request
@@ -890,7 +971,7 @@ class FBP:
             elif key in inputs.NORMALISED_INPUTS:
                 setattr(self, key, value)  # normalised exactly like initialize
             elif key == 'fuel_type':
-                self.fuel_type, self.ftypes = inputs.prepare_fuel_type(value, self.convert_fuel_type_codes)
+                self._set_fuel(value)
             elif isinstance(value, np.ndarray):
                 setattr(self, key, mask.array(value, mask=np.isnan(value)))
             else:

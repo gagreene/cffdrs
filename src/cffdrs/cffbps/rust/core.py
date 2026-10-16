@@ -114,6 +114,7 @@ class FBP:
         self._fuel = verified.fuel_type.copy()
         self._inputs = {name: getattr(verified, name).copy() for name in _INPUTS}
         self._overrides = overrides
+        self._raw = dict(prepared.raw)
         self._dj_warned = set()
         self._fmc_done = self._sfc_done = False
         self._injected = {}
@@ -156,7 +157,9 @@ class FBP:
         self._require()
         if name not in ('d0', 'dj', 'fmc'):
             raise ValueError("set_override name must be 'd0', 'dj' or 'fmc'")
-        supplied = coerce_override(name, values)
+        raw = coerce_override(name, values)
+        self._raw[name] = raw
+        supplied = inputs.apply_fuel_mask(raw, inputs.fuel_mask_of(self._fuel))
         self._grid.set_override(name, self._boundary(supplied, self._grid.shape))
         self._overrides[name] = supplied
         if self._scalar_masks is not None:
@@ -177,10 +180,30 @@ class FBP:
     def set_fuel(self, value):
         self._require()
         fuel, _ = inputs.prepare_fuel_type(value, self.convert_fuel_type_codes)
+        old_mask = inputs.fuel_mask_of(self._fuel)
         self._grid.set_fuel(self._fuel_boundary(fuel, self._grid.shape))
         self._fuel = fuel.copy()
         if self._scalar_masks is not None:
             self._scalar_masks.set("fuel_type", fuel)
+        if old_mask is not None or inputs.fuel_mask_of(self._fuel) is not None:
+            self._refresh_fuel_mask()
+
+    def _refresh_fuel_mask(self):
+        """Send every input and override to the grid again with the mask of the current fuel grid applied."""
+        fuel_mask = inputs.fuel_mask_of(self._fuel)
+        for name in _INPUTS:
+            arr = inputs.apply_fuel_mask(self._raw[name], fuel_mask)
+            self._grid.set(name, self._boundary(arr, self._grid.shape))
+            self._inputs[name] = arr.copy()
+            if self._scalar_masks is not None:
+                self._scalar_masks.set(name, arr)
+        for name in ('d0', 'dj', 'fmc'):
+            supplied = inputs.apply_fuel_mask(self._raw.get(name), fuel_mask)
+            self._grid.set_override(name, self._boundary(supplied, self._grid.shape))
+            self._overrides[name] = supplied
+            if self._scalar_masks is not None:
+                self._scalar_masks.set(name, supplied)
+        self._fmc_done = False
 
     def set(self, name, value):
         self._require()
@@ -195,6 +218,9 @@ class FBP:
                    else inputs.coerce_input(name, value))
             if name == 'long':
                 arr = np.absolute(arr)
+            if name in _INPUTS:
+                self._raw[name] = arr
+                arr = inputs.apply_fuel_mask(arr, inputs.fuel_mask_of(self._fuel))
             self._grid.set(_ALIASES.get(name, name), self._boundary(arr, self._grid.shape))
             if self._scalar_masks is not None:
                 self._scalar_masks.set(_ALIASES.get(name, name), arr)

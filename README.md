@@ -208,6 +208,20 @@ calculated foliar moisture quantities: a value you give is used by every later `
 it, clear it with `None`, or call `initialize` again; anything you do not give is calculated. A given `fmc`
 also gives the matching foliar moisture effect (`fme`), and NaN or masked cells are missing values.
 
+In an override **array**, a negative value (please use -1) asks for that cell to be calculated while the other cells
+take your values: `fmc=[95, -1, 110]` gives the cell 0 and 2 values and calculates cell 1 when `calcFMC` (or `runFBP`)
+runs. A negative scalar is the same as `None`. Until `calcFMC` runs, calculated cells of `fmc` and `fme` are NaN (nothing
+is calculated for you when you change a value: run the stages yourself). Other inputs are not given a calculate value.
+
+**Missing data must be masked.** The package only knows masked cells (`np.ma` arrays) and NaN as missing; a nodata value
+such as -999 is an ordinary number. Mask it before `initialize`, for example `np.ma.masked_equal(arr, -999)` or
+rasterio's `src.read(1, masked=True)`. Negative `ws`, `ffmc`, `bui`, `pc`, `pdf` and `gfl` are set to 0, so an unmasked
+-999 gives a plausible-looking wrong result.
+
+**The fuel grid mask applies to every dataset.** A cell whose fuel is masked or invalid (not 1-20) is missing in every
+input and override, so its outputs are as for an invalid fuel with all other inputs missing (floats NaN, `fire_type` 0,
+`fi_class` -99, `dj` 0, and `fuel_type` 0). Non-fuel (19) and water (20) are valid codes and are not masked.
+
 `initialize(..., percentile_growth=p)` takes a percentile (0-100) of the rate-of-spread
 distribution of the Han & Braun (2014) model, not a percent change: 50 (the default)
 is the unadjusted ROS, and for example 95 scales surface-fire ROS by about 4.6x.

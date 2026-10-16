@@ -468,11 +468,10 @@ fn duplicate_fields_collapse_to_their_first_position() {
 
 /// (supplied, resolved in a common year, clipped there, resolved in a leap
 /// year, clipped there): floor, then clip to 1..365 / 1..366.
-const DJ_RULE: [(f64, f64, bool, f64, bool); 16] = [
+// negative values are requests to calculate, see `negative_dj_cells_are_calculated_not_clipped_or_counted`
+const DJ_RULE: [(f64, f64, bool, f64, bool); 13] = [
     (0.3, 1.0, true, 1.0, true),
     (0.0, 1.0, true, 1.0, true),
-    (-5.0, 1.0, true, 1.0, true),
-    (-0.5, 1.0, true, 1.0, true),
     (1.0, 1.0, false, 1.0, false),
     (1.999, 1.0, false, 1.0, false),
     (166.9, 166.0, false, 166.0, false),
@@ -484,7 +483,6 @@ const DJ_RULE: [(f64, f64, bool, f64, bool); 16] = [
     (367.0, 365.0, true, 366.0, true),
     (400.0, 365.0, true, 366.0, true),
     (1e300, 365.0, true, 366.0, true),
-    (-1e300, 1.0, true, 1.0, true),
 ];
 
 #[test]
@@ -537,6 +535,35 @@ fn dj_overrides_are_floored_then_clipped_to_the_year() {
         assert!(view.get(Field::Fmc)[last].is_nan() && view.get(Field::Fme)[last].is_nan());
         assert_eq!(g.dj_override_clipped, clipped, "{wx_date}");
     }
+}
+
+#[test]
+fn negative_dj_cells_are_calculated_not_clipped_or_counted() {
+    let mut cells = [200.9_f64; N];
+    cells[0] = -1.0;
+    cells[1] = -999.0;
+    cells[2] = 0.0; // still clipped to 1
+    cells[3] = 400.0; // still clipped to 365
+    cells[4] = -0.5;
+    let mut inp = input();
+    inp.dj = Some((&cells).into());
+    let g = run_grid_fields(&inp, &[Field::Dj], 1, NonModeled::Nan).expect("valid");
+    assert_eq!(
+        g.dj_override_clipped, 2,
+        "only the 0 and the 400 are clipped"
+    );
+    inp.dj = None;
+    let derived = run_grid_fields(&inp, &[Field::Dj], 1, NonModeled::Nan).expect("valid");
+    let (got, base) = (&g.fields[0].1, &derived.fields[0].1);
+    for i in [0, 1, 4] {
+        assert_eq!(got[i], base[i], "cell {i} is calculated");
+    }
+    assert_eq!((got[2], got[3], got[5]), (1.0, 365.0, 200.0));
+    // a constant negative is no override: nothing is clipped, every cell is calculated
+    inp.dj = Some(PerCell::Const(-1.0));
+    let g = run_grid_fields(&inp, &[Field::Dj], 1, NonModeled::Nan).expect("valid");
+    assert_eq!(g.dj_override_clipped, 0);
+    assert_eq!(g.fields[0].1, *base);
 }
 
 #[test]

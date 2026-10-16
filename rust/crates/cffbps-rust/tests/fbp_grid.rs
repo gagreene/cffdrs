@@ -838,6 +838,7 @@ fn fmc_contract() {
     fmc_follows_its_inputs(&d);
     fmc_repeats_are_cached(&d);
     fmc_overrides(&d);
+    fmc_calculate_cells(&d);
     fmc_d0_is_not_range_limited();
     fmc_dj_overrides_are_floored_and_clipped();
     fmc_scalar_parameters(&d);
@@ -1033,6 +1034,69 @@ fn fmc_overrides(d: &Data) {
     );
 }
 
+/// Negative override cells ask for a calculation: an array holds NaN in `fmc` and `fme` until
+/// `calcFMC` runs and the calculated value afterwards, a constant negative is no override.
+fn fmc_calculate_cells(d: &Data) {
+    let n = d.fuel.len();
+    let all = outputs();
+    let mut cells: Vec<f64> = (0..n)
+        .map(|i| 90.0 + f64::from(u32::try_from(i % 20).unwrap()))
+        .collect();
+    for i in (0..n).step_by(3) {
+        cells[i] = -1.0;
+    }
+    cells[1] = -999.0;
+    cells[2] = f64::NAN;
+    let mut g = d.grid(90.0, &all);
+    g.set_override(Field::FmcOverride, Some(PerCell::Cells(&cells)))
+        .unwrap();
+    let (fmc, fme) = (g.get(Field::Fmc).unwrap(), g.get(Field::Fme).unwrap());
+    for i in 0..n {
+        if cells[i] < 0.0 || cells[i].is_nan() {
+            assert!(
+                fmc[i].is_nan() && fme[i].is_nan(),
+                "cell {i}: not calculated yet"
+            );
+        } else {
+            assert_eq!(fmc[i], cells[i]);
+            assert!(same(
+                fme[i],
+                1000.0 * (1.5 - 0.00275 * cells[i]).powi(4) / (460.0 + 25.9 * cells[i])
+            ));
+        }
+    }
+    // after calcFMC: given cells kept, calculate cells derived, NaN missing; equals the fused run
+    let got = calc_fmc(&mut g);
+    let plain = calc_fmc(&mut d.grid(90.0, &all));
+    for i in 0..n {
+        for (k, f) in FMC_FIELDS.iter().take(4).enumerate() {
+            assert!(same(got[k][i], plain[k][i]), "{}[{i}]", f.name());
+        }
+        if cells[i].is_nan() {
+            assert!(
+                got[4][i].is_nan() && got[5][i].is_nan(),
+                "cell {i}: missing"
+            );
+        } else if cells[i] < 0.0 {
+            assert!(
+                same(got[4][i], plain[4][i]) && same(got[5][i], plain[5][i]),
+                "cell {i}: calculated"
+            );
+        } else {
+            assert_eq!(got[4][i], cells[i], "cell {i}: given");
+        }
+    }
+    assert_staged_equals_fused(&g, "fmc calculate cells");
+    // a constant negative is no override at all (templates before, derived after)
+    let mut c = d.grid(90.0, &all);
+    c.set_override(Field::FmcOverride, Some(PerCell::Const(-1.0)))
+        .unwrap();
+    assert!(c.get(Field::Fmc).unwrap().iter().all(|v| *v == 0.0));
+    assert_fmc_same(&calc_fmc(&mut c), &plain, "constant negative");
+    c.set_const(Field::Fmc, -5.0).unwrap();
+    assert!(c.get(Field::Fmc).unwrap().iter().all(|v| *v == 0.0));
+}
+
 /// (d3) `d0` is used as computed or supplied, never clipped (D15.7).
 fn fmc_d0_is_not_range_limited() {
     let all = outputs();
@@ -1073,7 +1137,7 @@ fn fmc_dj_overrides_are_floored_and_clipped() {
         366.9,
         367.0,
         400.0,
-        -5.0,
+        0.0, // a negative value is a request to calculate, see fmc_calculate_cells
         f64::NAN,
     ];
     let mut dj = data(supplied.len(), &[2]);

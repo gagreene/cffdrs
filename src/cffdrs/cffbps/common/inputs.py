@@ -165,7 +165,7 @@ def prepare_fuel_type(fuel_type, convert_fuel_type_codes: bool):
         valid = (data >= 1) & (data <= 20)
         if data.dtype.kind == 'f':
             valid &= data == np.floor(data)
-        fuel_type = mask.array(np.where(valid, data, 0).astype(np.int8),
+        fuel_type = mask.array(np.where(valid & ~was_masked, data, 0).astype(np.int8),
                                mask=was_masked | ~valid)
     elif isinstance(fuel_type, str):
         fuel_type = mask.array([fbpFTCode_AlphaToNum_LUT.get(fuel_type)],
@@ -282,12 +282,45 @@ def verify_inputs(*,
     )
 
 
+#: The inputs and overrides that carry the fuel mask: a cell whose fuel is masked or invalid is missing in all of them.
+FUEL_MASKED_NAMES = ('lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui', 'pc', 'pdf', 'gfl',
+                     'gcf', 'd0', 'dj', 'fmc')
+
+
+def fuel_mask_of(fuel_type) -> np.ndarray | None:
+    """The mask of a prepared fuel grid, or ``None`` when no cell is masked (the common case costs nothing)."""
+    if fuel_type is None:
+        return None
+    fuel_mask = np.ma.getmaskarray(fuel_type)
+    return fuel_mask if fuel_mask.any() else None
+
+
+def apply_fuel_mask(value, fuel_mask):
+    """``value`` with the cells of ``fuel_mask`` masked as well; the data are shared, only the mask is new.
+
+    A value of one cell (a scalar input) is broadcast to the grid of the fuel mask. With no fuel mask, or for ``None``,
+    ``value`` is returned as it is.
+    """
+    if value is None or fuel_mask is None:
+        return value
+    data, missing = np.ma.getdata(value), np.ma.getmaskarray(value)
+    shape = np.broadcast_shapes(data.shape, fuel_mask.shape)
+    if data.shape != shape:
+        data, missing = np.broadcast_to(data, shape).copy(), np.broadcast_to(missing, shape)
+    return mask.array(data, mask=missing | fuel_mask, copy=False)
+
+
 class PreparedInputs(NamedTuple):
-    """Everything ``initialize`` needs from the raw arguments (shared by every backend)."""
+    """Everything ``initialize`` needs from the raw arguments (shared by every backend).
+
+    ``verified`` already carries the fuel mask; ``raw`` holds the same inputs as the user gave them (before the fuel
+    mask), so a later change of the fuel grid can mask and unmask the right cells.
+    """
     verified: VerifiedInputs
     return_array: bool
     ref_array: MaskedArray
     ref_int_array: MaskedArray
+    raw: dict
 
 
 REQUIRED_INPUTS = ('fuel_type', 'wx_date', 'lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui')
@@ -311,4 +344,8 @@ def prepare_inputs(*, fuel_type, wx_date, lat, long, elevation, slope, aspect, w
         fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
         aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf, gfl=gfl, gcf=gcf,
         d0=d0, dj=dj, fmc=fmc, out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes)
-    return PreparedInputs(verified, return_array, ref_array, ref_int_array)
+    raw = {name: getattr(verified, name) for name in FUEL_MASKED_NAMES}
+    fuel_mask = fuel_mask_of(verified.fuel_type)
+    if fuel_mask is not None:
+        verified = verified._replace(**{name: apply_fuel_mask(value, fuel_mask) for name, value in raw.items()})
+    return PreparedInputs(verified, return_array, ref_array, ref_int_array, raw)

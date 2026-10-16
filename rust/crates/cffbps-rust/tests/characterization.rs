@@ -109,7 +109,7 @@ fn row(input: &FbpInput) -> Vec<u64> {
 fn outputs_match_the_recorded_baseline() {
     let path = baseline_path();
     let cases = cases();
-    assert_eq!(cases.len(), 25 * 48 * 6, "input set changed");
+    assert_eq!(cases.len(), cases::CASE_COUNT, "input set changed");
     let rows: Vec<Vec<u64>> = cases.iter().map(|(_, _, i)| row(i)).collect();
 
     // Only the exact value "1" records: `=0`, an empty value or any other

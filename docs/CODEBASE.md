@@ -431,10 +431,24 @@ The fixed per-fuel tables are read in addition to the listed per-cell inputs.
   stay calculated whenever `calcFMC` runs (or `runFBP`), and a missing (NaN or masked) cell makes that
   cell's `fmc` and `fme` missing. An explicit `fme` in the same `setParams` call wins. Before, injecting
   `fmc` left `fme` at its zero template (C-6 crown cells came out as surface fire), and a later
-  `runFBP` discarded the injected value. Python: `foliar_moisture.calc_foliar_moisture(fmc_override=...)`,
+  `runFBP` discarded the injected value. In an override array a negative cell (documented as -1, every negative is
+  normalised to -1 in `coerce_override`) asks for that cell to be calculated: it is derived when `calcFMC` or `runFBP`
+  runs and is NaN in `fmc`/`fme` until then (nothing runs on its own after `setParams`); a negative scalar is `None`;
+  negative `dj` cells are not floored, clipped or counted for the warning; Rust treats any negative as calculate. Python: `foliar_moisture.calc_foliar_moisture(fmc_override=...)`,
   `set_override`; Rust: `foliar_moisture::calc_foliar_moisture`, `Field::FmcOverride`,
   `GridInput::fmc`; the experimental CuPy backend only derives `fme` from a `fmc` given in `setParams`
   (no override semantics; stand-in test only).
+
+- **The fuel mask applies to every dataset.** `inputs.prepare_inputs` ORs the mask of the fuel grid (masked, invalid or
+  fractional codes; 19/20 are valid) into every input and override (`apply_fuel_mask`; data are shared, only the mask is
+  new, and nothing is done when no fuel cell is masked). A fuel-masked cell is therefore an invalid fuel with every other
+  input missing, as both backends export it (floats NaN or the zero templates, `fire_type` 0, `fi_class` -99, `dj` 0), and
+  `fuel_type` exports 0 there. The user's own masks are kept in `_raw` so a later `setParams({'fuel_type': ...})` or
+  `set_fuel` masks and unmasks the right cells, and later updates of an input keep the mask. `ref_array` (the template)
+  is not masked: pre-run computed fields stay their templates. Changes versus before: `fmc`, `latn`, `ws`, ... and `dj`
+  are missing in masked-fuel cells (they were computed), scalar invalid fuel codes follow the masked-scalar export rule.
+
+- **Nodata is the user's to mask.** Only masked entries and NaN are missing; -999 and other nodata values are numbers.
 
 ## Outputs and intentional differences
 

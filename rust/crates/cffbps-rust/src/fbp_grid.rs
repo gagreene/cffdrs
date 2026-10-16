@@ -86,8 +86,8 @@ use crate::field::Field;
 use crate::foliar_moisture::calc_fme;
 use crate::fuel::FuelType;
 use crate::grid::{
-    fill_chunks, python_non_modeled, resolve_dj, run_grid_fields, GridError, GridInput, NonModeled,
-    OwnedPerCell, PerCell,
+    fill_chunks, python_non_modeled, resolve_dj, run_grid_fields, without_constant_request,
+    GridError, GridInput, NonModeled, OwnedPerCell, PerCell,
 };
 use crate::liveness::Liveness;
 use crate::normalize::normalize_input;
@@ -298,6 +298,12 @@ impl FbpGrid {
     /// its order: [`GridError::InvalidDate`], [`GridError::LengthMismatch`],
     /// [`GridError::InfiniteDj`].
     pub fn new(input: &GridInput<'_>, out_request: &[Field]) -> Result<Self, GridError> {
+        let input = &GridInput {
+            d0: without_constant_request(input.d0),
+            dj: without_constant_request(input.dj),
+            fmc: without_constant_request(input.fmc),
+            ..*input
+        };
         let (resolved, clipped) = input.validate()?;
         let mut slots = vec![Slot::Never; Field::COUNT];
         for (f, p) in [
@@ -617,6 +623,7 @@ impl FbpGrid {
         field: Field,
         values: Option<PerCell<'_>>,
     ) -> Result<(), GridError> {
+        let values = without_constant_request(values);
         let name = match field {
             Field::D0Override => "d0",
             Field::DjOverride => "dj",
@@ -956,7 +963,9 @@ impl FbpGrid {
             Field::Fmc => {
                 // a provided fmc is the fmc override: it also gives the matching
                 // foliar moisture effect and persists until replaced or cleared
-                self.set_fmc_override(Some(values));
+                // (a constant negative is no override)
+                let none = matches!(values, OwnedPerCell::Const(v) if v < 0.0);
+                self.set_fmc_override((!none).then_some(values));
             }
             Field::Wd | Field::WdIn | Field::Aspect | Field::AspectIn => {
                 let input = if matches!(field, Field::Wd | Field::WdIn) {
@@ -1020,8 +1029,10 @@ impl FbpGrid {
     /// both hold it before `calcFMC` runs (and when it is skipped).
     fn store_fmc_override(&mut self) {
         if let Some(fmc) = &self.fmc {
-            let fme = Slot::Stored(fmc.map(calc_fme));
-            self.slots[Field::Fmc.index()] = Slot::Stored(fmc.clone());
+            // a cell that asks for a calculation (negative) has no value until `calcFMC` runs
+            let given = fmc.map(|v| if v < 0.0 { f64::NAN } else { v });
+            let fme = Slot::Stored(given.map(calc_fme));
+            self.slots[Field::Fmc.index()] = Slot::Stored(given);
             self.slots[Field::Fme.index()] = fme;
         }
     }
