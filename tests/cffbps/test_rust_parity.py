@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from cffdrs import _rust as rust_backend
-from cffdrs.cffbps import FBP
+from cffdrs.cffbps.python import FBP
 
 RNG = np.random.default_rng(42)
 SHAPE = (12, 18)  # every modeled fuel type appears more than once

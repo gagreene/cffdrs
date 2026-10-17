@@ -6,19 +6,24 @@ built wheel was installed, from a directory outside the repository checkout:
     python tools/smoke_test_wheel.py
 
 It checks that the package imported from site-packages (not the source tree),
-that the compiled ``cffdrs._rust`` extension loads, and that the compiled grid
+that its metadata declares the ``cp311-abi3`` tag, that the compiled
+``cffdrs._rust`` extension loads, and that the compiled grid
 pass agrees with the pure-Python FBP on a small synthetic grid, including a
 percentile-growth run, a Fortran-ordered input, and rejection of an invalid date.
 """
 from __future__ import annotations
 
 import sys
+from importlib.metadata import distribution
 
 import numpy as np
 
 import cffdrs
 from cffdrs import _rust
-from cffdrs.cffbps import FBP
+from cffdrs.cffbps import FBP as AutoFBP
+from cffdrs.cffbps.common.constants import valid_outputs
+from cffdrs.cffbps.python import FBP as PythonFBP
+from cffdrs.cffbps.rust import FBP as RustFBP
 
 FIELDS = ["hros", "bros", "raz", "wsv", "hfi", "rso", "sros", "sfc", "fmc", "accel"]
 SCALARS = dict(wx_date=20230615, ffmc=91.2, bui=76.4, pdf=42.0, gfl=0.41)
@@ -43,7 +48,7 @@ def make_grid():
 
 
 def run_python(g, percentile):
-    fbp = FBP()
+    fbp = PythonFBP()
     fbp.initialize(
         fuel_type=g["fuel_type"].astype(np.float64), wx_date=SCALARS["wx_date"],
         lat=g["lat"], long=g["long"], elevation=g["elevation"], slope=g["slope"], aspect=g["aspect"],
@@ -70,13 +75,40 @@ def assert_close(a, b, label):
             raise AssertionError(f"{label}: {name} differs between Rust and Python")
 
 
+
+def check_public_facades():
+    # One array cell checks all requested fields, including integer output parity.
+    kwargs = dict(fuel_type=np.array([2], dtype=np.int8), wx_date=20230615,
+                  lat=52., long=-115., elevation=800., slope=10., aspect=180.,
+                  ws=20., wd=270., ffmc=90., bui=80., out_request=list(valid_outputs))
+    reference = PythonFBP()
+    reference.initialize(**kwargs)
+    expected = reference.runFBP()
+    for cls in (RustFBP, AutoFBP):
+        model = cls()
+        model.initialize(**kwargs)
+        if isinstance(model, AutoFBP):
+            assert model.backend_in_use == 'rust', model.backend_in_use
+        for name, actual, wanted in zip(valid_outputs, model.runFBP(), expected, strict=True):
+            if np.asarray(wanted).dtype.kind in 'iu':
+                np.testing.assert_array_equal(actual, wanted, err_msg=name)
+            else:
+                np.testing.assert_allclose(actual, wanted, rtol=1e-9, atol=1e-12,
+                                           equal_nan=True, err_msg=name)
+    print('public Rust and default AutoFBP: all 54 outputs match Python; auto uses rust')
+
 def main() -> None:
+    wheel_metadata = distribution("cffdrs").read_text("WHEEL")
+    assert wheel_metadata is not None and any(
+        line.startswith("Tag: cp311-abi3-") for line in wheel_metadata.splitlines()
+    ), f"installed wheel does not contain a cp311-abi3 tag: {wheel_metadata}"
     location = cffdrs.__file__.replace("\\", "/")
     if "site-packages" not in location:
         raise SystemExit(f"cffdrs was imported from {location}, not an installed wheel")
     print(f"cffdrs {getattr(cffdrs, '__version__', '?')} from {location}")
     print(f"cffdrs._rust core {_rust.__core_version__} from {_rust.__file__}")
 
+    check_public_facades()
     g = make_grid()
     for percentile in (50, 90, 10):
         assert_close(run_python(g, percentile), run_rust(g, percentile), f"percentile {percentile}")

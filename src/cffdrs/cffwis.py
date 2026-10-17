@@ -3,7 +3,7 @@ Created on Wed Mar 20 15:00:00 2024
 
 @author: Gregory A. Greene
 """
-__author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
+__author__ = ['Gregory A. Greene']
 
 import warnings
 
