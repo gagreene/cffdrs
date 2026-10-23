@@ -66,3 +66,4 @@ jobs:
           uv run pytest -q
           uv run ruff check src/
           uv run mypy
+          uv run python tools/check_function_order.py
