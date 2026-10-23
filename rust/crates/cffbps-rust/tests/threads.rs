@@ -12,6 +12,31 @@ struct Cells {
     cols: [Vec<f64>; 8],
 }
 
+// ---- helpers ----
+fn assert_bit_identical(a: &BehaviourGrids, b: &BehaviourGrids, what: &str) {
+    let pairs = [
+        ("hros", &a.hros, &b.hros),
+        ("bros", &a.bros, &b.bros),
+        ("raz", &a.raz, &b.raz),
+        ("wsv", &a.wsv, &b.wsv),
+        ("hfi", &a.hfi, &b.hfi),
+        ("rso", &a.rso, &b.rso),
+        ("sros", &a.sros, &b.sros),
+        ("sfc", &a.sfc, &b.sfc),
+        ("fmc", &a.fmc, &b.fmc),
+        ("accel", &a.accel, &b.accel),
+    ];
+    for (name, x, y) in pairs {
+        assert_eq!(x.len(), y.len(), "{what}: {name} length");
+        for (i, (p, q)) in x.iter().zip(y).enumerate() {
+            assert!(
+                p.to_bits() == q.to_bits() || (p.is_nan() && q.is_nan()),
+                "{what}: {name}[{i}] serial {p:?} vs threaded {q:?}"
+            );
+        }
+    }
+}
+
 fn cells(n: usize) -> Cells {
     let fuel: Vec<i32> = (0..n).map(|i| BASE_FUEL[i % BASE_FUEL.len()]).collect();
     let f = |k: usize, scale: f64, off: f64| -> Vec<f64> {
@@ -70,30 +95,7 @@ fn grids_for(c: &Cells, threads: Option<usize>) -> BehaviourGrids {
     }
 }
 
-fn assert_bit_identical(a: &BehaviourGrids, b: &BehaviourGrids, what: &str) {
-    let pairs = [
-        ("hros", &a.hros, &b.hros),
-        ("bros", &a.bros, &b.bros),
-        ("raz", &a.raz, &b.raz),
-        ("wsv", &a.wsv, &b.wsv),
-        ("hfi", &a.hfi, &b.hfi),
-        ("rso", &a.rso, &b.rso),
-        ("sros", &a.sros, &b.sros),
-        ("sfc", &a.sfc, &b.sfc),
-        ("fmc", &a.fmc, &b.fmc),
-        ("accel", &a.accel, &b.accel),
-    ];
-    for (name, x, y) in pairs {
-        assert_eq!(x.len(), y.len(), "{what}: {name} length");
-        for (i, (p, q)) in x.iter().zip(y).enumerate() {
-            assert!(
-                p.to_bits() == q.to_bits() || (p.is_nan() && q.is_nan()),
-                "{what}: {name}[{i}] serial {p:?} vs threaded {q:?}"
-            );
-        }
-    }
-}
-
+// ---- other tests ----
 #[test]
 fn every_thread_count_matches_the_serial_pass() {
     // Large enough to take the parallel path; not a multiple of any chunk size.

@@ -20,35 +20,6 @@ pub(crate) struct Liveness {
 }
 
 impl Liveness {
-    /// The bookkeeping for `planned` (duplicates and order do not matter),
-    /// with no stage run yet.
-    pub(crate) fn new(planned: &[Stage]) -> Self {
-        let mut l = Self {
-            planned: [false; Stage::COUNT],
-            ran: [false; Stage::COUNT],
-            pending_readers: [0; Field::COUNT],
-        };
-        l.replan(planned);
-        l
-    }
-
-    /// Replace the planned set, keeping the record of which stages have run:
-    /// a field's count becomes the number of newly planned stages that read
-    /// it and have not run yet.
-    pub(crate) fn replan(&mut self, planned: &[Stage]) {
-        self.planned = [false; Stage::COUNT];
-        for s in planned {
-            self.planned[s.index()] = true;
-        }
-        self.recount();
-    }
-
-    /// Forget which stages have run (the counts start again from the plan).
-    pub(crate) fn restart(&mut self) {
-        self.ran = [false; Stage::COUNT];
-        self.recount();
-    }
-
     /// The counts from the planned set and the stages that ran.
     fn recount(&mut self) {
         self.pending_readers = [0; Field::COUNT];
@@ -71,6 +42,18 @@ impl Liveness {
     /// Whether a planned stage that has not run yet reads `field`.
     pub(crate) fn needed(&self, field: Field) -> bool {
         self.pending_readers[field.index()] > 0
+    }
+
+    /// The bookkeeping for `planned` (duplicates and order do not matter),
+    /// with no stage run yet.
+    pub(crate) fn new(planned: &[Stage]) -> Self {
+        let mut l = Self {
+            planned: [false; Stage::COUNT],
+            ran: [false; Stage::COUNT],
+            pending_readers: [0; Field::COUNT],
+        };
+        l.replan(planned);
+        l
     }
 
     /// The number of planned stages that read `field` and have not run yet.
@@ -99,6 +82,23 @@ impl Liveness {
         }
         last
     }
+
+    /// Replace the planned set, keeping the record of which stages have run:
+    /// a field's count becomes the number of newly planned stages that read
+    /// it and have not run yet.
+    pub(crate) fn replan(&mut self, planned: &[Stage]) {
+        self.planned = [false; Stage::COUNT];
+        for s in planned {
+            self.planned[s.index()] = true;
+        }
+        self.recount();
+    }
+
+    /// Forget which stages have run (the counts start again from the plan).
+    pub(crate) fn restart(&mut self) {
+        self.ran = [false; Stage::COUNT];
+        self.recount();
+    }
 }
 
 #[cfg(test)]
@@ -107,6 +107,27 @@ mod tests {
     use crate::field::Field;
     use crate::stage::Stage;
 
+    // ---- field tests ----
+    #[test]
+    fn a_field_read_by_no_stage_is_never_needed() {
+        let l = Liveness::new(&Stage::ALL);
+        for f in [Field::Raz, Field::FiClass, Field::BrosCfb, Field::Latn] {
+            assert!(!l.needed(f), "{f:?}");
+        }
+    }
+
+    #[test]
+    fn a_field_read_twice_is_freed_after_its_second_reader() {
+        // sfc is read by calcRSO and calcTFC
+        let mut l = Liveness::new(&[Stage::CalcRso, Stage::CalcTfc]);
+        assert_eq!(l.pending_readers(Field::Sfc), 2);
+        assert!(!l.record_run(Stage::CalcRso).contains(&Field::Sfc));
+        assert!(l.needed(Field::Sfc));
+        assert!(l.record_run(Stage::CalcTfc).contains(&Field::Sfc));
+        assert!(!l.needed(Field::Sfc));
+    }
+
+    // ---- other tests ----
     #[test]
     fn a_two_stage_plan_counts_each_planned_reader() {
         let mut l = Liveness::new(&[Stage::CalcTfc, Stage::CalcHfi]);
@@ -155,25 +176,6 @@ mod tests {
         for f in Field::ALL {
             assert_eq!(l.pending_readers(f), 0, "{f:?}");
         }
-    }
-
-    #[test]
-    fn a_field_read_by_no_stage_is_never_needed() {
-        let l = Liveness::new(&Stage::ALL);
-        for f in [Field::Raz, Field::FiClass, Field::BrosCfb, Field::Latn] {
-            assert!(!l.needed(f), "{f:?}");
-        }
-    }
-
-    #[test]
-    fn a_field_read_twice_is_freed_after_its_second_reader() {
-        // sfc is read by calcRSO and calcTFC
-        let mut l = Liveness::new(&[Stage::CalcRso, Stage::CalcTfc]);
-        assert_eq!(l.pending_readers(Field::Sfc), 2);
-        assert!(!l.record_run(Stage::CalcRso).contains(&Field::Sfc));
-        assert!(l.needed(Field::Sfc));
-        assert!(l.record_run(Stage::CalcTfc).contains(&Field::Sfc));
-        assert!(!l.needed(Field::Sfc));
     }
 
     #[test]

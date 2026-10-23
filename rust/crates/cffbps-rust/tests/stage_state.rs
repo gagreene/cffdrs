@@ -12,6 +12,7 @@ use cffbps_rust::field::Field;
 use cffbps_rust::stage::Stage;
 use cffbps_rust::state::CellState;
 
+// ---- helpers ----
 fn generated_inputs() -> Vec<FbpInput> {
     cases().into_iter().map(|(_, _, input)| input).collect()
 }
@@ -36,6 +37,7 @@ fn run_stages_full(input: &FbpInput) -> Vec<(Stage, CellState)> {
     out
 }
 
+// ---- stage tests ----
 #[test]
 fn stage_composition_equals_run_bit_for_bit() {
     for (n, input) in generated_inputs().iter().enumerate() {
@@ -101,6 +103,7 @@ fn every_stage_writes_only_what_it_declares() {
     }
 }
 
+// ---- other tests ----
 #[test]
 fn a_template_holds_the_python_initialize_values() {
     let s = CellState::template(

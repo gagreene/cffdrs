@@ -9,6 +9,28 @@ from numpy import ma as mask
 MaskedArray = mask.MaskedArray
 
 
+def _calc_cfb_from_ros(*, ros: MaskedArray, rso: MaskedArray) -> MaskedArray:
+    """Apply the CFB equation to one directional ROS array."""
+    delta_ros = ros - rso
+    with np.errstate(over='ignore'):
+        return mask.where(delta_ros < -3086, 0, 1 - np.exp(-0.23 * delta_ros))
+
+
+def _sanitize_cfb(cfb: MaskedArray) -> MaskedArray:
+    """Replace non-finite CFB values and constrain the result to [0, 1]."""
+    cfb = mask.where(np.isfinite(cfb), cfb, 0)
+    return mask.clip(cfb, 0, 1)
+
+
+def calc_c6_blend_cfb(*,
+                      fuel_type: MaskedArray,
+                      sros: MaskedArray,
+                      rso: MaskedArray) -> MaskedArray:
+    """Calculate the temporary SROS-derived CFB used only by the C6 ROS blend."""
+    cfb = mask.where(fuel_type == 6, _calc_cfb_from_ros(ros=sros, rso=rso), 0)
+    return _sanitize_cfb(cfb)
+
+
 def calc_cbh_cfl(*,
                  fuel_type: MaskedArray,
                  cbh: MaskedArray,
@@ -62,20 +84,6 @@ def calc_cbh_cfl(*,
     return cbh, cfl
 
 
-def calc_csfi(*, fuel_type: MaskedArray, cbh: MaskedArray, fmc: MaskedArray) -> MaskedArray:
-    """Calculate the critical surface fire intensity (CSFI)."""
-    return mask.where(fuel_type < 14,
-                      np.power(0.01 * cbh * (460 + (25.9 * fmc)), 1.5),
-                      0)
-
-
-def calc_rso(*, sfc: MaskedArray, csfi: MaskedArray) -> MaskedArray:
-    """Calculate the critical surface fire rate of spread (RSO)."""
-    return mask.where(sfc > 0,
-                      csfi / (300.0 * sfc),
-                      0)
-
-
 def calc_cfb(*,
              fuel_type: MaskedArray,
              ftypes: Sequence[int],
@@ -95,23 +103,15 @@ def calc_cfb(*,
     return _sanitize_cfb(cfb)
 
 
-def calc_c6_blend_cfb(*,
-                      fuel_type: MaskedArray,
-                      sros: MaskedArray,
-                      rso: MaskedArray) -> MaskedArray:
-    """Calculate the temporary SROS-derived CFB used only by the C6 ROS blend."""
-    cfb = mask.where(fuel_type == 6, _calc_cfb_from_ros(ros=sros, rso=rso), 0)
-    return _sanitize_cfb(cfb)
+def calc_csfi(*, fuel_type: MaskedArray, cbh: MaskedArray, fmc: MaskedArray) -> MaskedArray:
+    """Calculate the critical surface fire intensity (CSFI)."""
+    return mask.where(fuel_type < 14,
+                      np.power(0.01 * cbh * (460 + (25.9 * fmc)), 1.5),
+                      0)
 
 
-def _calc_cfb_from_ros(*, ros: MaskedArray, rso: MaskedArray) -> MaskedArray:
-    """Apply the CFB equation to one directional ROS array."""
-    delta_ros = ros - rso
-    with np.errstate(over='ignore'):
-        return mask.where(delta_ros < -3086, 0, 1 - np.exp(-0.23 * delta_ros))
-
-
-def _sanitize_cfb(cfb: MaskedArray) -> MaskedArray:
-    """Replace non-finite CFB values and constrain the result to [0, 1]."""
-    cfb = mask.where(np.isfinite(cfb), cfb, 0)
-    return mask.clip(cfb, 0, 1)
+def calc_rso(*, sfc: MaskedArray, csfi: MaskedArray) -> MaskedArray:
+    """Calculate the critical surface fire rate of spread (RSO)."""
+    return mask.where(sfc > 0,
+                      csfi / (300.0 * sfc),
+                      0)

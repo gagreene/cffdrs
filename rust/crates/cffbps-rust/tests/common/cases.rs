@@ -9,24 +9,15 @@ use cffbps_rust::fbp::FbpInput;
 
 pub const CANONICAL_NAN: u64 = 0x7ff8_0000_0000_0000;
 
-pub fn bits(x: f64) -> u64 {
-    if x.is_nan() {
-        CANONICAL_NAN
-    } else {
-        x.to_bits()
-    }
-}
-
-/// Bit-identical, with every NaN equal to every other NaN.
-#[allow(dead_code)] // used by stage_state.rs, not by the oracle
-pub fn same_bits(a: f64, b: f64) -> bool {
-    bits(a) == bits(b)
-}
-
 struct Lcg(u64);
+
 // Top 53 bits of the LCG state scaled to [0, 1): exact in f64.
 #[allow(clippy::cast_precision_loss)]
 impl Lcg {
+    fn range(&mut self, lo: f64, hi: f64) -> f64 {
+        lo + (hi - lo) * self.unit()
+    }
+
     fn unit(&mut self) -> f64 {
         self.0 = self
             .0
@@ -34,8 +25,17 @@ impl Lcg {
             .wrapping_add(1_442_695_040_888_963_407);
         ((self.0 >> 11) as f64) / ((1_u64 << 53) as f64)
     }
-    fn range(&mut self, lo: f64, hi: f64) -> f64 {
-        lo + (hi - lo) * self.unit()
+}
+
+/// The number of runs of [`cases`].
+#[allow(dead_code)]
+pub const CASE_COUNT: usize = 25 * 48 * 6 + 25 * 4;
+
+pub fn bits(x: f64) -> u64 {
+    if x.is_nan() {
+        CANONICAL_NAN
+    } else {
+        x.to_bits()
     }
 }
 
@@ -135,6 +135,8 @@ pub fn cases() -> Vec<(i32, f64, FbpInput)> {
     out
 }
 
-/// The number of runs of [`cases`].
-#[allow(dead_code)]
-pub const CASE_COUNT: usize = 25 * 48 * 6 + 25 * 4;
+/// Bit-identical, with every NaN equal to every other NaN.
+#[allow(dead_code)] // used by stage_state.rs, not by the oracle
+pub fn same_bits(a: f64, b: f64) -> bool {
+    bits(a) == bits(b)
+}

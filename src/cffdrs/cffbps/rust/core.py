@@ -51,12 +51,16 @@ def _percentile(value):
     return 50 if value is None else value
 
 
+def _stage_method(name):
+    def method(self):
+        self._stage(name)
+    method.__name__ = name
+    method.__doc__ = f'Run the {name} stage on the owned Rust grid.'
+    return method
+
+
 class FBP:
     """FBP with Rust calculations and explicit owned-input update routes."""
-
-    def __init__(self):
-        object.__setattr__(self, '_grid', None)
-        object.__setattr__(self, 'initialized', False)
 
     def __getattr__(self, name):
         if name in _INPUTS and self._grid is not None:
@@ -73,6 +77,10 @@ class FBP:
                                  "or backend='python' for result attributes and mutable tables")
         raise AttributeError(name)
 
+    def __init__(self):
+        object.__setattr__(self, '_grid', None)
+        object.__setattr__(self, 'initialized', False)
+
     def __setattr__(self, name, value):
         if name in _UNSUPPORTED:
             raise NotImplementedError(f"{name} is unsupported on Rust FBP; use backend='python'")
@@ -81,48 +89,6 @@ class FBP:
             self.set(name, value)
         else:
             object.__setattr__(self, name, value)
-
-    def initialize(self, fuel_type=None, wx_date=None, lat=None, long=None, elevation=None,
-                   slope=None, aspect=None, ws=None, wd=None, ffmc=None, bui=None,
-                   pc=50, pdf=35, gfl=0.35, gcf=80, d0=None, dj=None, out_request=None,
-                   convert_fuel_type_codes=False, percentile_growth=50, threads=1, fmc=None):
-        prepared = inputs.prepare_inputs(
-            fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation,
-            slope=slope, aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf,
-            gfl=gfl, gcf=gcf, d0=d0, dj=dj, fmc=fmc, out_request=out_request,
-            convert_fuel_type_codes=convert_fuel_type_codes)
-        verified = prepared.verified
-        request = _DEFAULT.copy() if out_request is None else list(out_request)
-        unknown = [name for name in request if name not in valid_outputs]
-        if unknown:
-            raise ValueError(f'Invalid out_request values: {unknown}. Valid values are: {sorted(valid_outputs)}')
-        shape = prepared.ref_array.shape if prepared.return_array else ()
-        values = {name: self._boundary(getattr(verified, name), shape) for name in _INPUTS}
-        overrides = {name: getattr(verified, name) for name in ('d0', 'dj', 'fmc')}
-        grid = _rust.FbpGrid(
-            fuel_type=self._fuel_boundary(verified.fuel_type, shape), **values, wx_date=wx_date,
-            percentile_growth=_percentile(percentile_growth),
-            d0=self._boundary(overrides['d0'], shape), dj=self._boundary(overrides['dj'], shape),
-            fmc=self._boundary(overrides['fmc'], shape),
-            out_request=request, threads=threads)
-        object.__setattr__(self, '_grid', grid)
-        object.__setattr__(self, 'wx_date', wx_date)
-        object.__setattr__(self, 'percentile_growth', percentile_growth)
-        self.out_request = request
-        self.convert_fuel_type_codes = convert_fuel_type_codes
-        self.return_array = prepared.return_array
-        self._fuel = verified.fuel_type.copy()
-        self._inputs = {name: getattr(verified, name).copy() for name in _INPUTS}
-        self._overrides = overrides
-        self._raw = dict(prepared.raw)
-        self._dj_warned = set()
-        self._fmc_done = self._sfc_done = False
-        self._injected = {}
-        self._accel_done = False
-        self._accel_fused = False
-        self._reset_masks()
-        self.initialized = True
-        self._warn_dj()
 
     @staticmethod
     def _boundary(value, shape):
@@ -144,50 +110,6 @@ class FBP:
             raise ValueError(f'fuel_type shape {arr.shape} != grid shape {shape}')
         return arr
 
-    def _require(self):
-        if self._grid is None:
-            raise ValueError('FBP class must be initialized before running calculations. Call "initialize" first.')
-
-    def _warn_dj(self):
-        supplied = self._overrides['dj']
-        if supplied is not None and self._grid.dj_override_clipped:
-            resolve_dj_override(supplied, self.wx_date, self._dj_warned)
-
-    def set_override(self, name, values):
-        self._require()
-        if name not in ('d0', 'dj', 'fmc'):
-            raise ValueError("set_override name must be 'd0', 'dj' or 'fmc'")
-        raw = coerce_override(name, values)
-        self._raw[name] = raw
-        supplied = inputs.apply_fuel_mask(raw, inputs.fuel_mask_of(self._fuel))
-        self._grid.set_override(name, self._boundary(supplied, self._grid.shape))
-        self._overrides[name] = supplied
-        if self._scalar_masks is not None:
-            self._scalar_masks.set(name, supplied)
-        self._fmc_done = False
-        self._warn_dj()
-
-    def set_param(self, name, value):
-        self._require()
-        if name == 'wx_date':
-            value = inputs.validate_wx_date(value)
-        self._grid.set_param(name, _percentile(value) if name == 'percentile_growth' else value)
-        object.__setattr__(self, name, value)
-        if name == 'wx_date':
-            self._fmc_done = False
-            self._warn_dj()
-
-    def set_fuel(self, value):
-        self._require()
-        fuel, _ = inputs.prepare_fuel_type(value, self.convert_fuel_type_codes)
-        old_mask = inputs.fuel_mask_of(self._fuel)
-        self._grid.set_fuel(self._fuel_boundary(fuel, self._grid.shape))
-        self._fuel = fuel.copy()
-        if self._scalar_masks is not None:
-            self._scalar_masks.set("fuel_type", fuel)
-        if old_mask is not None or inputs.fuel_mask_of(self._fuel) is not None:
-            self._refresh_fuel_mask()
-
     def _refresh_fuel_mask(self):
         """Send every input and override to the grid again with the mask of the current fuel grid applied."""
         fuel_mask = inputs.fuel_mask_of(self._fuel)
@@ -205,64 +127,13 @@ class FBP:
                 self._scalar_masks.set(name, supplied)
         self._fmc_done = False
 
-    def set(self, name, value):
-        self._require()
-        if name in ('d0', 'dj', 'fmc'):
-            self.set_override(name, value)
-        elif name in ('wx_date', 'percentile_growth'):
-            self.set_param(name, value)
-        elif name == 'fuel_type':
-            self.set_fuel(value)
-        else:
-            arr = (inputs.normalize_input(name, value) if name in inputs.NORMALISED_INPUTS
-                   else inputs.coerce_input(name, value))
-            if name == 'long':
-                arr = np.absolute(arr)
-            if name in _INPUTS:
-                self._raw[name] = arr
-                if name in inputs.FUEL_MASKED_NAMES:
-                    arr = inputs.apply_fuel_mask(arr, inputs.fuel_mask_of(self._fuel))
-            self._grid.set(_ALIASES.get(name, name), self._boundary(arr, self._grid.shape))
-            if self._scalar_masks is not None:
-                self._scalar_masks.set(_ALIASES.get(name, name), arr)
-            if name in _INPUTS:
-                self._inputs[name] = arr.copy()
-            else:
-                self._injected[_ALIASES.get(name, name)] = arr.copy()
-
-    def setParams(self, set_dict):
-        # an explicit fme goes last so that it wins over the one derived from a fmc given in the same call
-        for name, value in sorted(set_dict.items(), key=lambda item: item[0] == 'fme'):
-            if name in _SETTABLE or name in ('wx_date', 'percentile_growth'):
-                self.set(name, value)
+    def _require(self):
+        if self._grid is None:
+            raise ValueError('FBP class must be initialized before running calculations. Call "initialize" first.')
 
     def _reset_masks(self):
         self._scalar_masks = (None if self.return_array else
                               ScalarMasks(self._inputs, self._fuel, self._overrides))
-
-    def reset(self):
-        self._require()
-        self._grid.reset()
-        self._reset_masks()
-        self._fmc_done = self._sfc_done = False
-        self._injected.clear()
-        self._accel_done = False
-        self._accel_fused = False
-
-    def runFBP(self, block=None):
-        self._require()
-        if block is not None:
-            raise NotImplementedError('block processing is a Python-backend feature; the Rust backend uses threads; '
-                                      "use backend='python' for block processing")
-        self.reset()
-        self._grid.run()
-        if self._scalar_masks is not None:
-            for stage in _STAGE_WRITES:
-                self._scalar_masks.stage(stage, self._fuel, _percentile(self.percentile_growth))
-        self._fmc_done = self._sfc_done = self._accel_done = True
-        self._accel_fused = True
-        self._accel_fuel = self._fuel
-        return self.getParams(self.out_request)
 
     def _stage(self, name):
         self._require()
@@ -291,6 +162,11 @@ class FBP:
             self._fmc_done = True
         elif name == 'calcSFC':
             self._sfc_done = True
+
+    def _warn_dj(self):
+        supplied = self._overrides['dj']
+        if supplied is not None and self._grid.dj_override_clipped:
+            resolve_dj_override(supplied, self.wx_date, self._dj_warned)
 
     def calcFMC(self, d0=None, dj=None, fmc=None, lat=None, long=None, elevation=None, wx_date=None):
         for name, value in [('d0', d0), ('dj', dj), ('fmc', fmc), ('lat', lat), ('long', long),
@@ -362,13 +238,137 @@ class FBP:
             results.append(finish(name, result, not self.return_array, dtype=dtype))
         return results
 
+    def initialize(self, fuel_type=None, wx_date=None, lat=None, long=None, elevation=None,
+                   slope=None, aspect=None, ws=None, wd=None, ffmc=None, bui=None,
+                   pc=50, pdf=35, gfl=0.35, gcf=80, d0=None, dj=None, out_request=None,
+                   convert_fuel_type_codes=False, percentile_growth=50, threads=1, fmc=None):
+        prepared = inputs.prepare_inputs(
+            fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation,
+            slope=slope, aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf,
+            gfl=gfl, gcf=gcf, d0=d0, dj=dj, fmc=fmc, out_request=out_request,
+            convert_fuel_type_codes=convert_fuel_type_codes)
+        verified = prepared.verified
+        request = _DEFAULT.copy() if out_request is None else list(out_request)
+        unknown = [name for name in request if name not in valid_outputs]
+        if unknown:
+            raise ValueError(f'Invalid out_request values: {unknown}. Valid values are: {sorted(valid_outputs)}')
+        shape = prepared.ref_array.shape if prepared.return_array else ()
+        values = {name: self._boundary(getattr(verified, name), shape) for name in _INPUTS}
+        overrides = {name: getattr(verified, name) for name in ('d0', 'dj', 'fmc')}
+        grid = _rust.FbpGrid(
+            fuel_type=self._fuel_boundary(verified.fuel_type, shape), **values, wx_date=wx_date,
+            percentile_growth=_percentile(percentile_growth),
+            d0=self._boundary(overrides['d0'], shape), dj=self._boundary(overrides['dj'], shape),
+            fmc=self._boundary(overrides['fmc'], shape),
+            out_request=request, threads=threads)
+        object.__setattr__(self, '_grid', grid)
+        object.__setattr__(self, 'wx_date', wx_date)
+        object.__setattr__(self, 'percentile_growth', percentile_growth)
+        self.out_request = request
+        self.convert_fuel_type_codes = convert_fuel_type_codes
+        self.return_array = prepared.return_array
+        self._fuel = verified.fuel_type.copy()
+        self._inputs = {name: getattr(verified, name).copy() for name in _INPUTS}
+        self._overrides = overrides
+        self._raw = dict(prepared.raw)
+        self._dj_warned = set()
+        self._fmc_done = self._sfc_done = False
+        self._injected = {}
+        self._accel_done = False
+        self._accel_fused = False
+        self._reset_masks()
+        self.initialized = True
+        self._warn_dj()
 
-def _stage_method(name):
-    def method(self):
-        self._stage(name)
-    method.__name__ = name
-    method.__doc__ = f'Run the {name} stage on the owned Rust grid.'
-    return method
+    def reset(self):
+        self._require()
+        self._grid.reset()
+        self._reset_masks()
+        self._fmc_done = self._sfc_done = False
+        self._injected.clear()
+        self._accel_done = False
+        self._accel_fused = False
+
+    def runFBP(self, block=None):
+        self._require()
+        if block is not None:
+            raise NotImplementedError('block processing is a Python-backend feature; the Rust backend uses threads; '
+                                      "use backend='python' for block processing")
+        self.reset()
+        self._grid.run()
+        if self._scalar_masks is not None:
+            for stage in _STAGE_WRITES:
+                self._scalar_masks.stage(stage, self._fuel, _percentile(self.percentile_growth))
+        self._fmc_done = self._sfc_done = self._accel_done = True
+        self._accel_fused = True
+        self._accel_fuel = self._fuel
+        return self.getParams(self.out_request)
+
+    def set(self, name, value):
+        self._require()
+        if name in ('d0', 'dj', 'fmc'):
+            self.set_override(name, value)
+        elif name in ('wx_date', 'percentile_growth'):
+            self.set_param(name, value)
+        elif name == 'fuel_type':
+            self.set_fuel(value)
+        else:
+            arr = (inputs.normalize_input(name, value) if name in inputs.NORMALISED_INPUTS
+                   else inputs.coerce_input(name, value))
+            if name == 'long':
+                arr = np.absolute(arr)
+            if name in _INPUTS:
+                self._raw[name] = arr
+                if name in inputs.FUEL_MASKED_NAMES:
+                    arr = inputs.apply_fuel_mask(arr, inputs.fuel_mask_of(self._fuel))
+            self._grid.set(_ALIASES.get(name, name), self._boundary(arr, self._grid.shape))
+            if self._scalar_masks is not None:
+                self._scalar_masks.set(_ALIASES.get(name, name), arr)
+            if name in _INPUTS:
+                self._inputs[name] = arr.copy()
+            else:
+                self._injected[_ALIASES.get(name, name)] = arr.copy()
+
+    def set_fuel(self, value):
+        self._require()
+        fuel, _ = inputs.prepare_fuel_type(value, self.convert_fuel_type_codes)
+        old_mask = inputs.fuel_mask_of(self._fuel)
+        self._grid.set_fuel(self._fuel_boundary(fuel, self._grid.shape))
+        self._fuel = fuel.copy()
+        if self._scalar_masks is not None:
+            self._scalar_masks.set("fuel_type", fuel)
+        if old_mask is not None or inputs.fuel_mask_of(self._fuel) is not None:
+            self._refresh_fuel_mask()
+
+    def set_override(self, name, values):
+        self._require()
+        if name not in ('d0', 'dj', 'fmc'):
+            raise ValueError("set_override name must be 'd0', 'dj' or 'fmc'")
+        raw = coerce_override(name, values)
+        self._raw[name] = raw
+        supplied = inputs.apply_fuel_mask(raw, inputs.fuel_mask_of(self._fuel))
+        self._grid.set_override(name, self._boundary(supplied, self._grid.shape))
+        self._overrides[name] = supplied
+        if self._scalar_masks is not None:
+            self._scalar_masks.set(name, supplied)
+        self._fmc_done = False
+        self._warn_dj()
+
+    def set_param(self, name, value):
+        self._require()
+        if name == 'wx_date':
+            value = inputs.validate_wx_date(value)
+        self._grid.set_param(name, _percentile(value) if name == 'percentile_growth' else value)
+        object.__setattr__(self, name, value)
+        if name == 'wx_date':
+            self._fmc_done = False
+            self._warn_dj()
+
+    def setParams(self, set_dict):
+        # an explicit fme goes last so that it wins over the one derived from a fmc given in the same call
+        for name, value in sorted(set_dict.items(), key=lambda item: item[0] == 'fme'):
+            if name in _SETTABLE or name in ('wx_date', 'percentile_growth'):
+                self.set(name, value)
 
 
 for _name in (

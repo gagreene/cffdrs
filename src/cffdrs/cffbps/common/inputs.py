@@ -46,31 +46,50 @@ class VerifiedInputs(NamedTuple):
     fmc: MaskedArray | None
 
 
-def convert_grid_codes(fuel_type_array: np.ndarray) -> np.ndarray:
-    """
-    Function to convert grid code values from the cffdrs_r R package fuel type codes
-    to the codes used in this module.
+# Inputs that are normalised when they are set: name -> default substituted for a NaN scalar (or None)
+NORMALISED_INPUTS = {'slope': None, 'aspect': None, 'ws': None, 'ffmc': None, 'bui': None,
+                     'pc': 50, 'pdf': 35, 'gfl': 0.35, 'gcf': 80}
 
-    :param fuel_type_array: CFFBPS fuel type array, containing the CFS cffdrs R version of grid codes
-    :return: modified fuel_type_array
+#: The inputs and overrides that carry the fuel mask: a cell whose fuel is masked or invalid is missing in all of them.
+#: ``pc``, ``pdf``, ``gfl`` and ``gcf`` only feed fuel-dependent results, which the fuel mask already masks, so they are
+#: left alone (masking them would only add four full-size masks and slow every masked-array operation).
+FUEL_MASKED_NAMES = ('lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui', 'd0', 'dj', 'fmc')
+
+REQUIRED_INPUTS = ('fuel_type', 'wx_date', 'lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui')
+
+
+def _coerce(name: str, value, default: float | None = None) -> MaskedArray:
+    """Coerce one numeric input (scalar or ndarray) to a masked array.
+
+    Arrays mask their NaN cells. Scalars are wrapped as 1-element arrays with a NaN
+    mask — except when ``default`` is given: then a NaN scalar is replaced by the
+    default and wrapped WITHOUT a NaN mask (the historical behavior of the optional
+    pc/pdf/gfl/gcf fields, preserved deliberately — the golden snapshots lock it).
     """
-    fuel_type_array = mask.where(
-        fuel_type_array == 19, 20,
-        mask.where(
-            fuel_type_array == 13, 19,
-            mask.where(
-                fuel_type_array == 12, 13,
-                mask.where(
-                    fuel_type_array == 11, 12,
-                    mask.where(
-                        fuel_type_array == 10, 11,
-                        mask.where(fuel_type_array == 9, 10, fuel_type_array)
-                    )
-                )
-            )
-        )
-    )
-    return fuel_type_array
+    if not isinstance(value, (int, float, np.ndarray)):
+        raise TypeError(f'{name} must be either int, float, or numpy ndarray data types')
+    if isinstance(value, np.ndarray):
+        return mask.array(value, mask=np.isnan(value))
+    if default is not None:
+        if np.isnan(value):
+            value = default
+        return mask.array([value])
+    return mask.array([value], mask=np.isnan([value]))
+
+
+def apply_fuel_mask(value, fuel_mask):
+    """``value`` with the cells of ``fuel_mask`` masked as well; the data are shared, only the mask is new.
+
+    A value of one cell (a scalar input) is broadcast to the grid of the fuel mask. With no fuel mask, or for ``None``,
+    ``value`` is returned as it is.
+    """
+    if value is None or fuel_mask is None:
+        return value
+    data, missing = np.ma.getdata(value), np.ma.getmaskarray(value)
+    shape = np.broadcast_shapes(data.shape, fuel_mask.shape)
+    if data.shape != shape:
+        data, missing = np.broadcast_to(data, shape), np.broadcast_to(missing, shape)
+    return mask.array(data, mask=missing | fuel_mask, copy=False)
 
 
 def check_array(input_list: list) -> tuple[bool, mask.MaskedArray, mask.MaskedArray]:
@@ -134,23 +153,64 @@ def check_array(input_list: list) -> tuple[bool, mask.MaskedArray, mask.MaskedAr
     return return_array, ref_array, ref_int_array
 
 
-def _coerce(name: str, value, default: float | None = None) -> MaskedArray:
-    """Coerce one numeric input (scalar or ndarray) to a masked array.
+def coerce_input(name: str, value, default: float | None = None) -> MaskedArray:
+    """Public form of the shared numeric-input coercion (see ``_coerce``)."""
+    return _coerce(name, value, default)
 
-    Arrays mask their NaN cells. Scalars are wrapped as 1-element arrays with a NaN
-    mask — except when ``default`` is given: then a NaN scalar is replaced by the
-    default and wrapped WITHOUT a NaN mask (the historical behavior of the optional
-    pc/pdf/gfl/gcf fields, preserved deliberately — the golden snapshots lock it).
+
+def convert_grid_codes(fuel_type_array: np.ndarray) -> np.ndarray:
     """
-    if not isinstance(value, (int, float, np.ndarray)):
-        raise TypeError(f'{name} must be either int, float, or numpy ndarray data types')
-    if isinstance(value, np.ndarray):
-        return mask.array(value, mask=np.isnan(value))
-    if default is not None:
-        if np.isnan(value):
-            value = default
-        return mask.array([value])
-    return mask.array([value], mask=np.isnan([value]))
+    Function to convert grid code values from the cffdrs_r R package fuel type codes
+    to the codes used in this module.
+
+    :param fuel_type_array: CFFBPS fuel type array, containing the CFS cffdrs R version of grid codes
+    :return: modified fuel_type_array
+    """
+    fuel_type_array = mask.where(
+        fuel_type_array == 19, 20,
+        mask.where(
+            fuel_type_array == 13, 19,
+            mask.where(
+                fuel_type_array == 12, 13,
+                mask.where(
+                    fuel_type_array == 11, 12,
+                    mask.where(
+                        fuel_type_array == 10, 11,
+                        mask.where(fuel_type_array == 9, 10, fuel_type_array)
+                    )
+                )
+            )
+        )
+    )
+    return fuel_type_array
+
+
+def fuel_mask_of(fuel_type) -> np.ndarray | None:
+    """The mask of a prepared fuel grid, or ``None`` when no cell is masked (the common case costs nothing)."""
+    if fuel_type is None:
+        return None
+    fuel_mask = np.ma.getmaskarray(fuel_type)
+    return fuel_mask if fuel_mask.any() else None
+
+
+def normalize_input(name: str, value) -> MaskedArray:
+    """Coerce one of the nine normalised inputs to a masked array and apply its rule.
+
+    Used by ``verify_inputs`` and by every route that changes an input after initialisation, so an
+    updated model equals one initialised with the same value. Rules: ``slope`` is limited below at 0;
+    a negative ``aspect`` becomes 270 (flat terrain); negative ``ws``, ``ffmc``, ``bui``, ``pc``, ``pdf``
+    and ``gfl`` become 0; ``gcf`` of 0 becomes 0.1. A NaN scalar ``pc``/``pdf``/``gfl``/``gcf`` takes its default.
+    """
+    if name not in NORMALISED_INPUTS:
+        raise ValueError(f'{name} is not a normalised input')
+    value = _coerce(name, value, default=NORMALISED_INPUTS[name])
+    if name == 'slope':
+        return mask.clip(value, 0, None)  # Limit the lower slope value to 0
+    if name == 'aspect':
+        return mask.where(value < 0, 270, value)  # Negative aspect represents "flat" terrain
+    if name == 'gcf':
+        return mask.where(value == 0, 0.1, value)  # Set to 0.1% if 0%
+    return mask.where(value < 0, 0, value)  # Set to 0 if negative
 
 
 def prepare_fuel_type(fuel_type, convert_fuel_type_codes: bool):
@@ -191,6 +251,31 @@ def prepare_fuel_type(fuel_type, convert_fuel_type_codes: bool):
     return fuel_type, ftypes
 
 
+def prepare_inputs(*, fuel_type, wx_date, lat, long, elevation, slope, aspect, ws, wd,
+                   ffmc, bui, pc, pdf, gfl, gcf, d0, dj, out_request,
+                   convert_fuel_type_codes, fmc=None) -> PreparedInputs:
+    """Check the required parameters, detect array input and validate/coerce every input.
+
+    :raises ValueError: listing every missing required parameter
+    """
+    given = dict(fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
+                 aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui)
+    missing = [name for name in REQUIRED_INPUTS if given[name] is None]
+    if missing:
+        raise ValueError(f'Missing required parameters: {missing}')
+    return_array, ref_array, ref_int_array = check_array(
+        [fuel_type, lat, long, elevation, slope, aspect, ws, wd, ffmc, bui, pc, pdf, gfl, gcf])
+    verified = verify_inputs(
+        fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
+        aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf, gfl=gfl, gcf=gcf,
+        d0=d0, dj=dj, fmc=fmc, out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes)
+    raw = {name: getattr(verified, name) for name in FUEL_MASKED_NAMES}
+    fuel_mask = fuel_mask_of(verified.fuel_type)
+    if fuel_mask is not None:
+        verified = verified._replace(**{name: apply_fuel_mask(value, fuel_mask) for name, value in raw.items()})
+    return PreparedInputs(verified, return_array, ref_array, ref_int_array, raw)
+
+
 def validate_wx_date(wx_date) -> int:
     """Require ``wx_date`` to be an int formatted YYYYMMDD and return it."""
     if not isinstance(wx_date, int):
@@ -201,36 +286,6 @@ def validate_wx_date(wx_date) -> int:
     except ValueError:
         raise ValueError('wx_date must be formatted as: YYYYMMDD') from None
     return wx_date
-
-
-# Inputs that are normalised when they are set: name -> default substituted for a NaN scalar (or None)
-NORMALISED_INPUTS = {'slope': None, 'aspect': None, 'ws': None, 'ffmc': None, 'bui': None,
-                     'pc': 50, 'pdf': 35, 'gfl': 0.35, 'gcf': 80}
-
-
-def normalize_input(name: str, value) -> MaskedArray:
-    """Coerce one of the nine normalised inputs to a masked array and apply its rule.
-
-    Used by ``verify_inputs`` and by every route that changes an input after initialisation, so an
-    updated model equals one initialised with the same value. Rules: ``slope`` is limited below at 0;
-    a negative ``aspect`` becomes 270 (flat terrain); negative ``ws``, ``ffmc``, ``bui``, ``pc``, ``pdf``
-    and ``gfl`` become 0; ``gcf`` of 0 becomes 0.1. A NaN scalar ``pc``/``pdf``/``gfl``/``gcf`` takes its default.
-    """
-    if name not in NORMALISED_INPUTS:
-        raise ValueError(f'{name} is not a normalised input')
-    value = _coerce(name, value, default=NORMALISED_INPUTS[name])
-    if name == 'slope':
-        return mask.clip(value, 0, None)  # Limit the lower slope value to 0
-    if name == 'aspect':
-        return mask.where(value < 0, 270, value)  # Negative aspect represents "flat" terrain
-    if name == 'gcf':
-        return mask.where(value == 0, 0.1, value)  # Set to 0.1% if 0%
-    return mask.where(value < 0, 0, value)  # Set to 0 if negative
-
-
-def coerce_input(name: str, value, default: float | None = None) -> MaskedArray:
-    """Public form of the shared numeric-input coercion (see ``_coerce``)."""
-    return _coerce(name, value, default)
 
 
 def verify_inputs(*,
@@ -285,35 +340,6 @@ def verify_inputs(*,
     )
 
 
-#: The inputs and overrides that carry the fuel mask: a cell whose fuel is masked or invalid is missing in all of them.
-#: ``pc``, ``pdf``, ``gfl`` and ``gcf`` only feed fuel-dependent results, which the fuel mask already masks, so they are
-#: left alone (masking them would only add four full-size masks and slow every masked-array operation).
-FUEL_MASKED_NAMES = ('lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui', 'd0', 'dj', 'fmc')
-
-
-def fuel_mask_of(fuel_type) -> np.ndarray | None:
-    """The mask of a prepared fuel grid, or ``None`` when no cell is masked (the common case costs nothing)."""
-    if fuel_type is None:
-        return None
-    fuel_mask = np.ma.getmaskarray(fuel_type)
-    return fuel_mask if fuel_mask.any() else None
-
-
-def apply_fuel_mask(value, fuel_mask):
-    """``value`` with the cells of ``fuel_mask`` masked as well; the data are shared, only the mask is new.
-
-    A value of one cell (a scalar input) is broadcast to the grid of the fuel mask. With no fuel mask, or for ``None``,
-    ``value`` is returned as it is.
-    """
-    if value is None or fuel_mask is None:
-        return value
-    data, missing = np.ma.getdata(value), np.ma.getmaskarray(value)
-    shape = np.broadcast_shapes(data.shape, fuel_mask.shape)
-    if data.shape != shape:
-        data, missing = np.broadcast_to(data, shape), np.broadcast_to(missing, shape)
-    return mask.array(data, mask=missing | fuel_mask, copy=False)
-
-
 class PreparedInputs(NamedTuple):
     """Everything ``initialize`` needs from the raw arguments (shared by every backend).
 
@@ -325,31 +351,3 @@ class PreparedInputs(NamedTuple):
     ref_array: MaskedArray
     ref_int_array: MaskedArray
     raw: dict
-
-
-REQUIRED_INPUTS = ('fuel_type', 'wx_date', 'lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui')
-
-
-def prepare_inputs(*, fuel_type, wx_date, lat, long, elevation, slope, aspect, ws, wd,
-                   ffmc, bui, pc, pdf, gfl, gcf, d0, dj, out_request,
-                   convert_fuel_type_codes, fmc=None) -> PreparedInputs:
-    """Check the required parameters, detect array input and validate/coerce every input.
-
-    :raises ValueError: listing every missing required parameter
-    """
-    given = dict(fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
-                 aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui)
-    missing = [name for name in REQUIRED_INPUTS if given[name] is None]
-    if missing:
-        raise ValueError(f'Missing required parameters: {missing}')
-    return_array, ref_array, ref_int_array = check_array(
-        [fuel_type, lat, long, elevation, slope, aspect, ws, wd, ffmc, bui, pc, pdf, gfl, gcf])
-    verified = verify_inputs(
-        fuel_type=fuel_type, wx_date=wx_date, lat=lat, long=long, elevation=elevation, slope=slope,
-        aspect=aspect, ws=ws, wd=wd, ffmc=ffmc, bui=bui, pc=pc, pdf=pdf, gfl=gfl, gcf=gcf,
-        d0=d0, dj=dj, fmc=fmc, out_request=out_request, convert_fuel_type_codes=convert_fuel_type_codes)
-    raw = {name: getattr(verified, name) for name in FUEL_MASKED_NAMES}
-    fuel_mask = fuel_mask_of(verified.fuel_type)
-    if fuel_mask is not None:
-        verified = verified._replace(**{name: apply_fuel_mask(value, fuel_mask) for name, value in raw.items()})
-    return PreparedInputs(verified, return_array, ref_array, ref_int_array, raw)

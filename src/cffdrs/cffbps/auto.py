@@ -45,16 +45,6 @@ class AutoFBP:
     or computation fallback.
     """
 
-    def __init__(self) -> None:
-        object.__setattr__(self, '_backend', PythonFBP())
-        object.__setattr__(self, '_backend_in_use', None)
-        object.__setattr__(self, '_python_pinned', False)
-
-    @property
-    def backend_in_use(self) -> str | None:
-        """None before successful initialization, then 'python' or 'rust'."""
-        return self._backend_in_use
-
     def __getattr__(self, name: str) -> Any:
         if name in _TABLES:
             if self._backend_in_use == 'rust':
@@ -62,6 +52,11 @@ class AutoFBP:
             if self._backend_in_use is None:
                 object.__setattr__(self, '_python_pinned', True)
         return getattr(self._backend, name)
+
+    def __init__(self) -> None:
+        object.__setattr__(self, '_backend', PythonFBP())
+        object.__setattr__(self, '_backend_in_use', None)
+        object.__setattr__(self, '_python_pinned', False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name == 'backend_in_use':
@@ -75,6 +70,20 @@ class AutoFBP:
             if self._backend_in_use is None:
                 object.__setattr__(self, '_python_pinned', True)
         setattr(self._backend, name, value)
+
+    @property
+    def backend_in_use(self) -> str | None:
+        """None before successful initialization, then 'python' or 'rust'."""
+        return self._backend_in_use
+
+    def getCBH_CFL(self, ftype=None, cbh=None, cfl=None):
+        """Run the canopy lookup; Rust overrides use setParams after this stage."""
+        if self._backend_in_use == 'rust' and any(value is not None for value in (ftype, cbh, cfl)):
+            raise NotImplementedError(
+                "getCBH_CFL overrides require backend='python'; "
+                "on Rust use setParams({'cbh': ..., 'cfl': ...}) after this stage"
+            )
+        return self._backend.getCBH_CFL(ftype=ftype, cbh=cbh, cfl=cfl)
 
     def initialize(self, fuel_type=None, wx_date=None, lat=None, long=None, elevation=None,
                    slope=None, aspect=None, ws=None, wd=None, ffmc=None, bui=None,
@@ -130,12 +139,3 @@ class AutoFBP:
         if self._backend_in_use == 'rust' and block is not None:
             raise NotImplementedError("block processing requires backend='python'; Rust uses threads")
         return self._backend.runFBP(block=block)
-
-    def getCBH_CFL(self, ftype=None, cbh=None, cfl=None):
-        """Run the canopy lookup; Rust overrides use setParams after this stage."""
-        if self._backend_in_use == 'rust' and any(value is not None for value in (ftype, cbh, cfl)):
-            raise NotImplementedError(
-                "getCBH_CFL overrides require backend='python'; "
-                "on Rust use setParams({'cbh': ..., 'cfl': ...}) after this stage"
-            )
-        return self._backend.getCBH_CFL(ftype=ftype, cbh=cbh, cfl=cfl)

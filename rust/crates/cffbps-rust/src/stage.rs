@@ -95,6 +95,13 @@ impl Stage {
     /// Number of stages.
     pub(crate) const COUNT: usize = Stage::ALL.len();
 
+    /// The stage with this Python method name; `None` for an unknown name.
+    /// Names are case sensitive.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Stage> {
+        Stage::ALL.into_iter().find(|s| s.name() == name)
+    }
+
     /// Position of this stage in [`Stage::ALL`].
     #[must_use]
     pub(crate) const fn index(self) -> usize {
@@ -129,13 +136,6 @@ impl Stage {
             Stage::CalcHfi => "calcHFI",
             Stage::CalcFireIntensityClass => "calcFireIntensityClass",
         }
-    }
-
-    /// The stage with this Python method name; `None` for an unknown name.
-    /// Names are case sensitive.
-    #[must_use]
-    pub fn from_name(name: &str) -> Option<Stage> {
-        Stage::ALL.into_iter().find(|s| s.name() == name)
     }
 
     /// Every field the stage's result can depend on. Besides these, a stage
@@ -391,6 +391,7 @@ mod tests {
         ("calcFireIntensityClass", &["hfi"], &["fi_class"]),
     ];
 
+    // ---- other tests ----
     #[test]
     fn all_has_23_unique_stages() {
         assert_eq!(Stage::ALL.len(), 23);

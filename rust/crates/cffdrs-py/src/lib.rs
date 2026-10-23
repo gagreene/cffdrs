@@ -3,7 +3,6 @@
 //! implementation and the spec.
 
 mod fbp_grid;
-
 use cffbps_rust::grid::{run_grid_with_threads, GridInput, PerCell};
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
@@ -12,8 +11,18 @@ use pyo3::types::PyDict;
 
 /// Default percent dead balsam fir for a NaN scalar, as in the Python package.
 const PCT_DEAD_FIR_DEFAULT: f64 = 35.0;
+
 /// Default grass fuel load (kg/m^2) for a NaN scalar, as in the Python package.
 const GRASS_FUEL_LOAD_DEFAULT: f64 = 0.35;
+
+/// The compiled backend exposed as `cffdrs._rust` by the mixed Python/Rust wheel.
+#[pymodule]
+fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("__core_version__", cffbps_rust::VERSION)?;
+    m.add_function(wrap_pyfunction!(run_fbp_grid, m)?)?;
+    m.add_class::<fbp_grid::FbpGrid>()?;
+    Ok(())
+}
 
 /// Copy a 2-D array into an owned `Vec` in logical row-major order, whatever
 /// its memory layout (C, Fortran or strided).
@@ -177,13 +186,4 @@ fn run_fbp_grid<'py>(
         )?;
     }
     Ok(out)
-}
-
-/// The compiled backend exposed as `cffdrs._rust` by the mixed Python/Rust wheel.
-#[pymodule]
-fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("__core_version__", cffbps_rust::VERSION)?;
-    m.add_function(wrap_pyfunction!(run_fbp_grid, m)?)?;
-    m.add_class::<fbp_grid::FbpGrid>()?;
-    Ok(())
 }

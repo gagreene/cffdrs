@@ -10,6 +10,27 @@ pub(crate) struct Ros {
     pub sros: f64,
 }
 
+// The deterministic C-6 blend is four stages: SROS-derived CFB
+// (`crown::cfb_from_ros(sros, rso)`) -> CFC (`consumption::calc_cfc`, which is
+// `blend_cfb * cfl` for C-6) -> CROS (`c6_cros`) -> blended HROS (`c6_hros`).
+// The blend CFB is temporary; it is not the CFB used downstream.
+
+/// `calc_c6_cros`: C-6 crown ROS from the blend CFC; zero when the blend
+/// consumes no crown fuel.
+pub(crate) fn c6_cros(blend_cfc: f64, isi: f64, fme: f64) -> f64 {
+    if blend_cfc == 0.0 {
+        0.0
+    } else {
+        60.0 * (1.0 - (-0.0497 * isi).exp()) * (fme / 0.778_237)
+    }
+}
+
+/// `calc_c6_hros`: C-6 head ROS blended from surface and crown ROS by the
+/// blend CFB.
+pub(crate) fn c6_hros(sros: f64, blend_cfb: f64, cros: f64) -> f64 {
+    sros + blend_cfb * (cros - sros)
+}
+
 /// `calc_ros`, including the setParams({'hros': ...}) injection.
 pub(crate) fn calc_ros(
     ft: FuelType,
@@ -44,33 +65,13 @@ pub(crate) fn calc_ros(
     Ros { hros, bros, sros }
 }
 
-// The deterministic C-6 blend is four stages: SROS-derived CFB
-// (`crown::cfb_from_ros(sros, rso)`) -> CFC (`consumption::calc_cfc`, which is
-// `blend_cfb * cfl` for C-6) -> CROS (`c6_cros`) -> blended HROS (`c6_hros`).
-// The blend CFB is temporary; it is not the CFB used downstream.
-
-/// `calc_c6_cros`: C-6 crown ROS from the blend CFC; zero when the blend
-/// consumes no crown fuel.
-pub(crate) fn c6_cros(blend_cfc: f64, isi: f64, fme: f64) -> f64 {
-    if blend_cfc == 0.0 {
-        0.0
-    } else {
-        60.0 * (1.0 - (-0.0497 * isi).exp()) * (fme / 0.778_237)
-    }
-}
-
-/// `calc_c6_hros`: C-6 head ROS blended from surface and crown ROS by the
-/// blend CFB.
-pub(crate) fn c6_hros(sros: f64, blend_cfb: f64, cros: f64) -> f64 {
-    sros + blend_cfb * (cros - sros)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::consumption::calc_cfc;
     use crate::crown::cfb_from_ros;
 
+    // ---- helpers ----
     /// The four C-6 stage functions composed in pipeline order.
     fn composed(sros: f64, rso: f64, cfl: f64, isi: f64, fme: f64) -> (f64, f64) {
         let blend_cfb = cfb_from_ros(sros, rso);
@@ -91,6 +92,21 @@ mod tests {
         (cros, sros + blend_cfb * (cros - sros))
     }
 
+    // ---- c6 tests ----
+    #[test]
+    fn c6_cros_is_zero_without_blend_crown_consumption() {
+        assert_eq!(c6_cros(0.0, 20.0, 1.0), 0.0);
+        assert!(c6_cros(0.5, 20.0, 1.0) > 0.0);
+    }
+
+    #[test]
+    fn c6_hros_blends_surface_and_crown_by_the_blend_cfb() {
+        assert_eq!(c6_hros(4.0, 0.0, 30.0), 4.0);
+        assert_eq!(c6_hros(4.0, 1.0, 30.0), 30.0);
+        assert_eq!(c6_hros(4.0, 0.5, 30.0), 17.0);
+    }
+
+    // ---- other tests ----
     #[test]
     fn the_four_stage_functions_equal_the_old_blend_bit_for_bit() {
         let nan = f64::NAN;
@@ -110,18 +126,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn c6_cros_is_zero_without_blend_crown_consumption() {
-        assert_eq!(c6_cros(0.0, 20.0, 1.0), 0.0);
-        assert!(c6_cros(0.5, 20.0, 1.0) > 0.0);
-    }
-
-    #[test]
-    fn c6_hros_blends_surface_and_crown_by_the_blend_cfb() {
-        assert_eq!(c6_hros(4.0, 0.0, 30.0), 4.0);
-        assert_eq!(c6_hros(4.0, 1.0, 30.0), 30.0);
-        assert_eq!(c6_hros(4.0, 0.5, 30.0), 17.0);
     }
 }

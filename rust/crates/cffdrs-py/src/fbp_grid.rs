@@ -16,6 +16,20 @@ enum Snapshot {
 }
 
 impl Snapshot {
+    fn check_shape(&self, name: &str, expected: &[usize]) -> PyResult<()> {
+        if let Self::Cells(_, shape) = self {
+            check_shape(name, shape, expected)?;
+        }
+        Ok(())
+    }
+
+    fn per_cell(&self) -> PerCell<'_> {
+        match self {
+            Self::Const(v) => PerCell::Const(*v),
+            Self::Cells(v, _) => PerCell::Cells(v),
+        }
+    }
+
     fn read(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         // Cast before filling so masked integer inputs can represent NaN.
         let array = py
@@ -33,66 +47,6 @@ impl Snapshot {
             Ok(Self::Cells(values, shape))
         }
     }
-
-    fn per_cell(&self) -> PerCell<'_> {
-        match self {
-            Self::Const(v) => PerCell::Const(*v),
-            Self::Cells(v, _) => PerCell::Cells(v),
-        }
-    }
-
-    fn check_shape(&self, name: &str, expected: &[usize]) -> PyResult<()> {
-        if let Self::Cells(_, shape) = self {
-            check_shape(name, shape, expected)?;
-        }
-        Ok(())
-    }
-}
-
-fn check_shape(name: &str, found: &[usize], expected: &[usize]) -> PyResult<()> {
-    if found != expected {
-        return Err(PyValueError::new_err(format!(
-            "{name} shape {found:?} != grid shape {expected:?}"
-        )));
-    }
-    Ok(())
-}
-
-/// Fuel arrays must already contain the wrapper's int32 codes, including 0
-/// for masked/invalid cells. Integer scalars can broadcast over the grid.
-fn fuel_snapshot(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<(Vec<i32>, Vec<usize>)> {
-    let array = py.import("numpy")?.getattr("asarray")?.call1((value,))?;
-    let shape = array.getattr("shape")?.extract::<Vec<usize>>()?;
-    if shape.is_empty() {
-        return Ok((vec![array.call_method0("item")?.extract::<i32>()?], shape));
-    }
-    let readonly = array.extract::<PyReadonlyArrayDyn<'_, i32>>()?;
-    Ok((readonly.as_array().iter().copied().collect(), shape))
-}
-
-fn field(name: &str) -> PyResult<Field> {
-    Field::from_name(name).ok_or_else(|| {
-        PyValueError::new_err(format!(
-            "unknown field {name:?}; valid names: {}",
-            Field::ALL.map(Field::name).join(", ")
-        ))
-    })
-}
-
-fn stage(name: &str) -> PyResult<Stage> {
-    Stage::from_name(name).ok_or_else(|| {
-        PyValueError::new_err(format!(
-            "unknown stage {name:?}; valid names: {}",
-            Stage::ALL.map(Stage::name).join(", ")
-        ))
-    })
-}
-
-fn requested_fields(names: Option<Vec<String>>, default: &[Field]) -> PyResult<Vec<Field>> {
-    names.map_or_else(
-        || Ok(default.to_vec()),
-        |names| names.iter().map(|name| field(name)).collect(),
-    )
 }
 
 const DEFAULT_OUTPUTS: [Field; 10] = [
@@ -107,13 +61,6 @@ const DEFAULT_OUTPUTS: [Field; 10] = [
     Field::Fmc,
     Field::Accel,
 ];
-fn stage_error(error: &StageError) -> PyErr {
-    if *error == StageError::AfterFused {
-        PyRuntimeError::new_err("call reset() before running stages after run()")
-    } else {
-        PyValueError::new_err(error.to_string())
-    }
-}
 
 /// Stateful, owned grid of per-cell FBP values. `NumPy` buffers are copied
 /// before Rust work detaches from Python; returned arrays are independent.
@@ -126,6 +73,23 @@ pub(crate) struct FbpGrid {
 
 #[pymethods]
 impl FbpGrid {
+    #[getter]
+    fn dj_override_clipped(&self, py: Python<'_>) -> usize {
+        py.detach(|| self.grid.dj_override_clipped())
+    }
+
+    fn get<'py>(&self, py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyArrayDyn<f64>>> {
+        let field = field(name)?;
+        let values = py
+            .detach(|| self.grid.get(field))
+            .map_err(|e| stage_error(&e))?;
+        PyArray1::from_vec(py, values).reshape(numpy::ndarray::IxDyn(&self.shape))
+    }
+
+    fn live_bytes(&self, py: Python<'_>) -> usize {
+        py.detach(|| self.grid.live_bytes())
+    }
+
     #[new]
     #[pyo3(signature = (
         fuel_type, lat, long, elevation, slope, aspect, pc, pdf, gfl, gcf,
@@ -268,9 +232,33 @@ impl FbpGrid {
         })
     }
 
-    #[getter]
-    fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        PyTuple::new(py, self.shape.iter().copied())
+    fn reset(&mut self, py: Python<'_>) {
+        py.detach(|| self.grid.reset());
+    }
+
+    fn run(&mut self, py: Python<'_>) -> PyResult<()> {
+        py.detach(|| self.grid.run_fused(self.threads))
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    fn run_acceleration_for_fuel(
+        &mut self,
+        py: Python<'_>,
+        codes: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let (mut codes, shape) = fuel_snapshot(py, codes)?;
+        if shape.is_empty() {
+            codes.resize(self.grid.len(), codes[0]);
+        } else {
+            check_shape("fuel_type", &shape, &self.shape)?;
+        }
+        py.detach(|| self.grid.run_acceleration_for_fuel(&codes, self.threads))
+            .map_err(|e| stage_error(&e))
+    }
+
+    fn run_planned(&mut self, py: Python<'_>) -> PyResult<()> {
+        py.detach(|| self.grid.run_planned(self.threads))
+            .map_err(|e| stage_error(&e))
     }
 
     fn run_stage(&mut self, py: Python<'_>, name: &str) -> PyResult<()> {
@@ -279,31 +267,25 @@ impl FbpGrid {
             .map_err(|e| stage_error(&e))
     }
 
-    fn run(&mut self, py: Python<'_>) -> PyResult<()> {
-        py.detach(|| self.grid.run_fused(self.threads))
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+    fn set(&mut self, py: Python<'_>, name: &str, values: &Bound<'_, PyAny>) -> PyResult<()> {
+        let field = field(name)?;
+        let values = Snapshot::read(py, values)?;
+        values.check_shape(name, &self.shape)?;
+        py.detach(|| match values {
+            Snapshot::Const(v) => self.grid.set_const(field, v),
+            Snapshot::Cells(v, _) => self.grid.set(field, &v),
+        })
+        .map_err(|e| stage_error(&e))
     }
 
-    fn reset(&mut self, py: Python<'_>) {
-        py.detach(|| self.grid.reset());
-    }
-
-    fn run_planned(&mut self, py: Python<'_>) -> PyResult<()> {
-        py.detach(|| self.grid.run_planned(self.threads))
-            .map_err(|e| stage_error(&e))
-    }
-
-    fn set_param(&mut self, py: Python<'_>, name: &str, value: f64) -> PyResult<()> {
-        let param = match name {
-            "wx_date" => ParamName::WxDate,
-            "percentile_growth" => ParamName::PercentileGrowth,
-            _ => {
-                return Err(PyValueError::new_err(format!(
-                    "unknown parameter {name:?}; valid names: wx_date, percentile_growth"
-                )))
-            }
-        };
-        py.detach(|| self.grid.set_param(param, value))
+    fn set_fuel(&mut self, py: Python<'_>, codes: &Bound<'_, PyAny>) -> PyResult<()> {
+        let (mut codes, shape) = fuel_snapshot(py, codes)?;
+        if shape.is_empty() {
+            codes.resize(self.grid.len(), codes[0]);
+        } else {
+            check_shape("fuel_type", &shape, &self.shape)?;
+        }
+        py.detach(|| self.grid.set_fuel(&codes))
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
@@ -334,56 +316,76 @@ impl FbpGrid {
         .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    fn set(&mut self, py: Python<'_>, name: &str, values: &Bound<'_, PyAny>) -> PyResult<()> {
-        let field = field(name)?;
-        let values = Snapshot::read(py, values)?;
-        values.check_shape(name, &self.shape)?;
-        py.detach(|| match values {
-            Snapshot::Const(v) => self.grid.set_const(field, v),
-            Snapshot::Cells(v, _) => self.grid.set(field, &v),
-        })
-        .map_err(|e| stage_error(&e))
-    }
-
-    fn set_fuel(&mut self, py: Python<'_>, codes: &Bound<'_, PyAny>) -> PyResult<()> {
-        let (mut codes, shape) = fuel_snapshot(py, codes)?;
-        if shape.is_empty() {
-            codes.resize(self.grid.len(), codes[0]);
-        } else {
-            check_shape("fuel_type", &shape, &self.shape)?;
-        }
-        py.detach(|| self.grid.set_fuel(&codes))
+    fn set_param(&mut self, py: Python<'_>, name: &str, value: f64) -> PyResult<()> {
+        let param = match name {
+            "wx_date" => ParamName::WxDate,
+            "percentile_growth" => ParamName::PercentileGrowth,
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "unknown parameter {name:?}; valid names: wx_date, percentile_growth"
+                )))
+            }
+        };
+        py.detach(|| self.grid.set_param(param, value))
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    fn run_acceleration_for_fuel(
-        &mut self,
-        py: Python<'_>,
-        codes: &Bound<'_, PyAny>,
-    ) -> PyResult<()> {
-        let (mut codes, shape) = fuel_snapshot(py, codes)?;
-        if shape.is_empty() {
-            codes.resize(self.grid.len(), codes[0]);
-        } else {
-            check_shape("fuel_type", &shape, &self.shape)?;
-        }
-        py.detach(|| self.grid.run_acceleration_for_fuel(&codes, self.threads))
-            .map_err(|e| stage_error(&e))
-    }
-    fn get<'py>(&self, py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyArrayDyn<f64>>> {
-        let field = field(name)?;
-        let values = py
-            .detach(|| self.grid.get(field))
-            .map_err(|e| stage_error(&e))?;
-        PyArray1::from_vec(py, values).reshape(numpy::ndarray::IxDyn(&self.shape))
-    }
-
     #[getter]
-    fn dj_override_clipped(&self, py: Python<'_>) -> usize {
-        py.detach(|| self.grid.dj_override_clipped())
+    fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(py, self.shape.iter().copied())
     }
+}
 
-    fn live_bytes(&self, py: Python<'_>) -> usize {
-        py.detach(|| self.grid.live_bytes())
+fn check_shape(name: &str, found: &[usize], expected: &[usize]) -> PyResult<()> {
+    if found != expected {
+        return Err(PyValueError::new_err(format!(
+            "{name} shape {found:?} != grid shape {expected:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn field(name: &str) -> PyResult<Field> {
+    Field::from_name(name).ok_or_else(|| {
+        PyValueError::new_err(format!(
+            "unknown field {name:?}; valid names: {}",
+            Field::ALL.map(Field::name).join(", ")
+        ))
+    })
+}
+
+/// Fuel arrays must already contain the wrapper's int32 codes, including 0
+/// for masked/invalid cells. Integer scalars can broadcast over the grid.
+fn fuel_snapshot(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<(Vec<i32>, Vec<usize>)> {
+    let array = py.import("numpy")?.getattr("asarray")?.call1((value,))?;
+    let shape = array.getattr("shape")?.extract::<Vec<usize>>()?;
+    if shape.is_empty() {
+        return Ok((vec![array.call_method0("item")?.extract::<i32>()?], shape));
+    }
+    let readonly = array.extract::<PyReadonlyArrayDyn<'_, i32>>()?;
+    Ok((readonly.as_array().iter().copied().collect(), shape))
+}
+
+fn requested_fields(names: Option<Vec<String>>, default: &[Field]) -> PyResult<Vec<Field>> {
+    names.map_or_else(
+        || Ok(default.to_vec()),
+        |names| names.iter().map(|name| field(name)).collect(),
+    )
+}
+
+fn stage(name: &str) -> PyResult<Stage> {
+    Stage::from_name(name).ok_or_else(|| {
+        PyValueError::new_err(format!(
+            "unknown stage {name:?}; valid names: {}",
+            Stage::ALL.map(Stage::name).join(", ")
+        ))
+    })
+}
+
+fn stage_error(error: &StageError) -> PyErr {
+    if *error == StageError::AfterFused {
+        PyRuntimeError::new_err("call reset() before running stages after run()")
+    } else {
+        PyValueError::new_err(error.to_string())
     }
 }

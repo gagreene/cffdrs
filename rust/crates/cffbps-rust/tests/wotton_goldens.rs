@@ -7,9 +7,9 @@
 
 use cffbps_rust::fbp::{run, FbpResult};
 mod common;
-
 use common::parse_inputs;
 
+// ---- other tests ----
 #[test]
 fn scalar_core_matches_wotton_snapshot() {
     let inputs = parse_inputs();

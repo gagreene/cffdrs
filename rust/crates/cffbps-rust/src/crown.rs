@@ -71,14 +71,7 @@ mod tests {
     use super::*;
     use crate::fuel::FuelType;
 
-    #[test]
-    fn rso_propagates_missing_sfc() {
-        // Python: mask.where(sfc > 0, ...) keeps a masked sfc masked
-        assert!(calc_rso(f64::NAN, 500.0).is_nan());
-        assert_eq!(calc_rso(0.0, 500.0), 0.0);
-        assert_eq!(calc_rso(2.0, 600.0), 1.0);
-    }
-
+    // ---- final tests ----
     #[test]
     fn final_cfb_keeps_a_missing_rso_missing_after_the_percentile_step() {
         // A NaN hros after the percentile step is masked in Python when the
@@ -115,5 +108,14 @@ mod tests {
                 directional_cfb(ft, hros, rso).to_bits()
             );
         }
+    }
+
+    // ---- other tests ----
+    #[test]
+    fn rso_propagates_missing_sfc() {
+        // Python: mask.where(sfc > 0, ...) keeps a masked sfc masked
+        assert!(calc_rso(f64::NAN, 500.0).is_nan());
+        assert_eq!(calc_rso(0.0, 500.0), 0.0);
+        assert_eq!(calc_rso(2.0, 600.0), 1.0);
     }
 }

@@ -268,10 +268,24 @@ impl Field {
     /// Number of output fields (the first 54 variants).
     const OUTPUTS: usize = 54;
 
+    /// The field with this Python name; `None` for an unknown name. Names are
+    /// case sensitive (`"fF"`, not `"ff"`).
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Field> {
+        Field::ALL.into_iter().find(|f| f.name() == name)
+    }
+
     /// Position of this field in [`Field::ALL`].
     #[must_use]
     pub(crate) const fn index(self) -> usize {
         self as usize
+    }
+
+    /// True for the 54 outputs of
+    /// [`FbpResult::named_values`](crate::fbp::FbpResult::named_values).
+    #[must_use]
+    pub const fn is_output(self) -> bool {
+        self.index() < Field::OUTPUTS
     }
 
     /// The Python package's name for this field (`"fF"`, `"fW"`,
@@ -356,20 +370,6 @@ impl Field {
             Field::HrosGrowthNan => "hros_growth_nan",
             Field::Aspect => "aspect",
         }
-    }
-
-    /// The field with this Python name; `None` for an unknown name. Names are
-    /// case sensitive (`"fF"`, not `"ff"`).
-    #[must_use]
-    pub fn from_name(name: &str) -> Option<Field> {
-        Field::ALL.into_iter().find(|f| f.name() == name)
-    }
-
-    /// True for the 54 outputs of
-    /// [`FbpResult::named_values`](crate::fbp::FbpResult::named_values).
-    #[must_use]
-    pub const fn is_output(self) -> bool {
-        self.index() < Field::OUTPUTS
     }
 
     /// The value a field holds before anything sets or computes it, as in the
@@ -497,6 +497,7 @@ mod tests {
         "aspect",
     ];
 
+    // ---- other tests ----
     #[test]
     fn all_has_76_unique_fields_with_unique_names() {
         assert_eq!(Field::ALL.len(), Field::COUNT);

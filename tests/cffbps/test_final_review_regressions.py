@@ -4,6 +4,78 @@ import pytest
 from test_rust_backend import ALL, equal, make
 
 
+# ---- scalar tests ----
+@pytest.mark.parametrize('missing', ['ws', 'wd', 'ffmc', 'bui', 'slope'])
+def test_scalar_producer_mask_snapshot(missing):
+    models = [make(backend, **{missing: np.nan}) for backend in ('rust', 'python')]
+    for model in models:
+        for stage in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcISI_RSI_BE', 'calcROS'):
+            getattr(model, stage)()
+        model.setParams({missing: 30.})
+    equal(models[0].getParams(ALL), models[1].getParams(ALL), scalar=True)
+
+
+@pytest.mark.parametrize('missing', ['ws', 'lat', 'fuel_type', 'd0'])
+def test_scalar_independent_injected_producer(missing):
+    models = [make(backend, **{missing: 0 if missing == 'fuel_type' else np.nan}) for backend in ('rust', 'python')]
+    for model in models:
+        model.setParams({'hros': 2., 'tfc': 3.})
+        model.calcHFI()
+        model.calcFireIntensityClass()
+    fields = ['hros', 'tfc', 'hfi', 'fi_class']
+    for name, actual, expected in zip(fields, *(m.getParams(fields) for m in models), strict=True):
+        assert actual == expected, name
+        assert type(actual) is type(expected), name
+
+
+@pytest.mark.parametrize('missing', ['d0', 'dj', 'lat', 'long', 'elevation'])
+def test_scalar_date_and_geography_controls(missing):
+    equal(make(**{missing: np.nan}).runFBP(), make('python', **{missing: np.nan}).runFBP(), scalar=True)
+
+
+@pytest.mark.parametrize('value', [np.nan, np.inf, -np.inf, 1000.])
+def test_scalar_injected_intensity_mask_and_infinity(value):
+    models = [make(backend, ws=np.nan) for backend in ('rust', 'python')]
+    for model in models:
+        model.setParams({'hfi': value})
+        model.calcFireIntensityClass()
+        model.setParams({'hfi': 100.})
+    actual, expected = (model.getParams(['fi_class'])[0] for model in models)
+    assert actual == expected
+    assert type(actual) is type(expected)
+
+
+def test_scalar_new_missing_input_does_not_remask_old_producer():
+    models = [make(backend) for backend in ('rust', 'python')]
+    for model in models:
+        for stage in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcISI_RSI_BE', 'calcROS'):
+            getattr(model, stage)()
+        model.setParams({'ws': np.nan, 'lat': np.nan, 'fuel_type': 0})
+        model.setParams({'tfc': 3.})
+        model.calcHFI()
+        model.calcFireIntensityClass()
+    fields = ['hros', 'hfi', 'fi_class']
+    for name, actual, expected in zip(fields, *(model.getParams(fields) for model in models), strict=True):
+        np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=1e-12, err_msg=name)
+        assert type(actual) is type(expected), name
+
+
+def test_scalar_provenance_cannot_restore_freed_storage():
+    model = make(out_request=['hfi'], ws=np.nan)
+    model.runFBP()
+    with pytest.raises(ValueError, match='freed'):
+        model.getParams(['hros'])
+
+
+@pytest.mark.parametrize('missing', ['lat', 'long', 'elevation'])
+@pytest.mark.parametrize('fuel', [10, 11, 12, 13])
+@pytest.mark.parametrize('percentile', [10, 90])
+def test_scalar_mixedwood_growth_keeps_the_foliar_moisture_mask(missing, fuel, percentile):
+    kwargs = {'fuel_type': fuel, 'percentile_growth': percentile, missing: np.nan}
+    equal(make(**kwargs).runFBP(), make('python', **kwargs).runFBP(), scalar=True)
+
+
+# ---- other tests ----
 @pytest.mark.parametrize('scalar', [True, False])
 @pytest.mark.parametrize('fuel', [2, 19, 20, 0])
 @pytest.mark.parametrize(('stage', 'injected', 'fields'), [
@@ -33,29 +105,6 @@ def test_weather_mask_all_outputs(scalar, fuel, missing):
     equal(make(**kwargs).runFBP(), make('python', **kwargs).runFBP(), scalar=scalar)
 
 
-@pytest.mark.parametrize('missing', ['ws', 'wd', 'ffmc', 'bui', 'slope'])
-def test_scalar_producer_mask_snapshot(missing):
-    models = [make(backend, **{missing: np.nan}) for backend in ('rust', 'python')]
-    for model in models:
-        for stage in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcISI_RSI_BE', 'calcROS'):
-            getattr(model, stage)()
-        model.setParams({missing: 30.})
-    equal(models[0].getParams(ALL), models[1].getParams(ALL), scalar=True)
-
-
-@pytest.mark.parametrize('missing', ['ws', 'lat', 'fuel_type', 'd0'])
-def test_scalar_independent_injected_producer(missing):
-    models = [make(backend, **{missing: 0 if missing == 'fuel_type' else np.nan}) for backend in ('rust', 'python')]
-    for model in models:
-        model.setParams({'hros': 2., 'tfc': 3.})
-        model.calcHFI()
-        model.calcFireIntensityClass()
-    fields = ['hros', 'tfc', 'hfi', 'fi_class']
-    for name, actual, expected in zip(fields, *(m.getParams(fields) for m in models), strict=True):
-        assert actual == expected, name
-        assert type(actual) is type(expected), name
-
-
 @pytest.mark.parametrize('scalar', [True, False])
 @pytest.mark.parametrize('activation', [0., 1., np.nan, np.inf])
 def test_c6_activation_consumes_injection_not_current_weather(scalar, activation):
@@ -71,41 +120,9 @@ def test_c6_activation_consumes_injection_not_current_weather(scalar, activation
         assert type(actual) is type(expected)
 
 
-@pytest.mark.parametrize('missing', ['d0', 'dj', 'lat', 'long', 'elevation'])
-def test_scalar_date_and_geography_controls(missing):
-    equal(make(**{missing: np.nan}).runFBP(), make('python', **{missing: np.nan}).runFBP(), scalar=True)
-
-
-@pytest.mark.parametrize('value', [np.nan, np.inf, -np.inf, 1000.])
-def test_scalar_injected_intensity_mask_and_infinity(value):
-    models = [make(backend, ws=np.nan) for backend in ('rust', 'python')]
-    for model in models:
-        model.setParams({'hfi': value})
-        model.calcFireIntensityClass()
-        model.setParams({'hfi': 100.})
-    actual, expected = (model.getParams(['fi_class'])[0] for model in models)
-    assert actual == expected
-    assert type(actual) is type(expected)
-
-
 def test_unmasked_growth_nan_remains_nonfinite():
     equal(make(percentile_growth=np.nan).runFBP(),
           make('python', percentile_growth=np.nan).runFBP(), scalar=True)
-
-
-def test_scalar_new_missing_input_does_not_remask_old_producer():
-    models = [make(backend) for backend in ('rust', 'python')]
-    for model in models:
-        for stage in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcISI_RSI_BE', 'calcROS'):
-            getattr(model, stage)()
-        model.setParams({'ws': np.nan, 'lat': np.nan, 'fuel_type': 0})
-        model.setParams({'tfc': 3.})
-        model.calcHFI()
-        model.calcFireIntensityClass()
-    fields = ['hros', 'hfi', 'fi_class']
-    for name, actual, expected in zip(fields, *(model.getParams(fields) for model in models), strict=True):
-        np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=1e-12, err_msg=name)
-        assert type(actual) is type(expected), name
 
 
 @pytest.mark.parametrize('keep', [False, True])
@@ -124,13 +141,6 @@ def test_native_nonmodeled_rso_retention(keep, fuel):
             grid.get('rso')
     with pytest.raises(ValueError, match='freed'):
         grid.run_stage('calcRSO')
-
-
-def test_scalar_provenance_cannot_restore_freed_storage():
-    model = make(out_request=['hfi'], ws=np.nan)
-    model.runFBP()
-    with pytest.raises(ValueError, match='freed'):
-        model.getParams(['hros'])
 
 
 @pytest.mark.parametrize('scalar', [True, False])
@@ -153,14 +163,6 @@ def test_missing_date_override_exports_nan_before_and_after_calcfmc(name, route,
         actual, expected = (np.asarray(m.getParams([name])[0], dtype=float) for m in models)
         assert np.isnan(expected).all()
         assert np.isnan(actual).all(), f'{name} via {route} after {stage}: {actual}'
-
-
-@pytest.mark.parametrize('missing', ['lat', 'long', 'elevation'])
-@pytest.mark.parametrize('fuel', [10, 11, 12, 13])
-@pytest.mark.parametrize('percentile', [10, 90])
-def test_scalar_mixedwood_growth_keeps_the_foliar_moisture_mask(missing, fuel, percentile):
-    kwargs = {'fuel_type': fuel, 'percentile_growth': percentile, missing: np.nan}
-    equal(make(**kwargs).runFBP(), make('python', **kwargs).runFBP(), scalar=True)
 
 
 @pytest.mark.parametrize('route', ['initialize', 'setParams', 'attribute'])

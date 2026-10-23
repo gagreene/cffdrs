@@ -5,36 +5,50 @@ import pandas as pd
 from cffdrs import cffwis as fwi
 
 
-def calc_ffmc(df: pd.DataFrame) -> pd.DataFrame:
+def calc_bui(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate the Fine Fuel Moisture Code (FFMC) for each row in the DataFrame.
-    The calculation uses the previous day's FFMC as input for the next day's calculation.
-    The result is stored in a new column 'FFMC'.
+    Calculate the Buildup Index (BUI) for each row in the DataFrame using DMC and DC columns.
+    The result is stored in a new column 'BUI'.
     Args:
-        df (pd.DataFrame): DataFrame containing columns 'dailyFineFuelMoistureCode', 'TEMP', 'RH', 'WS', 'PCP_ACCUM'.
+        df (pd.DataFrame): DataFrame containing columns 'DMC' and 'DC'.
     Returns:
-        pd.DataFrame: DataFrame with an added 'FFMC' column.
+        pd.DataFrame: DataFrame with an added 'BUI' column.
     """
-    # Calculate FFMC for each row and store in a list
-    ffmc_values = []
-    ffmc0 = None
+    df['BUI'] = fwi.dailyBUI(
+        df['DMC'].values,
+        df['DC'].values,
+    )
+    return df
+
+
+def calc_dc(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate the Drought Code (DC) for each row in the DataFrame.
+    The calculation uses the previous day's DC as input for the next day's calculation.
+    The result is stored in a new column 'DC'.
+    Args:
+        df (pd.DataFrame): DataFrame containing columns 'dailyDroughtCode', 'TEMP', 'PCP_ACCUM', 'month'.
+    Returns:
+        pd.DataFrame: DataFrame with an added 'DC' column.
+    """
+    # Calculate DC for each row and store in a list
+    dc_values = []
+    dc0 = None
     for count, (idx, row) in enumerate(df.iterrows()):
         if count == 0:
-            ffmc = row['dailyFineFuelMoistureCode']
+            dc = row['dailyDroughtCode']
         else:
-            # Calculate FFMC
-            ffmc = fwi.dailyFFMC(
-                ffmc0,
+            dc = fwi.dailyDC(
+                dc0,
                 row['TEMP'],
-                row['RH'],
-                row['WS'],
-                row['PCP_ACCUM']
+                row['PCP_ACCUM'],
+                row['month']
             )
-        ffmc_values.append(ffmc)
-        ffmc0 = ffmc  # update for next iteration
+        dc_values.append(dc)
+        dc0 = dc  # update for next iteration
 
-    # Assign FFMC values
-    df['FFMC'] = ffmc_values
+    # Assign DC values
+    df['DC'] = dc_values
 
     return df
 
@@ -72,70 +86,37 @@ def calc_dmc(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def calc_dc(df: pd.DataFrame) -> pd.DataFrame:
+def calc_ffmc(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate the Drought Code (DC) for each row in the DataFrame.
-    The calculation uses the previous day's DC as input for the next day's calculation.
-    The result is stored in a new column 'DC'.
+    Calculate the Fine Fuel Moisture Code (FFMC) for each row in the DataFrame.
+    The calculation uses the previous day's FFMC as input for the next day's calculation.
+    The result is stored in a new column 'FFMC'.
     Args:
-        df (pd.DataFrame): DataFrame containing columns 'dailyDroughtCode', 'TEMP', 'PCP_ACCUM', 'month'.
+        df (pd.DataFrame): DataFrame containing columns 'dailyFineFuelMoistureCode', 'TEMP', 'RH', 'WS', 'PCP_ACCUM'.
     Returns:
-        pd.DataFrame: DataFrame with an added 'DC' column.
+        pd.DataFrame: DataFrame with an added 'FFMC' column.
     """
-    # Calculate DC for each row and store in a list
-    dc_values = []
-    dc0 = None
+    # Calculate FFMC for each row and store in a list
+    ffmc_values = []
+    ffmc0 = None
     for count, (idx, row) in enumerate(df.iterrows()):
         if count == 0:
-            dc = row['dailyDroughtCode']
+            ffmc = row['dailyFineFuelMoistureCode']
         else:
-            dc = fwi.dailyDC(
-                dc0,
+            # Calculate FFMC
+            ffmc = fwi.dailyFFMC(
+                ffmc0,
                 row['TEMP'],
-                row['PCP_ACCUM'],
-                row['month']
+                row['RH'],
+                row['WS'],
+                row['PCP_ACCUM']
             )
-        dc_values.append(dc)
-        dc0 = dc  # update for next iteration
+        ffmc_values.append(ffmc)
+        ffmc0 = ffmc  # update for next iteration
 
-    # Assign DC values
-    df['DC'] = dc_values
+    # Assign FFMC values
+    df['FFMC'] = ffmc_values
 
-    return df
-
-
-def calc_isi_generic(df: pd.DataFrame, ws_col: str, ffmc_col: str, out_col: str) -> pd.DataFrame:
-    """
-    Calculate the Initial Spread Index (ISI) for the given DataFrame using specified wind speed and FFMC columns.
-    The result is stored in the column specified by out_col.
-    Args:
-        df (pd.DataFrame): DataFrame containing wind speed and FFMC columns.
-        ws_col (str): Name of the wind speed column.
-        ffmc_col (str): Name of the FFMC column.
-        out_col (str): Name of the output ISI column.
-    Returns:
-        pd.DataFrame: DataFrame with the ISI column added.
-    """
-    df[out_col] = fwi.dailyISI(
-        df[ws_col].values,
-        df[ffmc_col].values,
-    )
-    return df
-
-
-def calc_bui(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate the Buildup Index (BUI) for each row in the DataFrame using DMC and DC columns.
-    The result is stored in a new column 'BUI'.
-    Args:
-        df (pd.DataFrame): DataFrame containing columns 'DMC' and 'DC'.
-    Returns:
-        pd.DataFrame: DataFrame with an added 'BUI' column.
-    """
-    df['BUI'] = fwi.dailyBUI(
-        df['DMC'].values,
-        df['DC'].values,
-    )
     return df
 
 
@@ -189,6 +170,25 @@ def calc_hffmc(df: pd.DataFrame) -> pd.DataFrame:
     # Assign HFFMC values
     df['hFFMC'] = hffmc_values
 
+    return df
+
+
+def calc_isi_generic(df: pd.DataFrame, ws_col: str, ffmc_col: str, out_col: str) -> pd.DataFrame:
+    """
+    Calculate the Initial Spread Index (ISI) for the given DataFrame using specified wind speed and FFMC columns.
+    The result is stored in the column specified by out_col.
+    Args:
+        df (pd.DataFrame): DataFrame containing wind speed and FFMC columns.
+        ws_col (str): Name of the wind speed column.
+        ffmc_col (str): Name of the FFMC column.
+        out_col (str): Name of the output ISI column.
+    Returns:
+        pd.DataFrame: DataFrame with the ISI column added.
+    """
+    df[out_col] = fwi.dailyISI(
+        df[ws_col].values,
+        df[ffmc_col].values,
+    )
     return df
 
 

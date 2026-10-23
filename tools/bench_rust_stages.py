@@ -48,61 +48,6 @@ def distribution(samples):
                 median_ms=statistics.median(milliseconds), max_ms=max(milliseconds))
 
 
-def measure(operation, warmup, repeats, prepare=lambda: None):
-    for _ in range(warmup):
-        prepare()
-        operation()
-    samples = []
-    for _ in range(repeats):
-        prepare()
-        start = time.perf_counter()
-        returned = operation()
-        samples.append(time.perf_counter() - start)
-        del returned
-    return distribution(samples)
-
-
-@contextmanager
-def rss_peak():
-    """Sample whole-process RSS every 5 ms; this is not native live_bytes."""
-    process = psutil.Process()
-    result = dict(baseline_bytes=process.memory_info().rss, peak_bytes=0)
-    result['peak_bytes'] = result['baseline_bytes']
-    stopped = threading.Event()
-
-    def sample():
-        while not stopped.wait(0.005):
-            result['peak_bytes'] = max(result['peak_bytes'], process.memory_info().rss)
-
-    worker = threading.Thread(target=sample, daemon=True)
-    worker.start()
-    try:
-        yield result
-    finally:
-        result['peak_bytes'] = max(result['peak_bytes'], process.memory_info().rss)
-        stopped.set()
-        worker.join()
-
-
-def memory_pass(inputs, outputs, fused):
-    gc.collect()
-    with rss_peak() as rss:
-        grid = construct(inputs, outputs)
-        live = [dict(stage='construction', live_bytes=grid.live_bytes())]
-        if fused:
-            grid.run()
-            live.append(dict(stage='run', live_bytes=grid.live_bytes()))
-        else:
-            for name in STAGES:
-                grid.run_stage(name)
-                live.append(dict(stage=name, live_bytes=grid.live_bytes()))
-        result = dict(peak_live_bytes=max(item['live_bytes'] for item in live),
-                      final_live_bytes=live[-1]['live_bytes'], after_stages=live)
-        del grid
-    result['rss'] = rss
-    return result
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--warmup', type=int, default=3)
@@ -191,6 +136,61 @@ def main():
                                regression_percent=(timing['min_ms'] / baseline - 1) * 100,
                                passed=timing['min_ms'] <= baseline * 1.10)
     print(json.dumps(result, indent=2), flush=True)
+
+
+def measure(operation, warmup, repeats, prepare=lambda: None):
+    for _ in range(warmup):
+        prepare()
+        operation()
+    samples = []
+    for _ in range(repeats):
+        prepare()
+        start = time.perf_counter()
+        returned = operation()
+        samples.append(time.perf_counter() - start)
+        del returned
+    return distribution(samples)
+
+
+def memory_pass(inputs, outputs, fused):
+    gc.collect()
+    with rss_peak() as rss:
+        grid = construct(inputs, outputs)
+        live = [dict(stage='construction', live_bytes=grid.live_bytes())]
+        if fused:
+            grid.run()
+            live.append(dict(stage='run', live_bytes=grid.live_bytes()))
+        else:
+            for name in STAGES:
+                grid.run_stage(name)
+                live.append(dict(stage=name, live_bytes=grid.live_bytes()))
+        result = dict(peak_live_bytes=max(item['live_bytes'] for item in live),
+                      final_live_bytes=live[-1]['live_bytes'], after_stages=live)
+        del grid
+    result['rss'] = rss
+    return result
+
+
+@contextmanager
+def rss_peak():
+    """Sample whole-process RSS every 5 ms; this is not native live_bytes."""
+    process = psutil.Process()
+    result = dict(baseline_bytes=process.memory_info().rss, peak_bytes=0)
+    result['peak_bytes'] = result['baseline_bytes']
+    stopped = threading.Event()
+
+    def sample():
+        while not stopped.wait(0.005):
+            result['peak_bytes'] = max(result['peak_bytes'], process.memory_info().rss)
+
+    worker = threading.Thread(target=sample, daemon=True)
+    worker.start()
+    try:
+        yield result
+    finally:
+        result['peak_bytes'] = max(result['peak_bytes'], process.memory_info().rss)
+        stopped.set()
+        worker.join()
 
 
 if __name__ == '__main__':

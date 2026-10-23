@@ -7,6 +7,11 @@ use cffbps_rust::fuel::FuelType;
 use cffbps_rust::percentile::{percentile_ros, percentile_tinv, wind_decay};
 use std::path::PathBuf;
 
+// ---- helpers ----
+fn close(actual: f64, expected: f64) -> bool {
+    (actual - expected).abs() <= expected.abs().max(1e-12) * 1e-9
+}
+
 fn load(rel: &str) -> serde_json::Value {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
@@ -14,10 +19,7 @@ fn load(rel: &str) -> serde_json::Value {
     serde_json::from_str(&std::fs::read_to_string(path).expect("golden file")).expect("valid json")
 }
 
-fn close(actual: f64, expected: f64) -> bool {
-    (actual - expected).abs() <= expected.abs().max(1e-12) * 1e-9
-}
-
+// ---- other tests ----
 #[test]
 fn percentile_ros_matches_python_function() {
     let snapshot = load("tests/cffbps/data/golden/percentile_ros_function_snapshot.json");

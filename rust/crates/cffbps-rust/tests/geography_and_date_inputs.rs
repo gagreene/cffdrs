@@ -32,6 +32,7 @@ fn c6() -> FbpInput {
     }
 }
 
+// ---- other tests ----
 #[test]
 fn finite_geography_gives_finite_c6_behaviour() {
     let r = run(&c6());

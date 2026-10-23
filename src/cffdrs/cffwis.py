@@ -66,6 +66,696 @@ def _verify_valid_data(arrays, return_array: bool):
     return True
 
 
+def dailyBUI(
+        dmc: int | float | np.ndarray,
+        dc: int | float | np.ndarray
+) -> float | np.ndarray:
+    """
+    Function to calculate daily Build Up Index values per Van Wagner (1987).
+    :param dmc: current DMC value (unitless code)
+    :param dc: current DC value (unitless code)
+    :return: current BUI value (unitless code)
+    """
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if any(isinstance(data, np.ndarray) for data in [dmc, dc]):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    # Verify dmc
+    if not isinstance(dmc, (int, float, np.ndarray)):
+        raise TypeError('dmc must be either int, float or numpy ndarray data types')
+    elif isinstance(dmc, np.ndarray):
+        dmc = np.ma.array(dmc, mask=np.isnan(dmc))
+    else:
+        dmc = np.ma.array([dmc], mask=np.isnan([dmc]))
+
+    # Verify dc
+    if not isinstance(dc, (int, float, np.ndarray)):
+        raise TypeError('dc must be either int, float or numpy ndarray data types')
+    elif isinstance(dc, np.ndarray):
+        dc = np.ma.array(dc, mask=np.isnan(dc))
+    else:
+        dc = np.ma.array([dc], mask=np.isnan([dc]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([dmc, dc], return_array)
+    if verification_result is not True:
+        return verification_result
+
+    # ### RETURN FINAL BUI VALUE
+    bui = np.ma.where(dmc == 0,
+                      0,
+                      np.ma.where(dmc <= 0.4 * dc,
+                                  0.8 * dmc * dc / (dmc + 0.4 * dc),
+                                  dmc - (1 - (0.8 * dc / (dmc + 0.4 * dc))) * (0.92 + (0.0114 * dmc) ** 1.7)))
+
+    # Ensure BUI >= 0
+    bui = np.ma.clip(bui, 0, None)
+
+    if return_array:
+        result = bui.filled(np.nan)
+        nan_mask = np.ma.getmaskarray(dmc) | np.ma.getmaskarray(dc)
+        return np.where(nan_mask, np.nan, result)
+    else:
+        return float(bui.filled(np.nan)[0])
+
+
+def dailyDC(
+        dc0: int | float | np.ndarray,
+        temp: int | float | np.ndarray,
+        precip: int | float | np.ndarray,
+        month: int | str,
+        lat: int | float | np.ndarray = 49.0,
+        lat_adjust: bool = False
+) -> float | np.ndarray:
+    """
+    Function to calculate today's DMC per Van Wagner (1987).
+    :param dc0: yesterday's DC value (unitless code)
+    :param temp: today's temperature value (C)
+    :param precip: today's precipitation value (mm)
+    :param month: the current month (e.g., 9, '09', 'September')
+    :param lat: latitude value (decimal degrees, e.g., 45.0)
+    :param lat_adjust: whether to apply latitude-based daylength adjustment (default is False)
+    :return: the current DC value (unitless code)
+    """
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if any(isinstance(data, np.ndarray) for data in [dc0, temp, precip]):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    # Verify dc0
+    if not isinstance(dc0, (int, float, np.ndarray)):
+        raise TypeError('dc0 must be either int, float or numpy ndarray data types')
+    elif isinstance(dc0, np.ndarray):
+        dc0 = np.ma.array(dc0, mask=np.isnan(dc0))
+    else:
+        dc0 = np.ma.array([dc0], mask=np.isnan([dc0]))
+
+    # Verify temp
+    if not isinstance(temp, (int, float, np.ndarray)):
+        raise TypeError('temp must be either int, float or numpy ndarray data types')
+    elif isinstance(temp, np.ndarray):
+        temp = np.ma.array(temp, mask=np.isnan(temp))
+    else:
+        temp = np.ma.array([temp], mask=np.isnan([temp]))
+
+    # Verify precip
+    if not isinstance(precip, (int, float, np.ndarray)):
+        raise TypeError('precip must be either int, float or numpy ndarray data types')
+    elif isinstance(precip, np.ndarray):
+        precip = np.ma.array(precip, mask=np.isnan(precip))
+    else:
+        precip = np.ma.array([precip], mask=np.isnan([precip]))
+
+    # Verify month
+    if not isinstance(month, (int, str)):
+        raise TypeError('month must be either int or string data types')
+    elif isinstance(month, int):
+        if not (1 <= month <= 12):
+            raise ValueError(f'month value is invalid: {month}')
+    else:
+        month = month_dict.get(month, None)
+        if month is None:
+            raise ValueError(f'month value is invalid: {month}')
+
+    # Verify lat
+    if not isinstance(lat, (int, float, np.ndarray)):
+        raise TypeError('lat must be either int, float or numpy ndarray data types')
+    elif isinstance(lat, np.ndarray):
+        lat = np.ma.array(lat, mask=np.isnan(lat))
+    else:
+        lat = np.ma.array([lat], mask=np.isnan([lat]))
+    lat = np.ma.clip(lat, -90, 90)  # Ensure lat is within valid range
+
+    # Verify lat_adjust
+    if not isinstance(lat_adjust, bool):
+        raise TypeError('lat_adjust must be a boolean value (True or False)')
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([dc0, temp, precip, lat], return_array)
+    if verification_result is not True:
+        return verification_result
+
+    # ### YESTERDAYS MOISTURE EQUIVALENT VALUE
+    q0 = 800 / np.exp(dc0 / 400)
+
+    # ### DRYING PHASE
+    # Day length factor for DC Calculations (per CFS cffdrs_r/cffwis module)
+    # 20N: For latitude >= 20
+    lat_20n = [-1.6, -1.6, -1.6, 0.9, 3.8, 5.8, 6.4, 5, 2.4, 0.4, -1.6, -1.6]
+    # Equator: For -20 <= latitude < 20 (near equator), use a factor of 1.4 for all months
+    lat_eq = [1.4] * 12
+    # 20S: For latitude < -20
+    lat_20s = [6.4, 5, 2.4, 0.4, -1.6, -1.6, -1.6, -1.6, -1.6, 0.9, 3.8, 5.8]
+
+    def _get_dc_lat_daylength(_lat, _month, _lat_adjust):
+        # Get the default DC daylength adjustment (Lf) based on latitude and month
+        lf_default = np.take(lat_20n, _month - 1)
+        if _lat_adjust:
+            _lat = np.asarray(_lat)
+            _month = np.asarray(_month)
+            if _month.shape != _lat.shape:
+                _month = np.full(_lat.shape, _month)
+            # Define masks
+            condlist = [
+                (_lat >= -20) & (_lat < 20),
+                (_lat < -20)
+            ]
+            # Daylength arrays must be defined in the global scope
+            lf_choices = [
+                np.take(lat_eq, _month - 1),
+                np.take(lat_20s, _month - 1)
+            ]
+            return np.select(condlist, lf_choices, default=lf_default)
+        else:
+            return lf_default
+
+    # Potential Evapotranspiration (v)
+    lf = _get_dc_lat_daylength(lat, month, lat_adjust)
+    v = 0.36 * (temp + 2.8) + lf
+
+    # ### RAINFALL PHASE
+    # Effective rainfall (rd)
+    rd = np.ma.where(precip > 2.8,
+                     (0.83 * precip) - 1.27,
+                     0)
+    # Moisture content after rain (mr)
+    qr = q0 + 3.937 * rd
+
+    # ### RETURN FINAL DMC VALUES
+    np.seterr(divide='ignore')
+    dc = np.ma.where(precip > 2.8,
+                     400 * np.log(800 / qr) + 0.5 * v,
+                     dc0 + 0.5 * v)
+    np.seterr(divide='warn')
+
+    # Ensure DC >= 0
+    dc = np.ma.clip(dc, 0, None)
+
+    if return_array:
+        result = dc.filled(np.nan)
+        nan_mask = (np.ma.getmaskarray(dc0)    | np.ma.getmaskarray(temp) |
+                    np.ma.getmaskarray(precip))
+        return np.where(nan_mask, np.nan, result)
+    else:
+        return float(dc.filled(np.nan)[0])
+
+
+def dailyDMC(
+        dmc0: int | float | np.ndarray,
+        temp: int | float | np.ndarray,
+        rh: int | float | np.ndarray,
+        precip: int | float | np.ndarray,
+        month: int | str,
+        lat: int | float | np.ndarray = 49.0,
+        lat_adjust: bool = False
+) -> float | np.ndarray:
+    """
+    Function to calculate today's DMC per Van Wagner (1987).
+
+    :param dmc0: yesterday's DMC value (unitless code)
+    :param temp: today's temperature value (C)
+    :param rh: today's relative humidity value (%)
+    :param precip: today's precipitation value (mm)
+    :param month: the current month (e.g., 9, '09', 'September', 'Sep')
+    :param lat: latitude value (decimal degrees, e.g., 45.0)
+    :param lat_adjust: whether to apply latitude-based daylength adjustment (default is False)
+    :return: the current DMC value (unitless code)
+    """
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if any(isinstance(data, np.ndarray) for data in [dmc0, temp, rh, precip]):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    # Verify dmc0
+    if not isinstance(dmc0, (int, float, np.ndarray)):
+        raise TypeError('dmc0 must be either int, float or numpy ndarray data types')
+    elif isinstance(dmc0, np.ndarray):
+        dmc0 = np.ma.array(dmc0, mask=np.isnan(dmc0))
+    else:
+        dmc0 = np.ma.array([dmc0], mask=np.isnan([dmc0]))
+
+    # Verify temp
+    if not isinstance(temp, (int, float, np.ndarray)):
+        raise TypeError('temp must be either int, float or numpy ndarray data types')
+    elif isinstance(temp, np.ndarray):
+        temp = np.ma.array(temp, mask=np.isnan(temp))
+    else:
+        temp = np.ma.array([temp], mask=np.isnan([temp]))
+    temp = np.ma.clip(temp, -1.1, None)  # Ensure temp >= -1.1C
+
+    # Verify rh
+    if not isinstance(rh, (int, float, np.ndarray)):
+        raise TypeError('rh must be either int, float or numpy ndarray data types')
+    elif isinstance(rh, np.ndarray):
+        rh = np.ma.array(rh, mask=np.isnan(rh))
+    else:
+        rh = np.ma.array([rh], mask=np.isnan([rh]))
+
+    # Verify precip
+    if not isinstance(precip, (int, float, np.ndarray)):
+        raise TypeError('precip must be either int, float or numpy ndarray data types')
+    elif isinstance(precip, np.ndarray):
+        precip = np.ma.array(precip, mask=np.isnan(precip))
+    else:
+        precip = np.ma.array([precip], mask=np.isnan([precip]))
+
+    # Verify month
+    if not isinstance(month, (int, str)):
+        raise TypeError('month must be either int or string data types')
+    elif isinstance(month, int):
+        if not (1 <= month <= 12):
+            raise ValueError(f'month value is invalid: {month}')
+    else:
+        month = month_dict.get(month, None)
+        if month is None:
+            raise ValueError(f'month value is invalid: {month}')
+
+    # Verify lat
+    if not isinstance(lat, (int, float, np.ndarray)):
+        raise TypeError('lat must be either int, float or numpy ndarray data types')
+    elif isinstance(lat, np.ndarray):
+        lat = np.ma.array(lat, mask=np.isnan(lat))
+    else:
+        lat = np.ma.array([lat], mask=np.isnan([lat]))
+    lat = np.ma.clip(lat, -90, 90)  # Ensure lat is within valid range
+
+    # Verify lat_adjust
+    if not isinstance(lat_adjust, bool):
+        raise TypeError('lat_adjust must be a boolean value (True or False)')
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([dmc0, temp, rh, precip, lat], return_array)
+    if verification_result is not True:
+        return verification_result
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=UserWarning)
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+
+        # ### YESTERDAY'S MOISTURE CONTENT
+        # Original equation: 20.0 + np.exp(-(dmc - 244.72) / 43.43)
+        # Use alteration to Eq. 12 for more accurate calculation
+        mo = 20 + 280 / np.exp(0.023 * dmc0)
+
+        # ### DRYING PHASE
+        # Reference latitude for DMC day length adjustment, addressing latitudinal differences
+        # brought up in Van Wagner 1987.
+        # 30N: Canadian standard, latitude >= 30N
+        lat_30n = [6.5, 7.5, 9, 12.8, 13.9, 13.9, 12.4, 10.9, 9.4, 8, 7, 6]
+        # 10N: For 10 <= latitude < 30
+        lat_10n = [7.9, 8.4, 8.9, 9.5, 9.9, 10.2, 10.1, 9.7, 9.1, 8.6, 8.1, 7.8]
+        # Equator: For -10 <= latitude < 10 (near equator), use a factor of 9 for all months
+        lat_eq = [9] * 12
+        # 10S: For -30 <= latitude < -10
+        lat_10s = [10.1, 9.6, 9.1, 8.5, 8.1, 7.8, 7.9, 8.3, 8.9, 9.4, 9.9, 10.2]
+        # 30S: For latitude < -30
+        lat_30s = [11.5, 10.5, 9.2, 7.9, 6.8, 6.2, 6.5, 7.4, 8.7, 10, 11.2, 11.8]
+
+        def _get_dmc_lat_daylength(_lat, _month, _lat_adjust):
+            # Get the default DMC daylength adjustment (Le) based on latitude and month
+            le_default = np.take(lat_30n, _month - 1)
+            if _lat_adjust:
+                _lat = np.asarray(_lat)
+                _month = np.asarray(_month)
+                if _month.shape != _lat.shape:
+                    _month = np.full(_lat.shape, _month)
+                # Define masks
+                condlist = [
+                    (_lat >= 10) & (_lat < 30),
+                    (_lat >= -10) & (_lat < 10),
+                    (_lat >= -30) & (_lat < -10),
+                    (_lat < -30)
+                ]
+                # Daylength arrays must be defined in the global scope
+                le_choices = [
+                    np.take(lat_10n, _month - 1),
+                    np.take(lat_eq, _month - 1),
+                    np.take(lat_10s, _month - 1),
+                    np.take(lat_30s, _month - 1)
+                ]
+                return np.select(condlist, le_choices, default=le_default)
+            else:
+                return le_default
+
+        le = _get_dmc_lat_daylength(lat, month, lat_adjust)
+        # Log drying rate (k)
+        k = 1.894 * (temp + 1.1) * (100 - rh) * le * 1e-04
+
+        # ### RAINFALL PHASE
+        b = np.ma.where(dmc0 <= 33,
+                        100 / (0.5 + 0.3 * dmc0),
+                        np.ma.where(dmc0 <= 65,
+                                    14 - 1.3 * np.log(dmc0),
+                                    6.2 * np.log(dmc0) - 17.2))
+
+        # Effective rain (re)
+        re = np.ma.where(precip > 1.5,
+                         (0.92 * precip) - 1.27,
+                         0)
+
+        # Moisture content after rain (mr)
+        mr = mo + 1000 * re / (48.77 + b * re)
+        mr = np.ma.clip(mr, 0, None)
+
+        # ### RETURN FINAL DMC VALUES
+        dmc = np.ma.where(precip > 1.5, (244.72 - 43.43 * np.log(mr - 20)), dmc0)
+        # Add the log drying rate (k) to the DMC value
+        dmc += k
+        # Ensure DMC >= 0
+        dmc = np.ma.clip(dmc, 0, None)
+
+    if return_array:
+        result = dmc.filled(np.nan)
+        nan_mask = (np.ma.getmaskarray(dmc0)   | np.ma.getmaskarray(temp) |
+                    np.ma.getmaskarray(rh)     | np.ma.getmaskarray(precip))
+        return np.where(nan_mask, np.nan, result)
+    else:
+        return float(dmc.filled(np.nan)[0])
+
+
+def dailyDSR(fwi: int | float | np.ndarray) -> float | np.ndarray:
+    """
+    Function to calculate the Daily Severity Rating (DSR) per Van Wagner (1987)
+    :param fwi: current FWI value (unitless code)
+    :return: current DSR value (unitless code)
+    """
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if isinstance(fwi, np.ndarray):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    # Verify fwi
+    if not isinstance(fwi, (int, float, np.ndarray)):
+        raise TypeError('fwi must be either int, float or numpy ndarray data types')
+    elif isinstance(fwi, np.ndarray):
+        fwi = np.ma.array(fwi, mask=np.isnan(fwi))
+    else:
+        fwi = np.ma.array([fwi], mask=np.isnan([fwi]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([fwi], return_array)
+    if verification_result is not True:
+        return verification_result
+
+    # ### RETURN DSR VALUE
+    dsr = 0.0272 * fwi ** 1.77
+
+    # Ensure DSR >= 0
+    dsr = np.ma.clip(dsr, 0, None)
+
+    if return_array:
+        result = dsr.filled(np.nan)
+        nan_mask = np.ma.getmaskarray(fwi)
+        return np.where(nan_mask, np.nan, result)
+    else:
+        return float(dsr.filled(np.nan)[0])
+
+
+def dailyFFMC(ffmc0: int | float | np.ndarray,
+              temp: int | float | np.ndarray,
+              rh: int | float | np.ndarray,
+              wind: int | float | np.ndarray,
+              precip: int | float | np.ndarray) -> float | np.ndarray:
+    """
+    Function to calculate daily FFMC values per Van Wagner (1987).
+    :param ffmc0: yesterday's FFMC value (unitless code)
+    :param temp: temperature value (C)
+    :param rh: relative humidity value (%)
+    :param wind: wind speed value (km/h)
+    :param precip: precipitation value (mm)
+    :return: the daily FFMC value
+    """
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if any(isinstance(data, np.ndarray) for data in [ffmc0, temp, rh, wind, precip]):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    # Verify ffmc0
+    if not isinstance(ffmc0, (int, float, np.ndarray)):
+        raise TypeError('ffmc0 must be either int, float or numpy ndarray data types')
+    elif isinstance(ffmc0, np.ndarray):
+        ffmc0 = np.ma.array(ffmc0, mask=np.isnan(ffmc0))
+    else:
+        ffmc0 = np.ma.array([ffmc0], mask=np.isnan([ffmc0]))
+
+    # Verify temp
+    if not isinstance(temp, (int, float, np.ndarray)):
+        raise TypeError('temp must be either int, float or numpy ndarray data types')
+    elif isinstance(temp, np.ndarray):
+        temp = np.ma.array(temp, mask=np.isnan(temp))
+    else:
+        temp = np.ma.array([temp], mask=np.isnan([temp]))
+
+    # Verify rh
+    if not isinstance(rh, (int, float, np.ndarray)):
+        raise TypeError('rh must be either int, float or numpy ndarray data types')
+    elif isinstance(rh, np.ndarray):
+        rh = np.ma.array(rh, mask=np.isnan(rh))
+    else:
+        rh = np.ma.array([rh], mask=np.isnan([rh]))
+
+    # Verify wind
+    if not isinstance(wind, (int, float, np.ndarray)):
+        raise TypeError('wind must be either int, float or numpy ndarray data types')
+    elif isinstance(wind, np.ndarray):
+        wind = np.ma.array(wind, mask=np.isnan(wind))
+    else:
+        wind = np.ma.array([wind], mask=np.isnan([wind]))
+
+    # Verify precip
+    if not isinstance(precip, (int, float, np.ndarray)):
+        raise TypeError('precip must be either int, float or numpy ndarray data types')
+    elif isinstance(precip, np.ndarray):
+        precip = np.ma.array(precip, mask=np.isnan(precip))
+    else:
+        precip = np.ma.array([precip], mask=np.isnan([precip]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([ffmc0, temp, rh, wind, precip], return_array)
+    if verification_result is not True:
+        return verification_result
+
+    # ### PREVIOUS HOURS ESTIMATED FINE FUEL MOISTURE CONTENT
+    # FFMC coefficient
+    FFMC_COEFFICIENT = 250.0 * 59.5 / 101.0
+    # This equation has been revised from Van Wagner (1977) to match Van Wagner (1987)
+    # Doing this uses the newer FF scale, over the old F scale (per Anderson 2009)
+    mo = FFMC_COEFFICIENT * (101 - ffmc0) / (59.5 + ffmc0)
+
+    # ### RAINFALL PHASE
+    rf = np.ma.where(precip > 0.5, precip - 0.5, precip)
+    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+        # Rainfall Effectiveness (delta_mrf)
+        delta_mrf = np.ma.where(
+            rf == 0,
+            0.0,
+            42.5 * rf * np.exp(-100 / (251 - mo)) * (1 - np.exp(-6.93 / rf))
+        )
+        # Rainfall Moisture
+        mr = np.ma.where(
+            mo > 150,
+            mo + delta_mrf + 0.0015 * (mo - 150) * (mo - 150) * (rf ** 0.5),
+            mo + delta_mrf
+        )
+    mr = np.ma.clip(mr, 0, 250)
+    mo = np.ma.where(precip > 0.0, mr, mo)
+
+    # ### DRYING PHASE
+    # Equilibrium Moisture Content (E)
+    # Drying from above
+    ed = (0.942 * (rh ** 0.679) + (11 * np.exp((rh - 100) / 10)) +
+          0.18 * (21.1 - temp) * (1 - 1 / np.exp(rh * 0.115)))
+    # Wetting from below
+    ew = (0.618 * (rh ** 0.753) + (10 * np.exp((rh - 100) / 10)) +
+          0.18 * (21.1 - temp) * (1 - 1 / np.exp(rh * 0.115)))
+
+    # LOG DRYING RATE (k)
+    # Calculate wetting rate
+    k0w = (0.424 * (1 - (((100 - rh) / 100) ** 1.7)) + 0.0694 * np.sqrt(wind) * (1 - ((100 - rh) / 100) ** 8))
+    kw = k0w * 0.581 * np.exp(0.0365 * temp)
+    # Calculate drying rate
+    k0d = (0.424 * (1 - (rh / 100) ** 1.7) + 0.0694 * np.sqrt(wind) * (1 - (rh / 100) ** 8))
+    kd = k0d * 0.581 * np.exp(0.0365 * temp)
+
+    # MOISTURE CONTENT (m)
+    m = np.ma.where((mo < ed) & (mo < ew),
+                    ew - (ew - mo) / (10 ** kw),
+                    np.ma.where(mo > ed,
+                                ed + (mo - ed) / (10 ** kd),
+                                mo))
+
+    # Cap m from 0 to 250 to reflect max moisture content of pine litter
+    m = np.ma.clip(m, 0, 250)
+
+    # ### RETURN FINAL FFMC VALUE
+    ffmc = 59.5 * (250 - m) / (FFMC_COEFFICIENT + m)
+
+    # Restrict FFMC values to range between 0 and 101
+    ffmc = np.ma.clip(ffmc, 0, 101)
+
+    if return_array:
+        result = ffmc.filled(np.nan)
+        nan_mask = (np.ma.getmaskarray(ffmc0) | np.ma.getmaskarray(temp) |
+                    np.ma.getmaskarray(rh)    | np.ma.getmaskarray(wind) |
+                    np.ma.getmaskarray(precip))
+        return np.where(nan_mask, np.nan, result)
+    else:
+        return float(ffmc.filled(np.nan)[0])
+
+
+def dailyFWI(
+        isi: int | float | np.ndarray,
+        bui: int | float | np.ndarray
+) -> float | np.ndarray:
+    """
+    Function to calculate FWI per Van Wagner (1987).
+    The daily FWI equation is used for both hourly and daily FWI calculations.\n
+    -- For hourly FWI, use the current hour's ISI and BUI values.\n
+    -- For daily FWI, use the current day's noon-time (1200) ISI and BUI values.\n
+    :param isi: the current ISI value (unitless code)
+    :param bui: the current BUI value (unitless code)
+    :return: the current FWI value (unitless code)
+    """
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if any(isinstance(data, np.ndarray) for data in [isi, bui]):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    # Verify isi
+    if not isinstance(isi, (int, float, np.ndarray)):
+        raise TypeError('isi must be either int, float or numpy ndarray data types')
+    elif isinstance(isi, np.ndarray):
+        isi = np.ma.array(isi, mask=np.isnan(isi))
+    else:
+        isi = np.ma.array([isi], mask=np.isnan([isi]))
+
+    # Verify bui
+    if not isinstance(bui, (int, float, np.ndarray)):
+        raise TypeError('bui must be either int, float or numpy ndarray data types')
+    elif isinstance(bui, np.ndarray):
+        bui = np.ma.array(bui, mask=np.isnan(bui))
+    else:
+        bui = np.ma.array([bui], mask=np.isnan([bui]))
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([isi, bui], return_array)
+    if verification_result is not True:
+        return verification_result
+
+    # ### DUFF MOISTURE FUNCTION (fD)
+    np.seterr(over='ignore')
+    fd = np.ma.where(bui <= 80,
+                     0.626 * (bui ** 0.809) + 2,
+                     1000 / (25 + 108.64 * np.exp(-0.023 * bui)))
+    np.seterr(over='warn')
+
+    # ### INTERMEDIATE FWI (B)
+    b = 0.1 * isi * fd
+
+    # ### RETURN FINAL FWI VALUE
+    np.seterr(divide='ignore')
+    fwi = np.ma.where(b > 1,
+                      np.exp(2.72 * (0.434 * np.log(b)) ** 0.647),
+                      b)
+    np.seterr(divide='warn')
+
+    # Ensure FWI >= 0
+    fwi = np.ma.clip(fwi, 0, None)
+
+    if return_array:
+        result = fwi.filled(np.nan)
+        nan_mask = np.ma.getmaskarray(isi) | np.ma.getmaskarray(bui)
+        return np.where(nan_mask, np.nan, result)
+    else:
+        return float(fwi.filled(np.nan)[0])
+
+
+def dailyISI(
+        wind: int | float | np.ndarray,
+        ffmc: int | float | np.ndarray,
+        fbp_mod: bool = False
+) -> float | np.ndarray:
+    """
+    Function to calculate ISI per Van Wagner (1987).
+    The daily ISI equation is used for both hourly and daily ISI calculations.\n
+    -- For hourly ISI, use the prior hour's wind and FFMC values.\n
+    -- For daily ISI, use the current day's noon-time (1200) wind, and the prior day's noon-time (1200) FFMC value.\n
+    :param wind: 10-m wind speed (km/h)
+    :param ffmc: current FFMC value (unitless code)
+    :param fbp_mod: use the CFFBPS modification for wind speeds > 40 km/h (default: False)
+    :return: the current ISI value (unitless code)
+    """
+    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
+    if any(isinstance(data, np.ndarray) for data in [wind, ffmc]):
+        return_array = True
+    else:
+        return_array = False
+
+    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
+    # Verify wind
+    if not isinstance(wind, (int, float, np.ndarray)):
+        raise TypeError('wind must be either int, float or numpy ndarray data types')
+    elif isinstance(wind, np.ndarray):
+        wind = np.ma.array(wind, mask=np.isnan(wind))
+    else:
+        wind = np.ma.array([wind], mask=np.isnan([wind]))
+
+    # Verify ffmc
+    if not isinstance(ffmc, (int, float, np.ndarray)):
+        raise TypeError('ffmc must be either int, float or numpy ndarray data types')
+    elif isinstance(ffmc, np.ndarray):
+        ffmc = np.ma.array(ffmc, mask=np.isnan(ffmc))
+    else:
+        ffmc = np.ma.array([ffmc], mask=np.isnan([ffmc]))
+
+    # Verify fbp_mod
+    if not isinstance(fbp_mod, bool):
+        raise ValueError('fbp_mod must be True or False')
+
+    # If any input dataset is entirely NaN, return NaN in the expected output format
+    verification_result = _verify_valid_data([wind, ffmc], return_array)
+    if verification_result is not True:
+        return verification_result
+
+    # ### CURRENT ESTIMATED FINE FUEL MOISTURE CONTENT
+    m = 147.2 * (101 - ffmc) / (59.5 + ffmc)
+
+    # ### WIND COMPONENT OF ISI
+    # The CFFBPS version includes a modification when wind speeds exceed 40 km/h, per Equation 53a in FCFDG (1992).
+    fw = np.ma.where((wind > 40) & fbp_mod,
+                     (12 * (1 - np.exp(-0.0818 * (wind - 28)))),
+                     np.exp(0.05039 * wind))
+
+    # ### FFMC COMPONENT OF ISI
+    ff = 91.9 * np.exp(-0.1386 * m) * (1 + ((m ** 5.31) / 49300000))
+
+    # ### RETURN FINAL ISI VALUE
+    isi = 0.208 * fw * ff
+
+    # Ensure ISI >= 0
+    isi = np.ma.clip(isi, 0, None)
+
+    if return_array:
+        result = isi.filled(np.nan)
+        nan_mask = np.ma.getmaskarray(wind) | np.ma.getmaskarray(ffmc)
+        return np.where(nan_mask, np.nan, result)
+    else:
+        return isi.filled(np.nan)[0]
+
+
 def diurnalFFMC_lawson(
         ffmc_1200: float | np.ndarray,
         rh_1200: float | np.ndarray,
@@ -295,696 +985,6 @@ def hourlyFFMC(
             return float(ffmc.filled(np.nan)[0])
         else:
             return float(np.atleast_1d(ffmc)[0])
-
-
-def dailyFFMC(ffmc0: int | float | np.ndarray,
-              temp: int | float | np.ndarray,
-              rh: int | float | np.ndarray,
-              wind: int | float | np.ndarray,
-              precip: int | float | np.ndarray) -> float | np.ndarray:
-    """
-    Function to calculate daily FFMC values per Van Wagner (1987).
-    :param ffmc0: yesterday's FFMC value (unitless code)
-    :param temp: temperature value (C)
-    :param rh: relative humidity value (%)
-    :param wind: wind speed value (km/h)
-    :param precip: precipitation value (mm)
-    :return: the daily FFMC value
-    """
-    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
-    if any(isinstance(data, np.ndarray) for data in [ffmc0, temp, rh, wind, precip]):
-        return_array = True
-    else:
-        return_array = False
-
-    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
-    # Verify ffmc0
-    if not isinstance(ffmc0, (int, float, np.ndarray)):
-        raise TypeError('ffmc0 must be either int, float or numpy ndarray data types')
-    elif isinstance(ffmc0, np.ndarray):
-        ffmc0 = np.ma.array(ffmc0, mask=np.isnan(ffmc0))
-    else:
-        ffmc0 = np.ma.array([ffmc0], mask=np.isnan([ffmc0]))
-
-    # Verify temp
-    if not isinstance(temp, (int, float, np.ndarray)):
-        raise TypeError('temp must be either int, float or numpy ndarray data types')
-    elif isinstance(temp, np.ndarray):
-        temp = np.ma.array(temp, mask=np.isnan(temp))
-    else:
-        temp = np.ma.array([temp], mask=np.isnan([temp]))
-
-    # Verify rh
-    if not isinstance(rh, (int, float, np.ndarray)):
-        raise TypeError('rh must be either int, float or numpy ndarray data types')
-    elif isinstance(rh, np.ndarray):
-        rh = np.ma.array(rh, mask=np.isnan(rh))
-    else:
-        rh = np.ma.array([rh], mask=np.isnan([rh]))
-
-    # Verify wind
-    if not isinstance(wind, (int, float, np.ndarray)):
-        raise TypeError('wind must be either int, float or numpy ndarray data types')
-    elif isinstance(wind, np.ndarray):
-        wind = np.ma.array(wind, mask=np.isnan(wind))
-    else:
-        wind = np.ma.array([wind], mask=np.isnan([wind]))
-
-    # Verify precip
-    if not isinstance(precip, (int, float, np.ndarray)):
-        raise TypeError('precip must be either int, float or numpy ndarray data types')
-    elif isinstance(precip, np.ndarray):
-        precip = np.ma.array(precip, mask=np.isnan(precip))
-    else:
-        precip = np.ma.array([precip], mask=np.isnan([precip]))
-
-    # If any input dataset is entirely NaN, return NaN in the expected output format
-    verification_result = _verify_valid_data([ffmc0, temp, rh, wind, precip], return_array)
-    if verification_result is not True:
-        return verification_result
-
-    # ### PREVIOUS HOURS ESTIMATED FINE FUEL MOISTURE CONTENT
-    # FFMC coefficient
-    FFMC_COEFFICIENT = 250.0 * 59.5 / 101.0
-    # This equation has been revised from Van Wagner (1977) to match Van Wagner (1987)
-    # Doing this uses the newer FF scale, over the old F scale (per Anderson 2009)
-    mo = FFMC_COEFFICIENT * (101 - ffmc0) / (59.5 + ffmc0)
-
-    # ### RAINFALL PHASE
-    rf = np.ma.where(precip > 0.5, precip - 0.5, precip)
-    with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
-        # Rainfall Effectiveness (delta_mrf)
-        delta_mrf = np.ma.where(
-            rf == 0,
-            0.0,
-            42.5 * rf * np.exp(-100 / (251 - mo)) * (1 - np.exp(-6.93 / rf))
-        )
-        # Rainfall Moisture
-        mr = np.ma.where(
-            mo > 150,
-            mo + delta_mrf + 0.0015 * (mo - 150) * (mo - 150) * (rf ** 0.5),
-            mo + delta_mrf
-        )
-    mr = np.ma.clip(mr, 0, 250)
-    mo = np.ma.where(precip > 0.0, mr, mo)
-
-    # ### DRYING PHASE
-    # Equilibrium Moisture Content (E)
-    # Drying from above
-    ed = (0.942 * (rh ** 0.679) + (11 * np.exp((rh - 100) / 10)) +
-          0.18 * (21.1 - temp) * (1 - 1 / np.exp(rh * 0.115)))
-    # Wetting from below
-    ew = (0.618 * (rh ** 0.753) + (10 * np.exp((rh - 100) / 10)) +
-          0.18 * (21.1 - temp) * (1 - 1 / np.exp(rh * 0.115)))
-
-    # LOG DRYING RATE (k)
-    # Calculate wetting rate
-    k0w = (0.424 * (1 - (((100 - rh) / 100) ** 1.7)) + 0.0694 * np.sqrt(wind) * (1 - ((100 - rh) / 100) ** 8))
-    kw = k0w * 0.581 * np.exp(0.0365 * temp)
-    # Calculate drying rate
-    k0d = (0.424 * (1 - (rh / 100) ** 1.7) + 0.0694 * np.sqrt(wind) * (1 - (rh / 100) ** 8))
-    kd = k0d * 0.581 * np.exp(0.0365 * temp)
-
-    # MOISTURE CONTENT (m)
-    m = np.ma.where((mo < ed) & (mo < ew),
-                    ew - (ew - mo) / (10 ** kw),
-                    np.ma.where(mo > ed,
-                                ed + (mo - ed) / (10 ** kd),
-                                mo))
-
-    # Cap m from 0 to 250 to reflect max moisture content of pine litter
-    m = np.ma.clip(m, 0, 250)
-
-    # ### RETURN FINAL FFMC VALUE
-    ffmc = 59.5 * (250 - m) / (FFMC_COEFFICIENT + m)
-
-    # Restrict FFMC values to range between 0 and 101
-    ffmc = np.ma.clip(ffmc, 0, 101)
-
-    if return_array:
-        result = ffmc.filled(np.nan)
-        nan_mask = (np.ma.getmaskarray(ffmc0) | np.ma.getmaskarray(temp) |
-                    np.ma.getmaskarray(rh)    | np.ma.getmaskarray(wind) |
-                    np.ma.getmaskarray(precip))
-        return np.where(nan_mask, np.nan, result)
-    else:
-        return float(ffmc.filled(np.nan)[0])
-
-
-def dailyDMC(
-        dmc0: int | float | np.ndarray,
-        temp: int | float | np.ndarray,
-        rh: int | float | np.ndarray,
-        precip: int | float | np.ndarray,
-        month: int | str,
-        lat: int | float | np.ndarray = 49.0,
-        lat_adjust: bool = False
-) -> float | np.ndarray:
-    """
-    Function to calculate today's DMC per Van Wagner (1987).
-
-    :param dmc0: yesterday's DMC value (unitless code)
-    :param temp: today's temperature value (C)
-    :param rh: today's relative humidity value (%)
-    :param precip: today's precipitation value (mm)
-    :param month: the current month (e.g., 9, '09', 'September', 'Sep')
-    :param lat: latitude value (decimal degrees, e.g., 45.0)
-    :param lat_adjust: whether to apply latitude-based daylength adjustment (default is False)
-    :return: the current DMC value (unitless code)
-    """
-    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
-    if any(isinstance(data, np.ndarray) for data in [dmc0, temp, rh, precip]):
-        return_array = True
-    else:
-        return_array = False
-
-    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
-    # Verify dmc0
-    if not isinstance(dmc0, (int, float, np.ndarray)):
-        raise TypeError('dmc0 must be either int, float or numpy ndarray data types')
-    elif isinstance(dmc0, np.ndarray):
-        dmc0 = np.ma.array(dmc0, mask=np.isnan(dmc0))
-    else:
-        dmc0 = np.ma.array([dmc0], mask=np.isnan([dmc0]))
-
-    # Verify temp
-    if not isinstance(temp, (int, float, np.ndarray)):
-        raise TypeError('temp must be either int, float or numpy ndarray data types')
-    elif isinstance(temp, np.ndarray):
-        temp = np.ma.array(temp, mask=np.isnan(temp))
-    else:
-        temp = np.ma.array([temp], mask=np.isnan([temp]))
-    temp = np.ma.clip(temp, -1.1, None)  # Ensure temp >= -1.1C
-
-    # Verify rh
-    if not isinstance(rh, (int, float, np.ndarray)):
-        raise TypeError('rh must be either int, float or numpy ndarray data types')
-    elif isinstance(rh, np.ndarray):
-        rh = np.ma.array(rh, mask=np.isnan(rh))
-    else:
-        rh = np.ma.array([rh], mask=np.isnan([rh]))
-
-    # Verify precip
-    if not isinstance(precip, (int, float, np.ndarray)):
-        raise TypeError('precip must be either int, float or numpy ndarray data types')
-    elif isinstance(precip, np.ndarray):
-        precip = np.ma.array(precip, mask=np.isnan(precip))
-    else:
-        precip = np.ma.array([precip], mask=np.isnan([precip]))
-
-    # Verify month
-    if not isinstance(month, (int, str)):
-        raise TypeError('month must be either int or string data types')
-    elif isinstance(month, int):
-        if not (1 <= month <= 12):
-            raise ValueError(f'month value is invalid: {month}')
-    else:
-        month = month_dict.get(month, None)
-        if month is None:
-            raise ValueError(f'month value is invalid: {month}')
-
-    # Verify lat
-    if not isinstance(lat, (int, float, np.ndarray)):
-        raise TypeError('lat must be either int, float or numpy ndarray data types')
-    elif isinstance(lat, np.ndarray):
-        lat = np.ma.array(lat, mask=np.isnan(lat))
-    else:
-        lat = np.ma.array([lat], mask=np.isnan([lat]))
-    lat = np.ma.clip(lat, -90, 90)  # Ensure lat is within valid range
-
-    # Verify lat_adjust
-    if not isinstance(lat_adjust, bool):
-        raise TypeError('lat_adjust must be a boolean value (True or False)')
-
-    # If any input dataset is entirely NaN, return NaN in the expected output format
-    verification_result = _verify_valid_data([dmc0, temp, rh, precip, lat], return_array)
-    if verification_result is not True:
-        return verification_result
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=UserWarning)
-        warnings.filterwarnings('ignore', category=RuntimeWarning)
-
-        # ### YESTERDAY'S MOISTURE CONTENT
-        # Original equation: 20.0 + np.exp(-(dmc - 244.72) / 43.43)
-        # Use alteration to Eq. 12 for more accurate calculation
-        mo = 20 + 280 / np.exp(0.023 * dmc0)
-
-        # ### DRYING PHASE
-        # Reference latitude for DMC day length adjustment, addressing latitudinal differences
-        # brought up in Van Wagner 1987.
-        # 30N: Canadian standard, latitude >= 30N
-        lat_30n = [6.5, 7.5, 9, 12.8, 13.9, 13.9, 12.4, 10.9, 9.4, 8, 7, 6]
-        # 10N: For 10 <= latitude < 30
-        lat_10n = [7.9, 8.4, 8.9, 9.5, 9.9, 10.2, 10.1, 9.7, 9.1, 8.6, 8.1, 7.8]
-        # Equator: For -10 <= latitude < 10 (near equator), use a factor of 9 for all months
-        lat_eq = [9] * 12
-        # 10S: For -30 <= latitude < -10
-        lat_10s = [10.1, 9.6, 9.1, 8.5, 8.1, 7.8, 7.9, 8.3, 8.9, 9.4, 9.9, 10.2]
-        # 30S: For latitude < -30
-        lat_30s = [11.5, 10.5, 9.2, 7.9, 6.8, 6.2, 6.5, 7.4, 8.7, 10, 11.2, 11.8]
-
-        def _get_dmc_lat_daylength(_lat, _month, _lat_adjust):
-            # Get the default DMC daylength adjustment (Le) based on latitude and month
-            le_default = np.take(lat_30n, _month - 1)
-            if _lat_adjust:
-                _lat = np.asarray(_lat)
-                _month = np.asarray(_month)
-                if _month.shape != _lat.shape:
-                    _month = np.full(_lat.shape, _month)
-                # Define masks
-                condlist = [
-                    (_lat >= 10) & (_lat < 30),
-                    (_lat >= -10) & (_lat < 10),
-                    (_lat >= -30) & (_lat < -10),
-                    (_lat < -30)
-                ]
-                # Daylength arrays must be defined in the global scope
-                le_choices = [
-                    np.take(lat_10n, _month - 1),
-                    np.take(lat_eq, _month - 1),
-                    np.take(lat_10s, _month - 1),
-                    np.take(lat_30s, _month - 1)
-                ]
-                return np.select(condlist, le_choices, default=le_default)
-            else:
-                return le_default
-
-        le = _get_dmc_lat_daylength(lat, month, lat_adjust)
-        # Log drying rate (k)
-        k = 1.894 * (temp + 1.1) * (100 - rh) * le * 1e-04
-
-        # ### RAINFALL PHASE
-        b = np.ma.where(dmc0 <= 33,
-                        100 / (0.5 + 0.3 * dmc0),
-                        np.ma.where(dmc0 <= 65,
-                                    14 - 1.3 * np.log(dmc0),
-                                    6.2 * np.log(dmc0) - 17.2))
-
-        # Effective rain (re)
-        re = np.ma.where(precip > 1.5,
-                         (0.92 * precip) - 1.27,
-                         0)
-
-        # Moisture content after rain (mr)
-        mr = mo + 1000 * re / (48.77 + b * re)
-        mr = np.ma.clip(mr, 0, None)
-
-        # ### RETURN FINAL DMC VALUES
-        dmc = np.ma.where(precip > 1.5, (244.72 - 43.43 * np.log(mr - 20)), dmc0)
-        # Add the log drying rate (k) to the DMC value
-        dmc += k
-        # Ensure DMC >= 0
-        dmc = np.ma.clip(dmc, 0, None)
-
-    if return_array:
-        result = dmc.filled(np.nan)
-        nan_mask = (np.ma.getmaskarray(dmc0)   | np.ma.getmaskarray(temp) |
-                    np.ma.getmaskarray(rh)     | np.ma.getmaskarray(precip))
-        return np.where(nan_mask, np.nan, result)
-    else:
-        return float(dmc.filled(np.nan)[0])
-
-
-def dailyDC(
-        dc0: int | float | np.ndarray,
-        temp: int | float | np.ndarray,
-        precip: int | float | np.ndarray,
-        month: int | str,
-        lat: int | float | np.ndarray = 49.0,
-        lat_adjust: bool = False
-) -> float | np.ndarray:
-    """
-    Function to calculate today's DMC per Van Wagner (1987).
-    :param dc0: yesterday's DC value (unitless code)
-    :param temp: today's temperature value (C)
-    :param precip: today's precipitation value (mm)
-    :param month: the current month (e.g., 9, '09', 'September')
-    :param lat: latitude value (decimal degrees, e.g., 45.0)
-    :param lat_adjust: whether to apply latitude-based daylength adjustment (default is False)
-    :return: the current DC value (unitless code)
-    """
-    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
-    if any(isinstance(data, np.ndarray) for data in [dc0, temp, precip]):
-        return_array = True
-    else:
-        return_array = False
-
-    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
-    # Verify dc0
-    if not isinstance(dc0, (int, float, np.ndarray)):
-        raise TypeError('dc0 must be either int, float or numpy ndarray data types')
-    elif isinstance(dc0, np.ndarray):
-        dc0 = np.ma.array(dc0, mask=np.isnan(dc0))
-    else:
-        dc0 = np.ma.array([dc0], mask=np.isnan([dc0]))
-
-    # Verify temp
-    if not isinstance(temp, (int, float, np.ndarray)):
-        raise TypeError('temp must be either int, float or numpy ndarray data types')
-    elif isinstance(temp, np.ndarray):
-        temp = np.ma.array(temp, mask=np.isnan(temp))
-    else:
-        temp = np.ma.array([temp], mask=np.isnan([temp]))
-
-    # Verify precip
-    if not isinstance(precip, (int, float, np.ndarray)):
-        raise TypeError('precip must be either int, float or numpy ndarray data types')
-    elif isinstance(precip, np.ndarray):
-        precip = np.ma.array(precip, mask=np.isnan(precip))
-    else:
-        precip = np.ma.array([precip], mask=np.isnan([precip]))
-
-    # Verify month
-    if not isinstance(month, (int, str)):
-        raise TypeError('month must be either int or string data types')
-    elif isinstance(month, int):
-        if not (1 <= month <= 12):
-            raise ValueError(f'month value is invalid: {month}')
-    else:
-        month = month_dict.get(month, None)
-        if month is None:
-            raise ValueError(f'month value is invalid: {month}')
-
-    # Verify lat
-    if not isinstance(lat, (int, float, np.ndarray)):
-        raise TypeError('lat must be either int, float or numpy ndarray data types')
-    elif isinstance(lat, np.ndarray):
-        lat = np.ma.array(lat, mask=np.isnan(lat))
-    else:
-        lat = np.ma.array([lat], mask=np.isnan([lat]))
-    lat = np.ma.clip(lat, -90, 90)  # Ensure lat is within valid range
-
-    # Verify lat_adjust
-    if not isinstance(lat_adjust, bool):
-        raise TypeError('lat_adjust must be a boolean value (True or False)')
-
-    # If any input dataset is entirely NaN, return NaN in the expected output format
-    verification_result = _verify_valid_data([dc0, temp, precip, lat], return_array)
-    if verification_result is not True:
-        return verification_result
-
-    # ### YESTERDAYS MOISTURE EQUIVALENT VALUE
-    q0 = 800 / np.exp(dc0 / 400)
-
-    # ### DRYING PHASE
-    # Day length factor for DC Calculations (per CFS cffdrs_r/cffwis module)
-    # 20N: For latitude >= 20
-    lat_20n = [-1.6, -1.6, -1.6, 0.9, 3.8, 5.8, 6.4, 5, 2.4, 0.4, -1.6, -1.6]
-    # Equator: For -20 <= latitude < 20 (near equator), use a factor of 1.4 for all months
-    lat_eq = [1.4] * 12
-    # 20S: For latitude < -20
-    lat_20s = [6.4, 5, 2.4, 0.4, -1.6, -1.6, -1.6, -1.6, -1.6, 0.9, 3.8, 5.8]
-
-    def _get_dc_lat_daylength(_lat, _month, _lat_adjust):
-        # Get the default DC daylength adjustment (Lf) based on latitude and month
-        lf_default = np.take(lat_20n, _month - 1)
-        if _lat_adjust:
-            _lat = np.asarray(_lat)
-            _month = np.asarray(_month)
-            if _month.shape != _lat.shape:
-                _month = np.full(_lat.shape, _month)
-            # Define masks
-            condlist = [
-                (_lat >= -20) & (_lat < 20),
-                (_lat < -20)
-            ]
-            # Daylength arrays must be defined in the global scope
-            lf_choices = [
-                np.take(lat_eq, _month - 1),
-                np.take(lat_20s, _month - 1)
-            ]
-            return np.select(condlist, lf_choices, default=lf_default)
-        else:
-            return lf_default
-
-    # Potential Evapotranspiration (v)
-    lf = _get_dc_lat_daylength(lat, month, lat_adjust)
-    v = 0.36 * (temp + 2.8) + lf
-
-    # ### RAINFALL PHASE
-    # Effective rainfall (rd)
-    rd = np.ma.where(precip > 2.8,
-                     (0.83 * precip) - 1.27,
-                     0)
-    # Moisture content after rain (mr)
-    qr = q0 + 3.937 * rd
-
-    # ### RETURN FINAL DMC VALUES
-    np.seterr(divide='ignore')
-    dc = np.ma.where(precip > 2.8,
-                     400 * np.log(800 / qr) + 0.5 * v,
-                     dc0 + 0.5 * v)
-    np.seterr(divide='warn')
-
-    # Ensure DC >= 0
-    dc = np.ma.clip(dc, 0, None)
-
-    if return_array:
-        result = dc.filled(np.nan)
-        nan_mask = (np.ma.getmaskarray(dc0)    | np.ma.getmaskarray(temp) |
-                    np.ma.getmaskarray(precip))
-        return np.where(nan_mask, np.nan, result)
-    else:
-        return float(dc.filled(np.nan)[0])
-
-
-def dailyISI(
-        wind: int | float | np.ndarray,
-        ffmc: int | float | np.ndarray,
-        fbp_mod: bool = False
-) -> float | np.ndarray:
-    """
-    Function to calculate ISI per Van Wagner (1987).
-    The daily ISI equation is used for both hourly and daily ISI calculations.\n
-    -- For hourly ISI, use the prior hour's wind and FFMC values.\n
-    -- For daily ISI, use the current day's noon-time (1200) wind, and the prior day's noon-time (1200) FFMC value.\n
-    :param wind: 10-m wind speed (km/h)
-    :param ffmc: current FFMC value (unitless code)
-    :param fbp_mod: use the CFFBPS modification for wind speeds > 40 km/h (default: False)
-    :return: the current ISI value (unitless code)
-    """
-    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
-    if any(isinstance(data, np.ndarray) for data in [wind, ffmc]):
-        return_array = True
-    else:
-        return_array = False
-
-    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
-    # Verify wind
-    if not isinstance(wind, (int, float, np.ndarray)):
-        raise TypeError('wind must be either int, float or numpy ndarray data types')
-    elif isinstance(wind, np.ndarray):
-        wind = np.ma.array(wind, mask=np.isnan(wind))
-    else:
-        wind = np.ma.array([wind], mask=np.isnan([wind]))
-
-    # Verify ffmc
-    if not isinstance(ffmc, (int, float, np.ndarray)):
-        raise TypeError('ffmc must be either int, float or numpy ndarray data types')
-    elif isinstance(ffmc, np.ndarray):
-        ffmc = np.ma.array(ffmc, mask=np.isnan(ffmc))
-    else:
-        ffmc = np.ma.array([ffmc], mask=np.isnan([ffmc]))
-
-    # Verify fbp_mod
-    if not isinstance(fbp_mod, bool):
-        raise ValueError('fbp_mod must be True or False')
-
-    # If any input dataset is entirely NaN, return NaN in the expected output format
-    verification_result = _verify_valid_data([wind, ffmc], return_array)
-    if verification_result is not True:
-        return verification_result
-
-    # ### CURRENT ESTIMATED FINE FUEL MOISTURE CONTENT
-    m = 147.2 * (101 - ffmc) / (59.5 + ffmc)
-
-    # ### WIND COMPONENT OF ISI
-    # The CFFBPS version includes a modification when wind speeds exceed 40 km/h, per Equation 53a in FCFDG (1992).
-    fw = np.ma.where((wind > 40) & fbp_mod,
-                     (12 * (1 - np.exp(-0.0818 * (wind - 28)))),
-                     np.exp(0.05039 * wind))
-
-    # ### FFMC COMPONENT OF ISI
-    ff = 91.9 * np.exp(-0.1386 * m) * (1 + ((m ** 5.31) / 49300000))
-
-    # ### RETURN FINAL ISI VALUE
-    isi = 0.208 * fw * ff
-
-    # Ensure ISI >= 0
-    isi = np.ma.clip(isi, 0, None)
-
-    if return_array:
-        result = isi.filled(np.nan)
-        nan_mask = np.ma.getmaskarray(wind) | np.ma.getmaskarray(ffmc)
-        return np.where(nan_mask, np.nan, result)
-    else:
-        return isi.filled(np.nan)[0]
-
-
-def dailyBUI(
-        dmc: int | float | np.ndarray,
-        dc: int | float | np.ndarray
-) -> float | np.ndarray:
-    """
-    Function to calculate daily Build Up Index values per Van Wagner (1987).
-    :param dmc: current DMC value (unitless code)
-    :param dc: current DC value (unitless code)
-    :return: current BUI value (unitless code)
-    """
-    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
-    if any(isinstance(data, np.ndarray) for data in [dmc, dc]):
-        return_array = True
-    else:
-        return_array = False
-
-    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
-    # Verify dmc
-    if not isinstance(dmc, (int, float, np.ndarray)):
-        raise TypeError('dmc must be either int, float or numpy ndarray data types')
-    elif isinstance(dmc, np.ndarray):
-        dmc = np.ma.array(dmc, mask=np.isnan(dmc))
-    else:
-        dmc = np.ma.array([dmc], mask=np.isnan([dmc]))
-
-    # Verify dc
-    if not isinstance(dc, (int, float, np.ndarray)):
-        raise TypeError('dc must be either int, float or numpy ndarray data types')
-    elif isinstance(dc, np.ndarray):
-        dc = np.ma.array(dc, mask=np.isnan(dc))
-    else:
-        dc = np.ma.array([dc], mask=np.isnan([dc]))
-
-    # If any input dataset is entirely NaN, return NaN in the expected output format
-    verification_result = _verify_valid_data([dmc, dc], return_array)
-    if verification_result is not True:
-        return verification_result
-
-    # ### RETURN FINAL BUI VALUE
-    bui = np.ma.where(dmc == 0,
-                      0,
-                      np.ma.where(dmc <= 0.4 * dc,
-                                  0.8 * dmc * dc / (dmc + 0.4 * dc),
-                                  dmc - (1 - (0.8 * dc / (dmc + 0.4 * dc))) * (0.92 + (0.0114 * dmc) ** 1.7)))
-
-    # Ensure BUI >= 0
-    bui = np.ma.clip(bui, 0, None)
-
-    if return_array:
-        result = bui.filled(np.nan)
-        nan_mask = np.ma.getmaskarray(dmc) | np.ma.getmaskarray(dc)
-        return np.where(nan_mask, np.nan, result)
-    else:
-        return float(bui.filled(np.nan)[0])
-
-
-def dailyFWI(
-        isi: int | float | np.ndarray,
-        bui: int | float | np.ndarray
-) -> float | np.ndarray:
-    """
-    Function to calculate FWI per Van Wagner (1987).
-    The daily FWI equation is used for both hourly and daily FWI calculations.\n
-    -- For hourly FWI, use the current hour's ISI and BUI values.\n
-    -- For daily FWI, use the current day's noon-time (1200) ISI and BUI values.\n
-    :param isi: the current ISI value (unitless code)
-    :param bui: the current BUI value (unitless code)
-    :return: the current FWI value (unitless code)
-    """
-    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
-    if any(isinstance(data, np.ndarray) for data in [isi, bui]):
-        return_array = True
-    else:
-        return_array = False
-
-    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
-    # Verify isi
-    if not isinstance(isi, (int, float, np.ndarray)):
-        raise TypeError('isi must be either int, float or numpy ndarray data types')
-    elif isinstance(isi, np.ndarray):
-        isi = np.ma.array(isi, mask=np.isnan(isi))
-    else:
-        isi = np.ma.array([isi], mask=np.isnan([isi]))
-
-    # Verify bui
-    if not isinstance(bui, (int, float, np.ndarray)):
-        raise TypeError('bui must be either int, float or numpy ndarray data types')
-    elif isinstance(bui, np.ndarray):
-        bui = np.ma.array(bui, mask=np.isnan(bui))
-    else:
-        bui = np.ma.array([bui], mask=np.isnan([bui]))
-
-    # If any input dataset is entirely NaN, return NaN in the expected output format
-    verification_result = _verify_valid_data([isi, bui], return_array)
-    if verification_result is not True:
-        return verification_result
-
-    # ### DUFF MOISTURE FUNCTION (fD)
-    np.seterr(over='ignore')
-    fd = np.ma.where(bui <= 80,
-                     0.626 * (bui ** 0.809) + 2,
-                     1000 / (25 + 108.64 * np.exp(-0.023 * bui)))
-    np.seterr(over='warn')
-
-    # ### INTERMEDIATE FWI (B)
-    b = 0.1 * isi * fd
-
-    # ### RETURN FINAL FWI VALUE
-    np.seterr(divide='ignore')
-    fwi = np.ma.where(b > 1,
-                      np.exp(2.72 * (0.434 * np.log(b)) ** 0.647),
-                      b)
-    np.seterr(divide='warn')
-
-    # Ensure FWI >= 0
-    fwi = np.ma.clip(fwi, 0, None)
-
-    if return_array:
-        result = fwi.filled(np.nan)
-        nan_mask = np.ma.getmaskarray(isi) | np.ma.getmaskarray(bui)
-        return np.where(nan_mask, np.nan, result)
-    else:
-        return float(fwi.filled(np.nan)[0])
-
-
-def dailyDSR(fwi: int | float | np.ndarray) -> float | np.ndarray:
-    """
-    Function to calculate the Daily Severity Rating (DSR) per Van Wagner (1987)
-    :param fwi: current FWI value (unitless code)
-    :return: current DSR value (unitless code)
-    """
-    # ### CHECK FOR NUMPY ARRAYS IN INPUT PARAMETERS
-    if isinstance(fwi, np.ndarray):
-        return_array = True
-    else:
-        return_array = False
-
-    # ### CONVERT ALL INPUTS TO MASKED NUMPY ARRAYS
-    # Verify fwi
-    if not isinstance(fwi, (int, float, np.ndarray)):
-        raise TypeError('fwi must be either int, float or numpy ndarray data types')
-    elif isinstance(fwi, np.ndarray):
-        fwi = np.ma.array(fwi, mask=np.isnan(fwi))
-    else:
-        fwi = np.ma.array([fwi], mask=np.isnan([fwi]))
-
-    # If any input dataset is entirely NaN, return NaN in the expected output format
-    verification_result = _verify_valid_data([fwi], return_array)
-    if verification_result is not True:
-        return verification_result
-
-    # ### RETURN DSR VALUE
-    dsr = 0.0272 * fwi ** 1.77
-
-    # Ensure DSR >= 0
-    dsr = np.ma.clip(dsr, 0, None)
-
-    if return_array:
-        result = dsr.filled(np.nan)
-        nan_mask = np.ma.getmaskarray(fwi)
-        return np.where(nan_mask, np.nan, result)
-    else:
-        return float(dsr.filled(np.nan)[0])
 
 
 def startupDC(

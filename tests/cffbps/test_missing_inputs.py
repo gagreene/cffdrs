@@ -28,57 +28,18 @@ WFC_USES = {'bui': {7, 16, 17, 18}, 'ffmc': set()}
 # Fuels that cannot crown: their tfc is sfc alone, so it is NaN exactly when sfc is.
 NON_CROWNING = {8, 9, 14, 15, 16, 17, 18}
 
-
-def _run(backend_fbp, fuel, missing=None):
-    """One-cell run with every input passed as an array; ``missing`` is set to NaN."""
-    kwargs = {k: np.array([[v]]) for k, v in SCENARIO.items()}
-    if missing is not None:
-        kwargs[missing] = np.array([[np.nan]])
-    fbp = backend_fbp()
-    fbp.initialize(fuel_type=np.array([[fuel]], dtype=np.float64), wx_date=20230615,
-                   out_request=FIELDS, **kwargs)
-    out = fbp.runFBP()
-    return {name: float(np.ma.asarray(arr).astype(np.float64).filled(np.nan).ravel()[0])
-            for name, arr in zip(FIELDS, out, strict=True)}
+# ── Python/Rust parity on the same scenario, one cell per modeled fuel ─────────
+GRID_FIELDS = ['hros', 'bros', 'raz', 'wsv', 'hfi', 'rso', 'sros', 'sfc', 'fmc', 'accel']
+CELL_INPUTS = ['lat', 'long', 'elevation', 'slope', 'aspect', 'pc', 'gcf', 'ws', 'wd']
 
 
+# ---- helpers ----
 def _expected_nan(fuel, missing):
     # consumption follows the spread, which is NaN whenever bui or ffmc is missing
     nan = {'sfc', 'ffc', 'wfc', 'tfc'}
     if fuel in SFC_USES[missing]:
         nan.add('rso')
     return nan
-
-
-@pytest.mark.parametrize('missing', ['bui', 'ffmc'])
-@pytest.mark.parametrize('fuel', FUELS)
-def test_missing_input_propagates_to_dependent_surface_outputs(backend_fbp, fuel, missing):
-    base = _run(backend_fbp, fuel)
-    got = _run(backend_fbp, fuel, missing)
-    nan = _expected_nan(fuel, missing)
-    for name in sorted(nan):
-        assert np.isnan(got[name]), f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected NaN'
-    # rso does not follow the spread: it keeps its finite value unless the input feeds sfc.
-    for name in sorted({'rso'} - nan):
-        assert np.array_equal(got[name], base[name], equal_nan=True), (
-            f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected {base[name]!r}')
-
-
-def test_consumption_is_missing_when_the_spread_is_missing(backend_fbp):
-    # sfc does not use ffmc for C-2, bui for C-1 or bui for O-1a, but their spread does
-    assert np.isnan(_run(backend_fbp, 2, 'ffmc')['sfc'])
-    assert np.isnan(_run(backend_fbp, 1, 'bui')['sfc'])
-    assert np.isnan(_run(backend_fbp, 14, 'bui')['sfc'])
-    assert np.isfinite(_run(backend_fbp, 2, 'ffmc')['rso'])
-
-
-def test_finite_baseline_is_unchanged(backend_fbp):
-    assert _run(backend_fbp, 2)['sfc'] == pytest.approx(2.9136045, abs=1e-7)
-
-
-# ── Python/Rust parity on the same scenario, one cell per modeled fuel ─────────
-GRID_FIELDS = ['hros', 'bros', 'raz', 'wsv', 'hfi', 'rso', 'sros', 'sfc', 'fmc', 'accel']
-CELL_INPUTS = ['lat', 'long', 'elevation', 'slope', 'aspect', 'pc', 'gcf', 'ws', 'wd']
 
 
 def _parity(missing, percentile):
@@ -108,10 +69,51 @@ def _parity(missing, percentile):
             f'py={a[~same].tolist()} rs={b[~same].tolist()}')
 
 
+def _run(backend_fbp, fuel, missing=None):
+    """One-cell run with every input passed as an array; ``missing`` is set to NaN."""
+    kwargs = {k: np.array([[v]]) for k, v in SCENARIO.items()}
+    if missing is not None:
+        kwargs[missing] = np.array([[np.nan]])
+    fbp = backend_fbp()
+    fbp.initialize(fuel_type=np.array([[fuel]], dtype=np.float64), wx_date=20230615,
+                   out_request=FIELDS, **kwargs)
+    out = fbp.runFBP()
+    return {name: float(np.ma.asarray(arr).astype(np.float64).filled(np.nan).ravel()[0])
+            for name, arr in zip(FIELDS, out, strict=True)}
+
+
+# ---- missing tests ----
+@pytest.mark.parametrize('missing', ['bui', 'ffmc'])
+@pytest.mark.parametrize('fuel', FUELS)
+def test_missing_input_propagates_to_dependent_surface_outputs(backend_fbp, fuel, missing):
+    base = _run(backend_fbp, fuel)
+    got = _run(backend_fbp, fuel, missing)
+    nan = _expected_nan(fuel, missing)
+    for name in sorted(nan):
+        assert np.isnan(got[name]), f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected NaN'
+    # rso does not follow the spread: it keeps its finite value unless the input feeds sfc.
+    for name in sorted({'rso'} - nan):
+        assert np.array_equal(got[name], base[name], equal_nan=True), (
+            f'fuel {fuel}, NaN {missing}: {name} = {got[name]!r}, expected {base[name]!r}')
+
+
 @pytest.mark.parametrize('percentile', [50, 90])
 @pytest.mark.parametrize('missing', ['bui', 'ffmc', 'lat'])
 def test_missing_input_matches_rust(missing, percentile):
     _parity(missing, percentile)
+
+
+# ---- other tests ----
+def test_consumption_is_missing_when_the_spread_is_missing(backend_fbp):
+    # sfc does not use ffmc for C-2, bui for C-1 or bui for O-1a, but their spread does
+    assert np.isnan(_run(backend_fbp, 2, 'ffmc')['sfc'])
+    assert np.isnan(_run(backend_fbp, 1, 'bui')['sfc'])
+    assert np.isnan(_run(backend_fbp, 14, 'bui')['sfc'])
+    assert np.isfinite(_run(backend_fbp, 2, 'ffmc')['rso'])
+
+
+def test_finite_baseline_is_unchanged(backend_fbp):
+    assert _run(backend_fbp, 2)['sfc'] == pytest.approx(2.9136045, abs=1e-7)
 
 
 @pytest.mark.parametrize('missing', ['gfl', 'pdf'])

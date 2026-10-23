@@ -18,6 +18,14 @@ INPUTS = ('lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bu
 BASE = dict(wx_date=20230615, lat=52., long=-115., elevation=800., slope=10., aspect=180., ws=20., wd=270., ffmc=90.,
             bui=80., pc=50., pdf=35., gfl=0.35, gcf=80.)
 
+BACKENDS = ['python', 'rust']
+
+
+# ---- helpers ----
+def cell(results, i):
+    flat = [np.asarray(r).ravel() for r in results]
+    return {n: (r[i] if r.size > 1 else r[0]) for n, r in zip(ALL, flat, strict=True)}
+
 
 def model(backend, fuel, missing_cells=(), **changes):
     """A grid (or scalar) model; ``missing_cells`` have every input except the fuel set to NaN."""
@@ -31,20 +39,13 @@ def model(backend, fuel, missing_cells=(), **changes):
     return fbp
 
 
-def cell(results, i):
-    flat = [np.asarray(r).ravel() for r in results]
-    return {n: (r[i] if r.size > 1 else r[0]) for n, r in zip(ALL, flat, strict=True)}
-
-
 def same(a, b, what=''):
     for name in ALL:
         x, y = a[name], b[name]
         assert (np.isnan(x) and np.isnan(y)) or x == y, (what, name, x, y)
 
 
-BACKENDS = ['python', 'rust']
-
-
+# ---- fuel tests ----
 @pytest.mark.parametrize('backend', BACKENDS)
 @pytest.mark.parametrize('fuel_code', [2, 6, 10, 14])
 def test_a_fuel_masked_cell_behaves_like_invalid_fuel_with_every_other_input_missing(backend, fuel_code):
@@ -55,6 +56,14 @@ def test_a_fuel_masked_cell_behaves_like_invalid_fuel_with_every_other_input_mis
     assert masked['fuel_type'] == 0
 
 
+@pytest.mark.parametrize('backend', BACKENDS)
+def test_fuel_independent_outputs_are_missing_in_a_masked_cell(backend):
+    out = cell(model(backend, np.ma.array([2, 2, 6], mask=[True, False, False])).runFBP(), 0)
+    for name in ('fmc', 'fme', 'latn', 'nd', 'ws', 'ffmc', 'bui', 'm', 'sf'):
+        assert np.isnan(out[name]), name
+
+
+# ---- other tests ----
 @pytest.mark.parametrize('backend', BACKENDS)
 def test_other_cells_are_untouched(backend):
     fuel = np.ma.array([2, 2, 6], mask=[True, False, False])
@@ -78,13 +87,6 @@ def test_an_invalid_code_is_the_same_as_a_masked_fuel(backend, code):
 def test_non_fuel_and_water_are_valid_codes_and_stay_unmasked(backend, code):
     out = cell(model(backend, np.array([code, 2, 6])).runFBP(), 0)
     assert np.isfinite(out['fmc']) and np.isfinite(out['ws']) and out['fuel_type'] == code
-
-
-@pytest.mark.parametrize('backend', BACKENDS)
-def test_fuel_independent_outputs_are_missing_in_a_masked_cell(backend):
-    out = cell(model(backend, np.ma.array([2, 2, 6], mask=[True, False, False])).runFBP(), 0)
-    for name in ('fmc', 'fme', 'latn', 'nd', 'ws', 'ffmc', 'bui', 'm', 'sf'):
-        assert np.isnan(out[name]), name
 
 
 @pytest.mark.parametrize('backend', BACKENDS)

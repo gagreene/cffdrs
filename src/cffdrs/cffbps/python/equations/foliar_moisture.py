@@ -45,21 +45,6 @@ def _resolve(override, derived: MaskedArray) -> MaskedArray:
     return mask.where(calculate, derived, given)
 
 
-def calc_latn(*,
-              long: MaskedArray,
-              elevation: MaskedArray,
-              ) -> MaskedArray:
-    """Calculate the normalized latitude (LATN) from longitude and the elevation branch.
-
-    :param long: longitude (decimal degrees)
-    :param elevation: elevation (m)
-    :return: LATN
-    """
-    return mask.where((elevation is not None) & (elevation > 0),
-                      43 + (33.7 * np.exp(-0.0351 * (150 - np.abs(long)))),
-                      46 + (23.4 * (np.exp(-0.036 * (150 - np.abs(long))))))
-
-
 def calc_d0(*,
             lat: MaskedArray,
             latn: MaskedArray,
@@ -96,19 +81,6 @@ def calc_dj(*,
     return mask.where(np.isfinite(latn),
                       dt.strptime(str(wx_date), '%Y%m%d').timetuple().tm_yday,
                       0)
-
-
-def calc_nd(*,
-            dj: MaskedArray,
-            d0: MaskedArray,
-            ) -> MaskedArray:
-    """Calculate the number of days between the modelled day and the date of minimum foliar moisture (ND).
-
-    :param dj: Julian date of the modelled day
-    :param d0: date of minimum foliar moisture content
-    :return: ND (days, always non-negative)
-    """
-    return np.absolute(dj - d0)
 
 
 def calc_fmc(*,
@@ -175,3 +147,31 @@ def calc_foliar_moisture(*,
         fmc = _resolve(fmc_override, fmc)
     fme = calc_fme(fmc=fmc)
     return FoliarMoistureResult(latn=latn, d0=d0, dj=dj, nd=nd, fmc=fmc, fme=fme)
+
+
+def calc_latn(*,
+              long: MaskedArray,
+              elevation: MaskedArray,
+              ) -> MaskedArray:
+    """Calculate the normalized latitude (LATN) from longitude and the elevation branch.
+
+    :param long: longitude (decimal degrees)
+    :param elevation: elevation (m)
+    :return: LATN
+    """
+    return mask.where((elevation is not None) & (elevation > 0),
+                      43 + (33.7 * np.exp(-0.0351 * (150 - np.abs(long)))),
+                      46 + (23.4 * (np.exp(-0.036 * (150 - np.abs(long))))))
+
+
+def calc_nd(*,
+            dj: MaskedArray,
+            d0: MaskedArray,
+            ) -> MaskedArray:
+    """Calculate the number of days between the modelled day and the date of minimum foliar moisture (ND).
+
+    :param dj: Julian date of the modelled day
+    :param d0: date of minimum foliar moisture content
+    :return: ND (days, always non-negative)
+    """
+    return np.absolute(dj - d0)

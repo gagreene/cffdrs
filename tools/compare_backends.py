@@ -26,46 +26,6 @@ BASE = dict(wx_date=20230615, lat=55.0, long=-110.0, elevation=500.0, slope=10.0
             ws=20.0, wd=0.0, ffmc=90.0, bui=80.0)
 
 
-def scenarios():
-    """Yield (label, kwargs) for scalar and array input."""
-    for shape in ('scalar', 'array', 'mixed'):
-        scalar = shape == 'scalar'
-        for fuel in FUELS:
-            for missing in [None, *INPUTS, 'fuel']:
-                for percentile in (50, 90):
-                    kw = dict(BASE, percentile_growth=percentile, out_request=NAMES)
-                    kw['fuel_type'] = fuel
-                    if missing in INPUTS:
-                        kw[missing] = np.nan
-                    if shape == 'mixed':
-                        kw['fuel_type'] = np.array([[fuel, fuel]])
-                        yield f'{shape} fuel={fuel} missing={missing} p={percentile}', kw
-                        continue
-                    if not scalar:
-                        kw = {k: (np.full((1, 2), v) if k in INPUTS else v) for k, v in kw.items()}
-                        kw['fuel_type'] = np.array([[fuel, fuel]])
-                        if missing in INPUTS:
-                            kw[missing][0, 0] = np.nan
-                    if missing == 'fuel':
-                        kw['fuel_type'] = np.ma.masked_array(np.array([[fuel, fuel]]), mask=[[True, False]]) \
-                            if not scalar else -1
-                    yield f'{shape} fuel={fuel} missing={missing} p={percentile}', kw
-
-
-def run(cls, kw, stage):
-    model = cls()
-    model.initialize(**kw)
-    if stage == 'init':
-        return model.getParams(NAMES)
-    if stage == 'run':
-        return model.runFBP()
-    for step in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcFMC'):
-        getattr(model, step)()
-        if step == stage:
-            break
-    return model.getParams(NAMES)
-
-
 def compare(py, rs):
     """Return the set of difference kinds between one Python and one Rust output."""
     kinds = set()
@@ -119,6 +79,46 @@ def main():
                 print(f'| {name} | {kind} | {count} | {example} |')
             else:
                 print(f'{name:12s} {kind:10s} {count:6d}  {example}')
+
+
+def run(cls, kw, stage):
+    model = cls()
+    model.initialize(**kw)
+    if stage == 'init':
+        return model.getParams(NAMES)
+    if stage == 'run':
+        return model.runFBP()
+    for step in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcFMC'):
+        getattr(model, step)()
+        if step == stage:
+            break
+    return model.getParams(NAMES)
+
+
+def scenarios():
+    """Yield (label, kwargs) for scalar and array input."""
+    for shape in ('scalar', 'array', 'mixed'):
+        scalar = shape == 'scalar'
+        for fuel in FUELS:
+            for missing in [None, *INPUTS, 'fuel']:
+                for percentile in (50, 90):
+                    kw = dict(BASE, percentile_growth=percentile, out_request=NAMES)
+                    kw['fuel_type'] = fuel
+                    if missing in INPUTS:
+                        kw[missing] = np.nan
+                    if shape == 'mixed':
+                        kw['fuel_type'] = np.array([[fuel, fuel]])
+                        yield f'{shape} fuel={fuel} missing={missing} p={percentile}', kw
+                        continue
+                    if not scalar:
+                        kw = {k: (np.full((1, 2), v) if k in INPUTS else v) for k, v in kw.items()}
+                        kw['fuel_type'] = np.array([[fuel, fuel]])
+                        if missing in INPUTS:
+                            kw[missing][0, 0] = np.nan
+                    if missing == 'fuel':
+                        kw['fuel_type'] = np.ma.masked_array(np.array([[fuel, fuel]]), mask=[[True, False]]) \
+                            if not scalar else -1
+                    yield f'{shape} fuel={fuel} missing={missing} p={percentile}', kw
 
 
 if __name__ == '__main__':

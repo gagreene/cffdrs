@@ -6,18 +6,12 @@
 //! engine contract (every requested field NaN).
 
 mod common;
-
 use cffbps_rust::field::Field;
 use cffbps_rust::grid::{run_grid_fields, GridInput, NonModeled, PerCell};
 use serde_json::Value;
 
 /// Golden tolerance (the shared fixtures' rtol).
 const RTOL: f64 = 1e-9;
-
-fn number(v: &Value) -> f64 {
-    // `null` is a NaN (missing) value in the snapshots.
-    v.as_f64().unwrap_or(f64::NAN)
-}
 
 struct Scenario {
     name: String,
@@ -34,16 +28,12 @@ impl Scenario {
     }
 }
 
-fn scenarios(snapshot: &Value) -> Vec<Scenario> {
-    snapshot["scenarios"]
-        .as_array()
-        .expect("scenarios")
-        .iter()
-        .map(|s| Scenario {
-            name: s["name"].as_str().expect("name").to_owned(),
-            inputs: s["inputs"].as_object().expect("inputs").clone(),
-        })
-        .collect()
+// ---- helpers ----
+fn close(got: f64, want: f64) -> bool {
+    if want.is_nan() {
+        return got.is_nan();
+    }
+    got == want || (got - want).abs() <= RTOL * want.abs()
 }
 
 fn grid<'a>(fuel: &'a [i32], s: &Scenario, wx_date: i64) -> GridInput<'a> {
@@ -70,13 +60,24 @@ fn grid<'a>(fuel: &'a [i32], s: &Scenario, wx_date: i64) -> GridInput<'a> {
     }
 }
 
-fn close(got: f64, want: f64) -> bool {
-    if want.is_nan() {
-        return got.is_nan();
-    }
-    got == want || (got - want).abs() <= RTOL * want.abs()
+fn number(v: &Value) -> f64 {
+    // `null` is a NaN (missing) value in the snapshots.
+    v.as_f64().unwrap_or(f64::NAN)
 }
 
+fn scenarios(snapshot: &Value) -> Vec<Scenario> {
+    snapshot["scenarios"]
+        .as_array()
+        .expect("scenarios")
+        .iter()
+        .map(|s| Scenario {
+            name: s["name"].as_str().expect("name").to_owned(),
+            inputs: s["inputs"].as_object().expect("inputs").clone(),
+        })
+        .collect()
+}
+
+// ---- other tests ----
 #[test]
 fn python_compat_equals_the_python_values_for_every_output() {
     let snapshot = common::load_snapshot("non_modeled_snapshot.json");

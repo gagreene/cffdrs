@@ -59,102 +59,6 @@ class ISIRSIBEResult(NamedTuple):
     bisi: MaskedArray
 
 
-def invert_wind_aspect(wd: MaskedArray, aspect: MaskedArray) -> tuple[MaskedArray, MaskedArray]:
-    """Invert/flip wind direction and aspect by 180 degrees.
-
-    :return: (wd, aspect) inverted
-    """
-    wd = mask.where(wd > 180, wd - 180, wd + 180)
-    aspect = mask.where(aspect > 180, aspect - 180, aspect + 180)
-    return wd, aspect
-
-
-def calc_sf(slope: MaskedArray) -> MaskedArray:
-    """Calculate the slope factor (SF)."""
-    return mask.where(slope < 70,
-                      np.exp(3.533 * np.power((slope / 100), 1.2)),
-                      10)
-
-
-def calc_isz(ffmc: MaskedArray) -> tuple[MaskedArray, MaskedArray, MaskedArray]:
-    """Calculate the no-wind/no-slope Initial Spread Index.
-
-    :return: (m, fF, isz) — fine fuel moisture content (%), the FFMC function in the
-        ISI equation, and the zero-wind/zero-slope ISI.
-    """
-    with np.errstate(invalid='ignore'):
-        # Fine fuel moisture content in percent (default CFFBPS equation)
-        m = (250 * (59.5 / 101) * (101 - ffmc)) / (59.5 + ffmc)
-
-        # FFMC function from the ISI equation (fF)
-        fF = (91.9 * np.exp(-0.1386 * m)) * (1 + (np.power(m, 5.31) / (4.93 * np.power(10, 7))))
-
-        # No slope/no wind Initial Spread Index
-        isz = 0.208 * fF
-
-    return m, fF, isz
-
-
-def calc_slope_wind_isi(*,
-                        isf: MaskedArray,
-                        fF: MaskedArray,
-                        wd: MaskedArray,
-                        aspect: MaskedArray,
-                        ws: MaskedArray) -> SlopeWindISI:
-    """Compute slope-equivalent wind, net wind vectors, RAZ, and wind-adjusted ISI."""
-    with np.errstate(invalid='ignore', divide='ignore'):
-        # Calculate slope-equivalent wind speeds using two formulas
-        wse1 = (1 / 0.05039) * mask.log(isf / (0.208 * fF))
-        wse2 = mask.where(
-            isf < 0.999 * 2.496 * fF,
-            28 - (1 / 0.0818) * np.log(1 - (isf / (2.496 * fF))),
-            112.45  # cap maximum WSE
-        )
-
-        # Assign slope equivalent wind speed
-        wse = mask.where(wse1 <= 40, wse1, wse2)
-
-        # Compute directional components for wind and slope
-        sin_wd = mask.sin(np.radians(wd))
-        cos_wd = mask.cos(np.radians(wd))
-        sin_asp = mask.sin(np.radians(aspect))
-        cos_asp = mask.cos(np.radians(aspect))
-
-        # Net wind vectors
-        wsx = ws * sin_wd + wse * sin_asp
-        wsy = ws * cos_wd + wse * cos_asp
-        wsv = mask.sqrt(wsx ** 2 + wsy ** 2)
-
-        # Wind azimuth calculation (RAZ)
-        acos_val = mask.clip(wsy / wsv, -1, 1)
-        angle_rad = mask.arccos(acos_val)
-        raz = mask.where(
-            wsx < 0,
-            360 - np.degrees(angle_rad),
-            np.degrees(angle_rad)
-        )
-
-        # When wsv == 0 (calm wind on flat ground, or exact wind/slope cancellation) the
-        # azimuth is undefined. Spread is circular in this state (lb_ratio == 1),
-        # so the direction is immaterial — substitute 0° to keep raz finite for downstream consumers.
-        raz = mask.where(wsv > 0, raz, 0.0)
-
-        # Compute head fire and backfire wind function
-        fW = mask.where(
-            wsv > 40,
-            12 * (1 - np.exp(-0.0818 * (wsv - 28))),
-            np.exp(0.05039 * wsv)
-        )
-        bfW = mask.exp(-0.05039 * wsv)
-
-        # Final head fire and backfire ISI
-        isi = 0.208 * fF * fW
-        bisi = 0.208 * fF * bfW
-
-    return SlopeWindISI(wse1=wse1, wse2=wse2, wse=wse, wsx=wsx, wsy=wsy, wsv=wsv,
-                        raz=raz, fW=fW, bfW=bfW, isi=isi, bisi=bisi)
-
-
 def calc_isi_rsi_be(*,
                     fuel_type: MaskedArray,
                     ros_params: Mapping[int, tuple],
@@ -322,3 +226,99 @@ def calc_isi_rsi_be(*,
         wse1=sw.wse1, wse2=sw.wse2, wse=sw.wse, wsx=sw.wsx, wsy=sw.wsy, wsv=sw.wsv,
         raz=sw.raz, fW=sw.fW, bfW=sw.bfW, isi=sw.isi, bisi=sw.bisi,
     )
+
+
+def calc_isz(ffmc: MaskedArray) -> tuple[MaskedArray, MaskedArray, MaskedArray]:
+    """Calculate the no-wind/no-slope Initial Spread Index.
+
+    :return: (m, fF, isz) — fine fuel moisture content (%), the FFMC function in the
+        ISI equation, and the zero-wind/zero-slope ISI.
+    """
+    with np.errstate(invalid='ignore'):
+        # Fine fuel moisture content in percent (default CFFBPS equation)
+        m = (250 * (59.5 / 101) * (101 - ffmc)) / (59.5 + ffmc)
+
+        # FFMC function from the ISI equation (fF)
+        fF = (91.9 * np.exp(-0.1386 * m)) * (1 + (np.power(m, 5.31) / (4.93 * np.power(10, 7))))
+
+        # No slope/no wind Initial Spread Index
+        isz = 0.208 * fF
+
+    return m, fF, isz
+
+
+def calc_sf(slope: MaskedArray) -> MaskedArray:
+    """Calculate the slope factor (SF)."""
+    return mask.where(slope < 70,
+                      np.exp(3.533 * np.power((slope / 100), 1.2)),
+                      10)
+
+
+def calc_slope_wind_isi(*,
+                        isf: MaskedArray,
+                        fF: MaskedArray,
+                        wd: MaskedArray,
+                        aspect: MaskedArray,
+                        ws: MaskedArray) -> SlopeWindISI:
+    """Compute slope-equivalent wind, net wind vectors, RAZ, and wind-adjusted ISI."""
+    with np.errstate(invalid='ignore', divide='ignore'):
+        # Calculate slope-equivalent wind speeds using two formulas
+        wse1 = (1 / 0.05039) * mask.log(isf / (0.208 * fF))
+        wse2 = mask.where(
+            isf < 0.999 * 2.496 * fF,
+            28 - (1 / 0.0818) * np.log(1 - (isf / (2.496 * fF))),
+            112.45  # cap maximum WSE
+        )
+
+        # Assign slope equivalent wind speed
+        wse = mask.where(wse1 <= 40, wse1, wse2)
+
+        # Compute directional components for wind and slope
+        sin_wd = mask.sin(np.radians(wd))
+        cos_wd = mask.cos(np.radians(wd))
+        sin_asp = mask.sin(np.radians(aspect))
+        cos_asp = mask.cos(np.radians(aspect))
+
+        # Net wind vectors
+        wsx = ws * sin_wd + wse * sin_asp
+        wsy = ws * cos_wd + wse * cos_asp
+        wsv = mask.sqrt(wsx ** 2 + wsy ** 2)
+
+        # Wind azimuth calculation (RAZ)
+        acos_val = mask.clip(wsy / wsv, -1, 1)
+        angle_rad = mask.arccos(acos_val)
+        raz = mask.where(
+            wsx < 0,
+            360 - np.degrees(angle_rad),
+            np.degrees(angle_rad)
+        )
+
+        # When wsv == 0 (calm wind on flat ground, or exact wind/slope cancellation) the
+        # azimuth is undefined. Spread is circular in this state (lb_ratio == 1),
+        # so the direction is immaterial — substitute 0° to keep raz finite for downstream consumers.
+        raz = mask.where(wsv > 0, raz, 0.0)
+
+        # Compute head fire and backfire wind function
+        fW = mask.where(
+            wsv > 40,
+            12 * (1 - np.exp(-0.0818 * (wsv - 28))),
+            np.exp(0.05039 * wsv)
+        )
+        bfW = mask.exp(-0.05039 * wsv)
+
+        # Final head fire and backfire ISI
+        isi = 0.208 * fF * fW
+        bisi = 0.208 * fF * bfW
+
+    return SlopeWindISI(wse1=wse1, wse2=wse2, wse=wse, wsx=wsx, wsy=wsy, wsv=wsv,
+                        raz=raz, fW=fW, bfW=bfW, isi=isi, bisi=bisi)
+
+
+def invert_wind_aspect(wd: MaskedArray, aspect: MaskedArray) -> tuple[MaskedArray, MaskedArray]:
+    """Invert/flip wind direction and aspect by 180 degrees.
+
+    :return: (wd, aspect) inverted
+    """
+    wd = mask.where(wd > 180, wd - 180, wd + 180)
+    aspect = mask.where(aspect > 180, aspect - 180, aspect + 180)
+    return wd, aspect

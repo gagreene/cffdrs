@@ -90,6 +90,53 @@ const fn rp(a: f64, b: f64, c: f64, q: f64, bui0: f64, be_max: f64) -> RosParams
 }
 
 impl FuelType {
+    /// The integer fuel code; the inverse of [`FuelType::from_code`].
+    #[must_use]
+    pub const fn code(self) -> i32 {
+        match self {
+            Self::C1 => 1,
+            Self::C2 => 2,
+            Self::C3 => 3,
+            Self::C4 => 4,
+            Self::C5 => 5,
+            Self::C6 => 6,
+            Self::C7 => 7,
+            Self::D1 => 8,
+            Self::D2 => 9,
+            Self::M1 => 10,
+            Self::M2 => 11,
+            Self::M3 => 12,
+            Self::M4 => 13,
+            Self::O1a => 14,
+            Self::O1b => 15,
+            Self::S1 => 16,
+            Self::S2 => 17,
+            Self::S3 => 18,
+            Self::NonFuel => 19,
+            Self::Water => 20,
+            Self::Unknown(code) => code,
+        }
+    }
+
+    /// Crown base height and foliar load; NaN for fuels without an entry.
+    pub(crate) fn crown_fuel(self) -> CrownFuel {
+        let (cbh, cfl) = match self {
+            Self::C1 => (2.0, 0.75),
+            Self::C2 => (3.0, 0.8),
+            Self::C3 => (8.0, 1.15),
+            Self::C4 => (4.0, 1.2),
+            Self::C5 => (18.0, 1.2),
+            Self::C6 => (7.0, 1.8),
+            Self::C7 => (10.0, 0.5),
+            Self::D1 | Self::D2 | Self::O1a | Self::O1b | Self::S1 | Self::S2 | Self::S3 => {
+                (0.0, 0.0)
+            }
+            Self::M1 | Self::M2 | Self::M3 | Self::M4 => (6.0, 0.8),
+            Self::NonFuel | Self::Water | Self::Unknown(_) => (f64::NAN, f64::NAN),
+        };
+        CrownFuel { cbh, cfl }
+    }
+
     /// Convert an integer fuel code to a `FuelType`. Total: codes outside
     /// 1..=20 become `Unknown(code)`.
     #[must_use]
@@ -119,58 +166,6 @@ impl FuelType {
         }
     }
 
-    /// The integer fuel code; the inverse of [`FuelType::from_code`].
-    #[must_use]
-    pub const fn code(self) -> i32 {
-        match self {
-            Self::C1 => 1,
-            Self::C2 => 2,
-            Self::C3 => 3,
-            Self::C4 => 4,
-            Self::C5 => 5,
-            Self::C6 => 6,
-            Self::C7 => 7,
-            Self::D1 => 8,
-            Self::D2 => 9,
-            Self::M1 => 10,
-            Self::M2 => 11,
-            Self::M3 => 12,
-            Self::M4 => 13,
-            Self::O1a => 14,
-            Self::O1b => 15,
-            Self::S1 => 16,
-            Self::S2 => 17,
-            Self::S3 => 18,
-            Self::NonFuel => 19,
-            Self::Water => 20,
-            Self::Unknown(code) => code,
-        }
-    }
-
-    /// True for the modeled fuels (codes 1..=18).
-    #[must_use]
-    pub const fn is_modeled(self) -> bool {
-        matches!(self.code(), 1..=18)
-    }
-
-    /// True for open fuels (`constants.open_fuel_types`).
-    #[must_use]
-    pub const fn is_open(self) -> bool {
-        matches!(
-            self,
-            Self::C1 | Self::C7 | Self::D2 | Self::O1a | Self::O1b | Self::S1 | Self::S2 | Self::S3
-        )
-    }
-
-    /// True for fuels that never crown (`constants.non_crowning_fuels`).
-    #[must_use]
-    pub const fn is_non_crowning(self) -> bool {
-        matches!(
-            self,
-            Self::D1 | Self::D2 | Self::O1a | Self::O1b | Self::S1 | Self::S2 | Self::S3
-        )
-    }
-
     // The two predicates below are deliberately threshold comparisons on the
     // code, not variant sets: an unknown NEGATIVE code (`Unknown(-1)`) keeps
     // taking the "modeled" path, as the original `code < 14` / `code < 19`
@@ -182,11 +177,12 @@ impl FuelType {
         self.code() < 14
     }
 
-    /// Fuels that get a fire type class: every code below 19 (the modeled
-    /// fuels, plus unknown negative codes, see above); non-fuel, water and
-    /// codes above 20 do not.
-    pub(crate) const fn is_fuel(self) -> bool {
-        self.code() < 19
+    /// Crown-regime fuels for percentile growth (C-1..C-4, C-6, C-7).
+    pub(crate) const fn has_crown_regime(self) -> bool {
+        matches!(
+            self,
+            Self::C1 | Self::C2 | Self::C3 | Self::C4 | Self::C6 | Self::C7
+        )
     }
 
     /// Surface-regime fuels for percentile growth (C-2..C-7).
@@ -197,11 +193,34 @@ impl FuelType {
         )
     }
 
-    /// Crown-regime fuels for percentile growth (C-1..C-4, C-6, C-7).
-    pub(crate) const fn has_crown_regime(self) -> bool {
+    /// Fuels that get a fire type class: every code below 19 (the modeled
+    /// fuels, plus unknown negative codes, see above); non-fuel, water and
+    /// codes above 20 do not.
+    pub(crate) const fn is_fuel(self) -> bool {
+        self.code() < 19
+    }
+
+    /// True for the modeled fuels (codes 1..=18).
+    #[must_use]
+    pub const fn is_modeled(self) -> bool {
+        matches!(self.code(), 1..=18)
+    }
+
+    /// True for fuels that never crown (`constants.non_crowning_fuels`).
+    #[must_use]
+    pub const fn is_non_crowning(self) -> bool {
         matches!(
             self,
-            Self::C1 | Self::C2 | Self::C3 | Self::C4 | Self::C6 | Self::C7
+            Self::D1 | Self::D2 | Self::O1a | Self::O1b | Self::S1 | Self::S2 | Self::S3
+        )
+    }
+
+    /// True for open fuels (`constants.open_fuel_types`).
+    #[must_use]
+    pub const fn is_open(self) -> bool {
+        matches!(
+            self,
+            Self::C1 | Self::C7 | Self::D2 | Self::O1a | Self::O1b | Self::S1 | Self::S2 | Self::S3
         )
     }
 
@@ -234,30 +253,51 @@ impl FuelType {
             Self::NonFuel | Self::Water | Self::Unknown(_) => rp(0.0, 0.0, 0.0, 0.0, 1.0, 1.0),
         }
     }
-
-    /// Crown base height and foliar load; NaN for fuels without an entry.
-    pub(crate) fn crown_fuel(self) -> CrownFuel {
-        let (cbh, cfl) = match self {
-            Self::C1 => (2.0, 0.75),
-            Self::C2 => (3.0, 0.8),
-            Self::C3 => (8.0, 1.15),
-            Self::C4 => (4.0, 1.2),
-            Self::C5 => (18.0, 1.2),
-            Self::C6 => (7.0, 1.8),
-            Self::C7 => (10.0, 0.5),
-            Self::D1 | Self::D2 | Self::O1a | Self::O1b | Self::S1 | Self::S2 | Self::S3 => {
-                (0.0, 0.0)
-            }
-            Self::M1 | Self::M2 | Self::M3 | Self::M4 => (6.0, 0.8),
-            Self::NonFuel | Self::Water | Self::Unknown(_) => (f64::NAN, f64::NAN),
-        };
-        CrownFuel { cbh, cfl }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---- helpers ----
+    /// (cbh, cfl) — `constants.fbpCBH_CFL_HT_LUT` (height column unused here).
+    fn old_cbh_cfl(fuel_type: i32) -> (f64, f64) {
+        const NAN: f64 = f64::NAN;
+        match fuel_type {
+            1 => (2.0, 0.75),
+            2 => (3.0, 0.8),
+            3 => (8.0, 1.15),
+            4 => (4.0, 1.2),
+            5 => (18.0, 1.2),
+            6 => (7.0, 1.8),
+            7 => (10.0, 0.5),
+            8 | 9 | 14 | 15 | 16 | 17 | 18 => (0.0, 0.0),
+            10..=13 => (6.0, 0.8),
+            _ => (NAN, NAN),
+        }
+    }
+
+    fn old_has_crown(fuel_type: i32) -> bool {
+        matches!(fuel_type, 1 | 2 | 3 | 4 | 6 | 7)
+    }
+
+    fn old_has_surface(fuel_type: i32) -> bool {
+        matches!(fuel_type, 2..=7)
+    }
+
+    fn old_is_modeled(fuel_type: i32) -> bool {
+        (1..=18).contains(&fuel_type)
+    }
+
+    /// `constants.non_crowning_fuels`
+    fn old_is_non_crowning(fuel_type: i32) -> bool {
+        matches!(fuel_type, 8 | 9 | 14 | 15 | 16 | 17 | 18)
+    }
+
+    /// `constants.open_fuel_types`
+    fn old_is_open_fuel(fuel_type: i32) -> bool {
+        matches!(fuel_type, 1 | 7 | 9 | 14 | 15 | 16 | 17 | 18)
+    }
 
     // Verbatim copies of the pre-refactor integer logic from fbp.rs, kept as
     // the reference the enum must reproduce for every code.
@@ -291,49 +331,11 @@ mod tests {
         }
     }
 
-    /// (cbh, cfl) — `constants.fbpCBH_CFL_HT_LUT` (height column unused here).
-    fn old_cbh_cfl(fuel_type: i32) -> (f64, f64) {
-        const NAN: f64 = f64::NAN;
-        match fuel_type {
-            1 => (2.0, 0.75),
-            2 => (3.0, 0.8),
-            3 => (8.0, 1.15),
-            4 => (4.0, 1.2),
-            5 => (18.0, 1.2),
-            6 => (7.0, 1.8),
-            7 => (10.0, 0.5),
-            8 | 9 | 14 | 15 | 16 | 17 | 18 => (0.0, 0.0),
-            10..=13 => (6.0, 0.8),
-            _ => (NAN, NAN),
-        }
-    }
-
-    fn old_is_modeled(fuel_type: i32) -> bool {
-        (1..=18).contains(&fuel_type)
-    }
-
-    /// `constants.open_fuel_types`
-    fn old_is_open_fuel(fuel_type: i32) -> bool {
-        matches!(fuel_type, 1 | 7 | 9 | 14 | 15 | 16 | 17 | 18)
-    }
-
-    /// `constants.non_crowning_fuels`
-    fn old_is_non_crowning(fuel_type: i32) -> bool {
-        matches!(fuel_type, 8 | 9 | 14 | 15 | 16 | 17 | 18)
-    }
-
-    fn old_has_surface(fuel_type: i32) -> bool {
-        matches!(fuel_type, 2..=7)
-    }
-
-    fn old_has_crown(fuel_type: i32) -> bool {
-        matches!(fuel_type, 1 | 2 | 3 | 4 | 6 | 7)
-    }
-
     fn same(a: f64, b: f64) -> bool {
         a.to_bits() == b.to_bits() || (a.is_nan() && b.is_nan())
     }
 
+    // ---- code tests ----
     #[test]
     fn code_round_trips_for_every_code() {
         for code in -3..=25 {
@@ -349,6 +351,26 @@ mod tests {
         assert_eq!(FuelType::from_code(-1), FuelType::Unknown(-1));
     }
 
+    #[test]
+    fn code_comparisons_match_old_thresholds() {
+        // crown.rs used to compare `ft.code() < 14` (csfi) and
+        // `ft.code() < 19` (fire type); the named predicates must give the
+        // same answer for every code, unknown negative codes included.
+        for code in -3..=25 {
+            let ft = FuelType::from_code(code);
+            assert_eq!(ft.code() < 14, code < 14);
+            assert_eq!(ft.code() < 19, code < 19);
+            assert_eq!(ft.has_crown_initiation(), code < 14, "csfi {code}");
+            assert_eq!(ft.is_fuel(), code < 19, "fire type {code}");
+        }
+        for code in [i32::MIN, i32::MIN + 1, i32::MAX] {
+            let ft = FuelType::from_code(code);
+            assert_eq!(ft.has_crown_initiation(), code < 14, "csfi {code}");
+            assert_eq!(ft.is_fuel(), code < 19, "fire type {code}");
+        }
+    }
+
+    // ---- other tests ----
     #[test]
     fn predicates_match_old_integer_logic() {
         for code in -3..=25 {
@@ -392,25 +414,6 @@ mod tests {
                 cf.cbh,
                 cf.cfl
             );
-        }
-    }
-
-    #[test]
-    fn code_comparisons_match_old_thresholds() {
-        // crown.rs used to compare `ft.code() < 14` (csfi) and
-        // `ft.code() < 19` (fire type); the named predicates must give the
-        // same answer for every code, unknown negative codes included.
-        for code in -3..=25 {
-            let ft = FuelType::from_code(code);
-            assert_eq!(ft.code() < 14, code < 14);
-            assert_eq!(ft.code() < 19, code < 19);
-            assert_eq!(ft.has_crown_initiation(), code < 14, "csfi {code}");
-            assert_eq!(ft.is_fuel(), code < 19, "fire type {code}");
-        }
-        for code in [i32::MIN, i32::MIN + 1, i32::MAX] {
-            let ft = FuelType::from_code(code);
-            assert_eq!(ft.has_crown_initiation(), code < 14, "csfi {code}");
-            assert_eq!(ft.is_fuel(), code < 19, "fire type {code}");
         }
     }
 

@@ -44,24 +44,24 @@ _WOTTON_COLS = {"fire_type": 15, "hros": 18, "hfi": 21, "cfb": 24, "wsv": 27, "r
 _FIRE_TYPE_LETTER = {1: "S", 2: "I", 3: "C"}
 
 
-def _load_scalar_golden() -> dict:
-    with open(wh.SCALAR_GOLDEN) as fh:
-        return json.load(fh)
+# ---- helpers ----
+# ── Layer 1: physical validation against published Wotton (2009) values ───────
+def _angular_diff(a: float, b: float) -> float:
+    """Smallest absolute difference between two azimuths in degrees (0 == 360)."""
+    d = abs(a - b) % 360.0
+    return min(d, 360.0 - d)
 
 
-def _load_array_golden() -> dict:
-    with open(wh.ARRAY_GOLDEN) as fh:
-        return json.load(fh)
-
-
-@pytest.fixture(scope="module")
-def scalar_golden() -> dict:
-    return _load_scalar_golden()
-
-
-@pytest.fixture(scope="module")
-def array_golden() -> dict:
-    return _load_array_golden()
+def _array_equal_at_float32(got_rows, golden_rows) -> bool:
+    """Element-wise ``_equal_at_float32`` over arrayize()'s nested-list shape."""
+    if len(got_rows) != len(golden_rows):
+        return False
+    for got_row, golden_row in zip(got_rows, golden_rows, strict=True):
+        if len(got_row) != len(golden_row):
+            return False
+        if not all(_equal_at_float32(g, h) for g, h in zip(got_row, golden_row, strict=True)):
+            return False
+    return True
 
 
 # ── float32-precision comparison (layers 2 & 3) ────────────────────────────────
@@ -77,25 +77,27 @@ def _equal_at_float32(got, golden) -> bool:
     return np.float32(got) == np.float32(golden)
 
 
-def _array_equal_at_float32(got_rows, golden_rows) -> bool:
-    """Element-wise ``_equal_at_float32`` over arrayize()'s nested-list shape."""
-    if len(got_rows) != len(golden_rows):
-        return False
-    for got_row, golden_row in zip(got_rows, golden_rows, strict=True):
-        if len(got_row) != len(golden_row):
-            return False
-        if not all(_equal_at_float32(g, h) for g, h in zip(got_row, golden_row, strict=True)):
-            return False
-    return True
+def _load_array_golden() -> dict:
+    with open(wh.ARRAY_GOLDEN) as fh:
+        return json.load(fh)
 
 
-# ── Layer 1: physical validation against published Wotton (2009) values ───────
-def _angular_diff(a: float, b: float) -> float:
-    """Smallest absolute difference between two azimuths in degrees (0 == 360)."""
-    d = abs(a - b) % 360.0
-    return min(d, 360.0 - d)
+def _load_scalar_golden() -> dict:
+    with open(wh.SCALAR_GOLDEN) as fh:
+        return json.load(fh)
 
 
+@pytest.fixture(scope="module")
+def array_golden() -> dict:
+    return _load_array_golden()
+
+
+@pytest.fixture(scope="module")
+def scalar_golden() -> dict:
+    return _load_scalar_golden()
+
+
+# ---- scalar tests ----
 def test_scalar_matches_published_wotton2009(backend_fbp):
     """Current outputs must track the published Wotton (2009) values.
 
@@ -175,6 +177,7 @@ def test_scalar_snapshot(scalar_golden, backend_fbp):
     assert not mismatches, "scalar snapshot drift:\n" + "\n".join(mismatches)
 
 
+# ---- other tests ----
 # ── Layer 3: float32-precision snapshot lock, array/masked-array path ─────────
 def test_array_snapshot(array_golden, backend_fbp):
     """Every array output must match the golden at float32 precision (masked-array path)."""

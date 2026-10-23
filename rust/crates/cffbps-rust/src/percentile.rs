@@ -15,42 +15,20 @@ use crate::fuel::FuelType;
 use crate::quantile::t_quantile_large_df;
 
 const SURFACE_SIGMA: f64 = 0.923;
+
 const CROWN_SIGMA: f64 = 1.637;
+
 const CROWN_DELTA: f64 = 0.6;
 
 /// Lower percentile cap: percentiles outside
 /// `[MIN_PERCENTILE, MAX_PERCENTILE]` are capped so 0 and 100 give finite ROS.
 pub const MIN_PERCENTILE: f64 = 0.001;
+
 /// Upper percentile cap; see [`MIN_PERCENTILE`].
 pub const MAX_PERCENTILE: f64 = 99.999;
 
 /// Degrees of freedom used by the Python reference's Student-t quantile.
 const T_DF: f64 = 9_999_999.0;
-
-/// Wind-speed decay `k(w)` applied to the backing-fire noise term. `wsv` is
-/// the net effective wind speed in km/h; NaN gives NaN. Mirrors the wind decay
-/// in the Python `growth` module.
-#[must_use]
-pub fn wind_decay(wsv: f64) -> f64 {
-    if wsv < 40.0 {
-        (-0.10078 * wsv).exp()
-    } else {
-        (-0.05039 * wsv).exp() / (12.0 * (1.0 - (-0.0818 * (wsv - 28.0)).exp()))
-    }
-}
-
-/// Student-t quantile for a percentile in 0-100, capped to
-/// `[MIN_PERCENTILE, MAX_PERCENTILE]`. NaN stays NaN. 50 gives exactly 0.0.
-/// [`crate::fbp::run`] skips the adjustment entirely at percentile 50.
-#[must_use]
-pub fn percentile_tinv(percentile_growth: f64) -> f64 {
-    let capped = if percentile_growth.is_nan() {
-        f64::NAN
-    } else {
-        percentile_growth.clamp(MIN_PERCENTILE, MAX_PERCENTILE)
-    };
-    t_quantile_large_df(capped / 100.0, T_DF)
-}
 
 /// Adjust one directional ROS. `regime_cfb` is that direction's pre-percentile
 /// CFB; `noise_scale` is 1.0 for head fire and `wind_decay(wsv)` for backing.
@@ -91,30 +69,36 @@ pub fn percentile_ros(
     }
 }
 
+/// Student-t quantile for a percentile in 0-100, capped to
+/// `[MIN_PERCENTILE, MAX_PERCENTILE]`. NaN stays NaN. 50 gives exactly 0.0.
+/// [`crate::fbp::run`] skips the adjustment entirely at percentile 50.
+#[must_use]
+pub fn percentile_tinv(percentile_growth: f64) -> f64 {
+    let capped = if percentile_growth.is_nan() {
+        f64::NAN
+    } else {
+        percentile_growth.clamp(MIN_PERCENTILE, MAX_PERCENTILE)
+    };
+    t_quantile_large_df(capped / 100.0, T_DF)
+}
+
+/// Wind-speed decay `k(w)` applied to the backing-fire noise term. `wsv` is
+/// the net effective wind speed in km/h; NaN gives NaN. Mirrors the wind decay
+/// in the Python `growth` module.
+#[must_use]
+pub fn wind_decay(wsv: f64) -> f64 {
+    if wsv < 40.0 {
+        (-0.10078 * wsv).exp()
+    } else {
+        (-0.05039 * wsv).exp() / (12.0 * (1.0 - (-0.0818 * (wsv - 28.0)).exp()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn median_tinv_is_zero() {
-        assert_eq!(percentile_tinv(50.0), 0.0);
-    }
-
-    #[test]
-    fn tails_are_capped_to_the_bounds() {
-        let (lo, hi) = (
-            percentile_tinv(MIN_PERCENTILE),
-            percentile_tinv(MAX_PERCENTILE),
-        );
-        for p in [0.0, -5.0, -1e9] {
-            assert_eq!(percentile_tinv(p), lo, "p={p}");
-        }
-        for p in [100.0, 150.0, 1e9] {
-            assert_eq!(percentile_tinv(p), hi, "p={p}");
-        }
-        assert!(lo.is_finite() && hi.is_finite());
-    }
-
+    // ---- nan tests ----
     #[test]
     fn nan_percentile_propagates() {
         let tinv = percentile_tinv(f64::NAN);
@@ -139,6 +123,27 @@ mod tests {
                 "back fuel {code}"
             );
         }
+    }
+
+    // ---- other tests ----
+    #[test]
+    fn median_tinv_is_zero() {
+        assert_eq!(percentile_tinv(50.0), 0.0);
+    }
+
+    #[test]
+    fn tails_are_capped_to_the_bounds() {
+        let (lo, hi) = (
+            percentile_tinv(MIN_PERCENTILE),
+            percentile_tinv(MAX_PERCENTILE),
+        );
+        for p in [0.0, -5.0, -1e9] {
+            assert_eq!(percentile_tinv(p), lo, "p={p}");
+        }
+        for p in [100.0, 150.0, 1e9] {
+            assert_eq!(percentile_tinv(p), hi, "p={p}");
+        }
+        assert!(lo.is_finite() && hi.is_finite());
     }
 
     #[test]

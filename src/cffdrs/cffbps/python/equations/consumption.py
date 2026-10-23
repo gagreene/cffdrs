@@ -7,33 +7,24 @@ from numpy import ma as mask
 MaskedArray = mask.MaskedArray
 
 
-def zero_without_spread(*, hros: MaskedArray, values: tuple[MaskedArray, ...]) -> tuple[MaskedArray, ...]:
-    """Make fuel consumption follow whether the fire spreads.
-
-    No fuel is consumed where the head rate of spread is exactly 0, and consumption is missing
-    where the rate of spread is missing (NaN or masked); everywhere else the values are unchanged.
-
-    :param hros: head fire rate of spread (m/min)
-    :param values: consumption arrays (for example ffc, wfc, sfc, cfc) to adjust
-    :return: the adjusted arrays, in the same order
-    """
-    data = np.asarray(mask.getdata(hros), dtype=np.float64)
-    hmask = mask.getmaskarray(hros)
-    zero = (data == 0) & ~hmask
-    nan_ros = np.isnan(data) & ~hmask
-    adjusted = []
-    for value in values:
-        arr = mask.asarray(value)
-        base = np.asarray(mask.getdata(arr), dtype=np.float64)
-        result = np.where(zero, 0.0, np.where(nan_ros, np.nan, base))
-        adjusted.append(mask.array(result, mask=(mask.getmaskarray(arr) | hmask) & ~zero))
-    return tuple(adjusted)
-
-
 def _mask_nan(values) -> MaskedArray:
     """Return ``values`` as a float64 masked array, masked where it is masked or NaN."""
     data = np.asarray(mask.getdata(values), dtype=np.float64)
     return mask.array(data, mask=mask.getmaskarray(values) | np.isnan(data))
+
+
+def calc_cfc(*,
+             fuel_type: MaskedArray,
+             cfb: MaskedArray,
+             cfl: MaskedArray,
+             pc: MaskedArray,
+             pdf: MaskedArray) -> MaskedArray:
+    """Calculate crown fuel consumed (kg/m^2)."""
+    return mask.where((fuel_type == 10) | (fuel_type == 11),
+                      cfb * cfl * pc / 100,
+                      mask.where((fuel_type == 12) | (fuel_type == 13),
+                                 cfb * cfl * pdf / 100,
+                                 cfb * cfl))
 
 
 def calc_sfc(*,
@@ -153,20 +144,29 @@ def calc_sfc(*,
     return ffc, wfc, sfc
 
 
-def calc_cfc(*,
-             fuel_type: MaskedArray,
-             cfb: MaskedArray,
-             cfl: MaskedArray,
-             pc: MaskedArray,
-             pdf: MaskedArray) -> MaskedArray:
-    """Calculate crown fuel consumed (kg/m^2)."""
-    return mask.where((fuel_type == 10) | (fuel_type == 11),
-                      cfb * cfl * pc / 100,
-                      mask.where((fuel_type == 12) | (fuel_type == 13),
-                                 cfb * cfl * pdf / 100,
-                                 cfb * cfl))
-
-
 def calc_tfc(*, sfc: MaskedArray, cfc: MaskedArray) -> MaskedArray:
     """Calculate total fuel consumed (kg/m^2)."""
     return sfc + cfc
+
+
+def zero_without_spread(*, hros: MaskedArray, values: tuple[MaskedArray, ...]) -> tuple[MaskedArray, ...]:
+    """Make fuel consumption follow whether the fire spreads.
+
+    No fuel is consumed where the head rate of spread is exactly 0, and consumption is missing
+    where the rate of spread is missing (NaN or masked); everywhere else the values are unchanged.
+
+    :param hros: head fire rate of spread (m/min)
+    :param values: consumption arrays (for example ffc, wfc, sfc, cfc) to adjust
+    :return: the adjusted arrays, in the same order
+    """
+    data = np.asarray(mask.getdata(hros), dtype=np.float64)
+    hmask = mask.getmaskarray(hros)
+    zero = (data == 0) & ~hmask
+    nan_ros = np.isnan(data) & ~hmask
+    adjusted = []
+    for value in values:
+        arr = mask.asarray(value)
+        base = np.asarray(mask.getdata(arr), dtype=np.float64)
+        result = np.where(zero, 0.0, np.where(nan_ros, np.nan, base))
+        adjusted.append(mask.array(result, mask=(mask.getmaskarray(arr) | hmask) & ~zero))
+    return tuple(adjusted)

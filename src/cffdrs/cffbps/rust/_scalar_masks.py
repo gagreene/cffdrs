@@ -24,6 +24,22 @@ class ScalarMasks:
             # the fmc (and the fme it gives) is present before calcFMC runs
             self.set('fmc', overrides['fmc'])
 
+    def export(self, name, result, dtype):
+        producer = {'fire_type': 'calcFireType', 'fi_class': 'calcFireIntensityClass'}.get(name)
+        if producer is not None and producer not in self.produced and dtype is None:
+            dtype = np.float64
+        if name == 'fuel_type' and self.fields[name]:
+            return np.array(0.), np.float64
+        if name in self.date_nan:
+            return result, dtype
+        if self.fields.get(name, False):
+            # Native integer sentinels represent a masked produced value only
+            # when this producer consumed a mask. Infinity remains unmasked.
+            sentinel = 0 if name in ('fire_type', 'dj') else -99 if name == 'fi_class' else None
+            if np.isnan(result).any() or (sentinel is not None and np.asarray(result).item() == sentinel):
+                return np.array(0.), np.float64
+        return result, dtype
+
     def set(self, name, value):
         self.fields[name] = masked(value)
         self.date_nan.discard(name)
@@ -136,19 +152,3 @@ class ScalarMasks:
             put('hfi', any_mask('hros', 'tfc'))
         elif name == 'calcFireIntensityClass':
             put('fi_class', any_mask('hfi'))
-
-    def export(self, name, result, dtype):
-        producer = {'fire_type': 'calcFireType', 'fi_class': 'calcFireIntensityClass'}.get(name)
-        if producer is not None and producer not in self.produced and dtype is None:
-            dtype = np.float64
-        if name == 'fuel_type' and self.fields[name]:
-            return np.array(0.), np.float64
-        if name in self.date_nan:
-            return result, dtype
-        if self.fields.get(name, False):
-            # Native integer sentinels represent a masked produced value only
-            # when this producer consumed a mask. Infinity remains unmasked.
-            sentinel = 0 if name in ('fire_type', 'dj') else -99 if name == 'fi_class' else None
-            if np.isnan(result).any() or (sentinel is not None and np.asarray(result).item() == sentinel):
-                return np.array(0.), np.float64
-        return result, dtype

@@ -13,45 +13,18 @@ from cffdrs.cffbps import FBP
 from cffdrs.cffbps.auto import AutoFBP, available_backends
 from cffdrs.cffbps.python import FBP as PythonFBP
 
+TABLES = ['rosParams', 'open_fuel_types', 'non_crowning_fuels', 'fbpCBH_CFL_HT_LUT',
+          'csfiVarList', 'rsoVarList', 'cfbVarList', 'cfcVarList', 'cfiVarList', 'ftypes']
 
+
+# ---- helpers ----
 def make(cls=FBP, **kwargs):
     model = cls()
     model.initialize(**(BASE | {'out_request': ALL} | kwargs))
     return model
 
 
-def test_public_dispatching_class_and_read_only_status():
-    assert FBP is AutoFBP
-    model = FBP()
-    assert model.backend_in_use is None
-    with pytest.raises(AttributeError):
-        model.backend_in_use = 'rust'
-    model.initialize(**BASE)
-    assert model.backend_in_use == 'rust'
-    with pytest.raises(AttributeError):
-        model.backend_in_use = 'python'
-
-
-def test_wotton_all_54_outputs_choose_rust():
-    rows = load_input_frame()
-    assert len(rows) == 20
-    for _, row in rows.iterrows():
-        kwargs = row_to_kwargs(row, ALL)
-        model = make(**kwargs)
-        assert model.backend_in_use == 'rust'
-        equal(model.runFBP(), make(PythonFBP, **kwargs).runFBP(), scalar=True)
-
-
-def test_missing_extension_falls_back_silently(monkeypatch):
-    monkeypatch.setitem(sys.modules, 'cffdrs._rust', None)
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter('always')
-        model = make()
-        equal(model.runFBP(), make(PythonFBP).runFBP(), scalar=True)
-    assert model.backend_in_use == 'python'
-    assert not captured
-
-
+# ---- forced tests ----
 def test_forced_python_never_imports_extension():
     code = """
 import sys
@@ -78,8 +51,81 @@ def test_forced_rust_requires_extension(monkeypatch):
         make(backend='rust')
 
 
-TABLES = ['rosParams', 'open_fuel_types', 'non_crowning_fuels', 'fbpCBH_CFL_HT_LUT',
-          'csfiVarList', 'rsoVarList', 'cfbVarList', 'cfcVarList', 'cfiVarList', 'ftypes']
+# ---- public tests ----
+def test_public_dispatching_class_and_read_only_status():
+    assert FBP is AutoFBP
+    model = FBP()
+    assert model.backend_in_use is None
+    with pytest.raises(AttributeError):
+        model.backend_in_use = 'rust'
+    model.initialize(**BASE)
+    assert model.backend_in_use == 'rust'
+    with pytest.raises(AttributeError):
+        model.backend_in_use = 'python'
+
+
+def test_public_fbp_import_is_lazy():
+    code = """
+import sys
+from cffdrs.cffbps import FBP
+assert 'cffdrs._rust' not in sys.modules
+assert 'cffdrs.cffbps.rust' not in sys.modules
+assert 'cupy' not in sys.modules
+model = FBP()
+assert model.backend_in_use is None
+assert 'cffdrs._rust' not in sys.modules
+assert 'cupy' not in sys.modules
+"""
+    subprocess.run([sys.executable, '-c', code], check=True)
+
+
+# ---- rust tests ----
+@pytest.mark.parametrize('name', TABLES)
+@pytest.mark.parametrize('route', ['read', 'assign'])
+def test_rust_table_operations_fail_without_switching(name, route):
+    model = make()
+    with pytest.raises((AttributeError, NotImplementedError), match="backend='python'"):
+        if route == 'read':
+            getattr(model, name)
+        else:
+            setattr(model, name, {})
+    assert model.backend_in_use == 'rust'
+    equal(model.runFBP(), make(PythonFBP).runFBP(), scalar=True)
+
+
+@pytest.mark.parametrize('operation', ['hros', 'block', 'cbh'])
+def test_rust_unsupported_operations_fail_without_switching(operation):
+    model = make()
+    with pytest.raises((AttributeError, NotImplementedError), match="backend='python'"):
+        if operation == 'hros':
+            _ = model.hros
+        elif operation == 'block':
+            model.runFBP(block=(0, 1))
+        else:
+            model.getCBH_CFL(cbh=3.)
+    assert model.backend_in_use == 'rust'
+    equal(model.runFBP(), make(PythonFBP).runFBP(), scalar=True)
+
+
+# ---- other tests ----
+def test_wotton_all_54_outputs_choose_rust():
+    rows = load_input_frame()
+    assert len(rows) == 20
+    for _, row in rows.iterrows():
+        kwargs = row_to_kwargs(row, ALL)
+        model = make(**kwargs)
+        assert model.backend_in_use == 'rust'
+        equal(model.runFBP(), make(PythonFBP, **kwargs).runFBP(), scalar=True)
+
+
+def test_missing_extension_falls_back_silently(monkeypatch):
+    monkeypatch.setitem(sys.modules, 'cffdrs._rust', None)
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter('always')
+        model = make()
+        equal(model.runFBP(), make(PythonFBP).runFBP(), scalar=True)
+    assert model.backend_in_use == 'python'
+    assert not captured
 
 
 @pytest.mark.parametrize('name', TABLES)
@@ -112,33 +158,6 @@ def test_calibrated_table_is_preserved_and_forced_rust_rejected():
     pinned.rosParams[2] = (150., *pinned.rosParams[2][1:])
     with pytest.raises(ValueError, match="backend='python'"):
         pinned.initialize(**BASE, backend='rust')
-
-
-@pytest.mark.parametrize('name', TABLES)
-@pytest.mark.parametrize('route', ['read', 'assign'])
-def test_rust_table_operations_fail_without_switching(name, route):
-    model = make()
-    with pytest.raises((AttributeError, NotImplementedError), match="backend='python'"):
-        if route == 'read':
-            getattr(model, name)
-        else:
-            setattr(model, name, {})
-    assert model.backend_in_use == 'rust'
-    equal(model.runFBP(), make(PythonFBP).runFBP(), scalar=True)
-
-
-@pytest.mark.parametrize('operation', ['hros', 'block', 'cbh'])
-def test_rust_unsupported_operations_fail_without_switching(operation):
-    model = make()
-    with pytest.raises((AttributeError, NotImplementedError), match="backend='python'"):
-        if operation == 'hros':
-            _ = model.hros
-        elif operation == 'block':
-            model.runFBP(block=(0, 1))
-        else:
-            model.getCBH_CFL(cbh=3.)
-    assert model.backend_in_use == 'rust'
-    equal(model.runFBP(), make(PythonFBP).runFBP(), scalar=True)
 
 
 @pytest.mark.parametrize('backend', ['python', 'rust'])
@@ -238,18 +257,3 @@ def test_cupy_is_listed_only_when_its_backend_module_imports(monkeypatch):
     monkeypatch.setitem(sys.modules, 'cupy', importlib)
     monkeypatch.setitem(sys.modules, 'cffdrs.cffbps.cupy', None)
     assert 'cupy' not in available_backends()
-
-
-def test_public_fbp_import_is_lazy():
-    code = """
-import sys
-from cffdrs.cffbps import FBP
-assert 'cffdrs._rust' not in sys.modules
-assert 'cffdrs.cffbps.rust' not in sys.modules
-assert 'cupy' not in sys.modules
-model = FBP()
-assert model.backend_in_use is None
-assert 'cffdrs._rust' not in sys.modules
-assert 'cupy' not in sys.modules
-"""
-    subprocess.run([sys.executable, '-c', code], check=True)

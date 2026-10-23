@@ -4,11 +4,11 @@ use cffbps_rust::fbp::FbpInput;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub fn repo_path(rel: &str) -> PathBuf {
-    // crates/cffbps-rust -> repo root
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../..")
-        .join(rel)
+/// Load a golden snapshot JSON under `tests/cffbps/data/golden/`.
+pub fn load_snapshot(file_name: &str) -> serde_json::Value {
+    let rel = format!("tests/cffbps/data/golden/{file_name}");
+    serde_json::from_str(&std::fs::read_to_string(repo_path(&rel)).expect("golden snapshot"))
+        .expect("valid json")
 }
 
 // One field per CSV column, so the length tracks the fixture schema. Not every
@@ -123,9 +123,9 @@ pub fn parse_inputs() -> HashMap<i64, FbpInput> {
     out
 }
 
-/// Load a golden snapshot JSON under `tests/cffbps/data/golden/`.
-pub fn load_snapshot(file_name: &str) -> serde_json::Value {
-    let rel = format!("tests/cffbps/data/golden/{file_name}");
-    serde_json::from_str(&std::fs::read_to_string(repo_path(&rel)).expect("golden snapshot"))
-        .expect("valid json")
+pub fn repo_path(rel: &str) -> PathBuf {
+    // crates/cffbps-rust -> repo root
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join(rel)
 }

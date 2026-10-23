@@ -96,6 +96,7 @@ const NAMES: [&str; 54] = [
     "fuel_type",
 ];
 
+// ---- helpers ----
 fn row(input: &FbpInput) -> Vec<u64> {
     let r = run(input);
     NAMES
@@ -104,6 +105,7 @@ fn row(input: &FbpInput) -> Vec<u64> {
         .collect()
 }
 
+// ---- other tests ----
 #[test]
 #[ignore = "local refactoring oracle: needs a recorded baseline; see the module docs"]
 fn outputs_match_the_recorded_baseline() {

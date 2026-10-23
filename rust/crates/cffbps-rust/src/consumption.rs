@@ -4,20 +4,6 @@
 use crate::fuel::FuelType;
 use crate::normalize::Normalized;
 
-/// Fuel consumption that follows whether the fire spreads: 0 where the head
-/// rate of spread is exactly 0, NaN where it is NaN, otherwise `value`
-/// unchanged. Applied in `calcTFC` (after the crown calculations used `sfc`) to
-/// `ffc`, `wfc`, `sfc` and `cfc`; mirrors `consumption.zero_without_spread`.
-pub(crate) fn without_spread(hros: f64, value: f64) -> f64 {
-    if hros == 0.0 {
-        0.0
-    } else if hros.is_nan() {
-        f64::NAN
-    } else {
-        value
-    }
-}
-
 /// Surface fuel consumption with its fine/woody components. `ffc`/`wfc` stay
 /// NaN where the Python package masks them (fuels without a fine/woody split):
 /// the GRID path surfaces masked cells as NaN.
@@ -25,6 +11,15 @@ pub(crate) struct SurfaceFuel {
     pub sfc: f64,
     pub ffc: f64,
     pub wfc: f64,
+}
+
+/// `calc_cfc`: crown fuel consumption.
+pub(crate) fn calc_cfc(ft: FuelType, cfb: f64, cfl: f64, pc: f64, pdf: f64) -> f64 {
+    match ft {
+        FuelType::M1 | FuelType::M2 => cfb * cfl * pc / 100.0,
+        FuelType::M3 | FuelType::M4 => cfb * cfl * pdf / 100.0,
+        _ => cfb * cfl,
+    }
 }
 
 /// `calc_sfc`: surface fuel consumption by fuel type.
@@ -78,24 +73,30 @@ pub(crate) fn calc_sfc(ft: FuelType, n: &Normalized) -> SurfaceFuel {
     SurfaceFuel { sfc, ffc, wfc }
 }
 
-/// `calc_cfc`: crown fuel consumption.
-pub(crate) fn calc_cfc(ft: FuelType, cfb: f64, cfl: f64, pc: f64, pdf: f64) -> f64 {
-    match ft {
-        FuelType::M1 | FuelType::M2 => cfb * cfl * pc / 100.0,
-        FuelType::M3 | FuelType::M4 => cfb * cfl * pdf / 100.0,
-        _ => cfb * cfl,
-    }
-}
-
 /// `calc_tfc`: total fuel consumption.
 pub(crate) fn calc_tfc(sfc: f64, cfc: f64) -> f64 {
     sfc + cfc
+}
+
+/// Fuel consumption that follows whether the fire spreads: 0 where the head
+/// rate of spread is exactly 0, NaN where it is NaN, otherwise `value`
+/// unchanged. Applied in `calcTFC` (after the crown calculations used `sfc`) to
+/// `ffc`, `wfc`, `sfc` and `cfc`; mirrors `consumption.zero_without_spread`.
+pub(crate) fn without_spread(hros: f64, value: f64) -> f64 {
+    if hros == 0.0 {
+        0.0
+    } else if hros.is_nan() {
+        f64::NAN
+    } else {
+        value
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ---- helpers ----
     fn normalized(ffmc: f64, bui: f64) -> Normalized {
         Normalized {
             slope: 10.0,
@@ -111,6 +112,7 @@ mod tests {
         }
     }
 
+    // ---- c7 tests ----
     #[test]
     fn c7_missing_ffmc_gives_nan_ffc_and_sfc() {
         let s = calc_sfc(FuelType::C7, &normalized(f64::NAN, 76.0));
@@ -126,6 +128,7 @@ mod tests {
         assert_eq!(s.sfc, s.wfc);
     }
 
+    // ---- other tests ----
     #[test]
     fn missing_bui_gives_nan_sfc_for_bui_driven_fuels() {
         for code in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18] {

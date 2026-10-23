@@ -2,6 +2,25 @@
 
 use crate::fuel::FuelType;
 
+/// `calc_fire_intensity_class`.
+pub(crate) fn calc_fire_intensity_class(hfi: f64) -> f64 {
+    if hfi > 10000.0 {
+        6.0
+    } else if hfi > 4000.0 {
+        5.0
+    } else if hfi > 2000.0 {
+        4.0
+    } else if hfi > 500.0 {
+        3.0
+    } else if hfi > 10.0 {
+        2.0
+    } else if hfi > 0.0 {
+        1.0
+    } else {
+        -99.0
+    }
+}
+
 /// `calc_fire_type`: 1 surface, 2 passive crown, 3 active crown.
 pub(crate) fn calc_fire_type(ft: FuelType, cfb: f64) -> f64 {
     // Unknown negative codes take this branch on purpose (decision D3, see
@@ -26,29 +45,11 @@ pub(crate) fn calc_hfi(hros: f64, tfc: f64) -> f64 {
     300.0 * hros * tfc
 }
 
-/// `calc_fire_intensity_class`.
-pub(crate) fn calc_fire_intensity_class(hfi: f64) -> f64 {
-    if hfi > 10000.0 {
-        6.0
-    } else if hfi > 4000.0 {
-        5.0
-    } else if hfi > 2000.0 {
-        4.0
-    } else if hfi > 500.0 {
-        3.0
-    } else if hfi > 10.0 {
-        2.0
-    } else if hfi > 0.0 {
-        1.0
-    } else {
-        -99.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ---- fire tests ----
     #[test]
     fn fire_type_boundaries() {
         let ft = FuelType::C2;

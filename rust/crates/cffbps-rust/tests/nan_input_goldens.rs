@@ -33,6 +33,10 @@ fn base() -> FbpInput {
     }
 }
 
+/// (mutator, sfc expectation; NaN means sfc must be NaN) for one NaN-input scenario.
+type NanCase = (fn(&mut FbpInput), f64);
+
+// ---- nan tests ----
 #[test]
 fn nan_gcf_propagates_for_grass_fuels() {
     // Grid-truth: O-1a with NaN gcf yields NaN hros — the _coerce default
@@ -46,29 +50,6 @@ fn nan_gcf_propagates_for_grass_fuels() {
         r.hros.is_nan(),
         "O-1a NaN gcf: hros must be NaN, got {}",
         r.hros
-    );
-}
-
-#[test]
-fn masked_cell_observables_match_grid_truth() {
-    // Grid-truth captured from the Python package (1x4 grid, ws=NaN cell):
-    // cfb and accel are NaN; fire_type surfaces as 0; fi_class as -99.
-    let mut input = base();
-    input.ws = f64::NAN;
-    let r = run(&input);
-    assert!(r.cfb.is_nan(), "cfb must be NaN, got {}", r.cfb);
-    assert!(r.accel.is_nan(), "accel must be NaN, got {}", r.accel);
-    assert_eq!(
-        r.fire_type, 0.0,
-        "fire_type observable is 0 for masked cells"
-    );
-    assert_eq!(
-        r.fi_class, -99.0,
-        "fi_class observable is -99 for masked cells"
-    );
-    assert!(
-        r.wsv.is_nan() && r.raz.is_nan() && r.bros.is_nan(),
-        "wind chain must be NaN"
     );
 }
 
@@ -91,9 +72,6 @@ fn nan_bui_leaves_wind_chain_intact() {
         r.raz
     );
 }
-
-/// (mutator, sfc expectation; NaN means sfc must be NaN) for one NaN-input scenario.
-type NanCase = (fn(&mut FbpInput), f64);
 
 #[test]
 fn nan_weather_inputs_propagate_to_nan_spread() {
@@ -127,6 +105,30 @@ fn nan_weather_inputs_propagate_to_nan_spread() {
             );
         }
     }
+}
+
+// ---- other tests ----
+#[test]
+fn masked_cell_observables_match_grid_truth() {
+    // Grid-truth captured from the Python package (1x4 grid, ws=NaN cell):
+    // cfb and accel are NaN; fire_type surfaces as 0; fi_class as -99.
+    let mut input = base();
+    input.ws = f64::NAN;
+    let r = run(&input);
+    assert!(r.cfb.is_nan(), "cfb must be NaN, got {}", r.cfb);
+    assert!(r.accel.is_nan(), "accel must be NaN, got {}", r.accel);
+    assert_eq!(
+        r.fire_type, 0.0,
+        "fire_type observable is 0 for masked cells"
+    );
+    assert_eq!(
+        r.fi_class, -99.0,
+        "fi_class observable is -99 for masked cells"
+    );
+    assert!(
+        r.wsv.is_nan() && r.raz.is_nan() && r.bros.is_nan(),
+        "wind chain must be NaN"
+    );
 }
 
 #[test]

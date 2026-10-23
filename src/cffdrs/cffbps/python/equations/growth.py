@@ -9,16 +9,6 @@ from scipy.stats import t
 
 MaskedArray = mask.MaskedArray
 
-
-def _tinv(probability: float | int, freedom: int = 9999999):
-    """Standard-normal quantile, computed via a Student's t at very high freedom.
-
-    Han & Braun (2014) use the standard normal quantile; a t distribution at
-    freedom=9999999 agrees with it to about 1e-7 relative.
-    """
-    return t.ppf(probability, freedom)
-
-
 # Han & Braun (2014), Section 3: noise standard deviations estimated on pooled
 # conifer data (surface fires on the log scale, crown fires on the Box-Cox
 # delta=0.6 scale). The paper pools by category because per-fuel-type data are
@@ -43,6 +33,15 @@ _SURFACE_FUEL_TYPES = (2, 3, 4, 5, 6, 7)
 _CROWN_FUEL_TYPES = (1, 2, 3, 4, 6, 7)
 
 
+def _tinv(probability: float | int, freedom: int = 9999999):
+    """Standard-normal quantile, computed via a Student's t at very high freedom.
+
+    Han & Braun (2014) use the standard normal quantile; a t distribution at
+    freedom=9999999 agrees with it to about 1e-7 relative.
+    """
+    return t.ppf(probability, freedom)
+
+
 def _wind_decay(w: MaskedArray) -> MaskedArray:
     """Wind-speed decay factor for backing-fire growth-percentile noise.
 
@@ -53,6 +52,33 @@ def _wind_decay(w: MaskedArray) -> MaskedArray:
     low = np.exp(-0.10078 * w)
     high = np.exp(-0.05039 * w) / (12.0 * (1.0 - np.exp(-0.0818 * (w - 28.0))))
     return mask.where(w < 40, low, high)
+
+
+def calc_accel_param(*,
+                     fuel_type: MaskedArray,
+                     ftypes: Sequence[int],
+                     open_fuel_types: Sequence[int],
+                     cfb: MaskedArray,
+                     accel_param: MaskedArray) -> MaskedArray:
+    """Calculate the acceleration parameter for a point-ignition fire.
+
+    ``accel_param`` is passed in as the initialized template.
+    """
+    # Mask for open fuel types that use a fixed acceleration parameter (0.115)
+    fixed_accel_mask = mask.where(np.isin(fuel_type, open_fuel_types), True, False)
+
+    # Mask for closed fuel types that require computation
+    variable_accel_mask = mask.where(np.isin(fuel_type, ftypes) & ~fixed_accel_mask, True, False)
+
+    # Compute acceleration parameter for open fuel types
+    accel_param = mask.where(fixed_accel_mask, 0.115, accel_param)
+
+    # Compute acceleration parameter for closed fuel types (safe calculation)
+    accel_param = mask.where(variable_accel_mask,
+                             0.115 - 18.8 * np.power(cfb, 2.5) * np.exp(-8 * cfb),
+                             accel_param)
+
+    return accel_param
 
 
 def calc_ros_percentile_growth(*,
@@ -126,30 +152,3 @@ def calc_ros_percentile_growth(*,
         adjusted.append(mask.where(regime_cfb < 0.1, surface_regime, crown_regime))
 
     return adjusted[0], adjusted[1]
-
-
-def calc_accel_param(*,
-                     fuel_type: MaskedArray,
-                     ftypes: Sequence[int],
-                     open_fuel_types: Sequence[int],
-                     cfb: MaskedArray,
-                     accel_param: MaskedArray) -> MaskedArray:
-    """Calculate the acceleration parameter for a point-ignition fire.
-
-    ``accel_param`` is passed in as the initialized template.
-    """
-    # Mask for open fuel types that use a fixed acceleration parameter (0.115)
-    fixed_accel_mask = mask.where(np.isin(fuel_type, open_fuel_types), True, False)
-
-    # Mask for closed fuel types that require computation
-    variable_accel_mask = mask.where(np.isin(fuel_type, ftypes) & ~fixed_accel_mask, True, False)
-
-    # Compute acceleration parameter for open fuel types
-    accel_param = mask.where(fixed_accel_mask, 0.115, accel_param)
-
-    # Compute acceleration parameter for closed fuel types (safe calculation)
-    accel_param = mask.where(variable_accel_mask,
-                             0.115 - 18.8 * np.power(cfb, 2.5) * np.exp(-8 * cfb),
-                             accel_param)
-
-    return accel_param

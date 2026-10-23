@@ -59,92 +59,6 @@ pub struct CellState {
 }
 
 impl CellState {
-    /// A state with every input missing (NaN) and every computed field at its
-    /// [`Field::template_value`], for fuel code `fuel_type`. The explicit
-    /// `d0` / `dj` / `fmc` values of `params`, if any, are stored in
-    /// [`Field::D0Override`] / [`Field::DjOverride`] / [`Field::FmcOverride`].
-    #[must_use]
-    pub fn template(fuel_type: i32, params: StageParams) -> Self {
-        let mut values = [0.0; Field::COUNT];
-        for f in Field::ALL {
-            values[f.index()] = f.template_value();
-        }
-        let mut s = Self {
-            values,
-            ft: FuelType::from_code(fuel_type),
-            params,
-            hros_injection: None,
-        };
-        s.set(Field::FuelType, f64::from(fuel_type));
-        s.set(Field::D0Override, params.d0.unwrap_or(f64::NAN));
-        s.set(Field::DjOverride, params.dj.unwrap_or(f64::NAN));
-        s.set(Field::FmcOverride, params.fmc.unwrap_or(f64::NAN));
-        s
-    }
-
-    /// The state [`fbp::run`](crate::fbp::run) starts from: the template with
-    /// the inputs of `input`, normalised as `FBP.initialize` does (`long` is
-    /// stored as its magnitude; `wd` and `aspect` hold the inputs until
-    /// `invertWindAspect` runs). `hros_override` replaces `calcROS`'s head ROS, as in [`FbpInput`].
-    #[must_use]
-    pub fn from_input(input: &FbpInput) -> Self {
-        let mut s = Self::template(
-            input.fuel_type,
-            StageParams {
-                wx_date: input.wx_date,
-                percentile_growth: input.percentile_growth,
-                d0: input.d0_override,
-                dj: input.dj_override,
-                fmc: input.fmc_override,
-            },
-        );
-        let n = normalize(input);
-        for (f, v) in [
-            (Field::Lat, input.lat),
-            (Field::Long, input.long.abs()),
-            (Field::Elevation, input.elevation),
-            (Field::Slope, n.slope),
-            (Field::AspectIn, n.aspect),
-            (Field::Aspect, n.aspect),
-            (Field::Ws, n.ws),
-            (Field::WdIn, n.wd),
-            (Field::Wd, n.wd),
-            (Field::Ffmc, n.ffmc),
-            (Field::Bui, n.bui),
-            (Field::Pc, n.pc),
-            (Field::Pdf, n.pdf),
-            (Field::Gfl, n.gfl),
-            (Field::Gcf, n.gcf),
-        ] {
-            s.set(f, v);
-        }
-        s.hros_injection = input.hros_override;
-        s
-    }
-
-    /// The current value of `f`.
-    #[must_use]
-    pub fn get(&self, f: Field) -> f64 {
-        self.values[f.index()]
-    }
-
-    /// Store `v` in `f`.
-    pub fn set(&mut self, f: Field, v: f64) {
-        self.values[f.index()] = v;
-        if f == Field::FuelType {
-            // Saturating cast (NaN gives 0): an integral code converts exactly.
-            #[allow(clippy::cast_possible_truncation)]
-            let code = v as i32;
-            self.ft = FuelType::from_code(code);
-        }
-    }
-
-    /// The scalar parameters.
-    #[must_use]
-    pub fn params(&self) -> &StageParams {
-        &self.params
-    }
-
     /// Normalised inputs as `calc_isi_rsi_be` / `calc_sfc` take them. Only the
     /// fields named by `with` are read from the state; the rest are NaN, and
     /// the callers below do not read them.
@@ -436,6 +350,52 @@ impl CellState {
         }
     }
 
+    /// The state [`fbp::run`](crate::fbp::run) starts from: the template with
+    /// the inputs of `input`, normalised as `FBP.initialize` does (`long` is
+    /// stored as its magnitude; `wd` and `aspect` hold the inputs until
+    /// `invertWindAspect` runs). `hros_override` replaces `calcROS`'s head ROS, as in [`FbpInput`].
+    #[must_use]
+    pub fn from_input(input: &FbpInput) -> Self {
+        let mut s = Self::template(
+            input.fuel_type,
+            StageParams {
+                wx_date: input.wx_date,
+                percentile_growth: input.percentile_growth,
+                d0: input.d0_override,
+                dj: input.dj_override,
+                fmc: input.fmc_override,
+            },
+        );
+        let n = normalize(input);
+        for (f, v) in [
+            (Field::Lat, input.lat),
+            (Field::Long, input.long.abs()),
+            (Field::Elevation, input.elevation),
+            (Field::Slope, n.slope),
+            (Field::AspectIn, n.aspect),
+            (Field::Aspect, n.aspect),
+            (Field::Ws, n.ws),
+            (Field::WdIn, n.wd),
+            (Field::Wd, n.wd),
+            (Field::Ffmc, n.ffmc),
+            (Field::Bui, n.bui),
+            (Field::Pc, n.pc),
+            (Field::Pdf, n.pdf),
+            (Field::Gfl, n.gfl),
+            (Field::Gcf, n.gcf),
+        ] {
+            s.set(f, v);
+        }
+        s.hros_injection = input.hros_override;
+        s
+    }
+
+    /// The current value of `f`.
+    #[must_use]
+    pub fn get(&self, f: Field) -> f64 {
+        self.values[f.index()]
+    }
+
     /// The 54 outputs as an [`FbpResult`].
     #[must_use]
     pub fn into_result(self) -> FbpResult {
@@ -498,12 +458,53 @@ impl CellState {
             fuel_type: g(F::FuelType),
         }
     }
+
+    /// The scalar parameters.
+    #[must_use]
+    pub fn params(&self) -> &StageParams {
+        &self.params
+    }
+
+    /// Store `v` in `f`.
+    pub fn set(&mut self, f: Field, v: f64) {
+        self.values[f.index()] = v;
+        if f == Field::FuelType {
+            // Saturating cast (NaN gives 0): an integral code converts exactly.
+            #[allow(clippy::cast_possible_truncation)]
+            let code = v as i32;
+            self.ft = FuelType::from_code(code);
+        }
+    }
+
+    /// A state with every input missing (NaN) and every computed field at its
+    /// [`Field::template_value`], for fuel code `fuel_type`. The explicit
+    /// `d0` / `dj` / `fmc` values of `params`, if any, are stored in
+    /// [`Field::D0Override`] / [`Field::DjOverride`] / [`Field::FmcOverride`].
+    #[must_use]
+    pub fn template(fuel_type: i32, params: StageParams) -> Self {
+        let mut values = [0.0; Field::COUNT];
+        for f in Field::ALL {
+            values[f.index()] = f.template_value();
+        }
+        let mut s = Self {
+            values,
+            ft: FuelType::from_code(fuel_type),
+            params,
+            hros_injection: None,
+        };
+        s.set(Field::FuelType, f64::from(fuel_type));
+        s.set(Field::D0Override, params.d0.unwrap_or(f64::NAN));
+        s.set(Field::DjOverride, params.dj.unwrap_or(f64::NAN));
+        s.set(Field::FmcOverride, params.fmc.unwrap_or(f64::NAN));
+        s
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ---- helpers ----
     fn params() -> StageParams {
         StageParams {
             wx_date: 20_230_615,
@@ -514,6 +515,7 @@ mod tests {
         }
     }
 
+    // ---- other tests ----
     #[test]
     fn get_returns_what_set_stored() {
         let mut s = CellState::template(2, params());

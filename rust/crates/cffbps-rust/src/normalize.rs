@@ -18,6 +18,17 @@ pub(crate) struct Normalized {
     pub gcf: f64,
 }
 
+/// `invert_wind_aspect`: flip wind direction and aspect by 180 degrees.
+pub(crate) fn invert_wind_aspect(wd: f64, aspect: f64) -> (f64, f64) {
+    let wd = if wd > 180.0 { wd - 180.0 } else { wd + 180.0 };
+    let aspect = if aspect > 180.0 {
+        aspect - 180.0
+    } else {
+        aspect + 180.0
+    };
+    (wd, aspect)
+}
+
 /// `inputs._verify_inputs` normalization.
 pub(crate) fn normalize(input: &FbpInput) -> Normalized {
     // `where(x < 0, 0, x)` / `clip(x, 0, None)` semantics: negatives clamp
@@ -94,23 +105,28 @@ pub(crate) fn normalize_input(field: Field, value: f64) -> f64 {
     }
 }
 
-/// `invert_wind_aspect`: flip wind direction and aspect by 180 degrees.
-pub(crate) fn invert_wind_aspect(wd: f64, aspect: f64) -> (f64, f64) {
-    let wd = if wd > 180.0 { wd - 180.0 } else { wd + 180.0 };
-    let aspect = if aspect > 180.0 {
-        aspect - 180.0
-    } else {
-        aspect + 180.0
-    };
-    (wd, aspect)
-}
-
 #[cfg(test)]
 mod tests {
     use super::{invert_wind_aspect, normalize, normalize_input};
     use crate::fbp::FbpInput;
     use crate::field::Field;
 
+    // ---- invert tests ----
+    #[test]
+    fn invert_at_180_boundary() {
+        // exactly 180 is not "> 180", so it adds 180
+        assert_eq!(invert_wind_aspect(180.0, 180.0), (360.0, 360.0));
+        assert_eq!(invert_wind_aspect(180.5, 270.0), (0.5, 90.0));
+        assert_eq!(invert_wind_aspect(0.0, 90.0), (180.0, 270.0));
+    }
+
+    #[test]
+    fn invert_propagates_nan() {
+        let (wd, asp) = invert_wind_aspect(f64::NAN, f64::NAN);
+        assert!(wd.is_nan() && asp.is_nan());
+    }
+
+    // ---- other tests ----
     #[test]
     fn normalize_input_equals_normalize_field_by_field_and_is_idempotent() {
         let values = [
@@ -157,19 +173,5 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn invert_at_180_boundary() {
-        // exactly 180 is not "> 180", so it adds 180
-        assert_eq!(invert_wind_aspect(180.0, 180.0), (360.0, 360.0));
-        assert_eq!(invert_wind_aspect(180.5, 270.0), (0.5, 90.0));
-        assert_eq!(invert_wind_aspect(0.0, 90.0), (180.0, 270.0));
-    }
-
-    #[test]
-    fn invert_propagates_nan() {
-        let (wd, asp) = invert_wind_aspect(f64::NAN, f64::NAN);
-        assert!(wd.is_nan() && asp.is_nan());
     }
 }

@@ -23,6 +23,99 @@ BASE_KWARGS = dict(
     slope=10, aspect=180, ws=20, wd=0, ffmc=90, bui=80,
 )
 
+FUEL_DTYPES = [np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.float32, np.float64]
+
+ALL_OUTPUTS = sorted(constants.valid_outputs)
+
+FMC_OUTPUTS = ['latn', 'd0', 'dj', 'nd', 'fmc', 'fme']
+OVERRIDE_ROUTES = ['initialize', 'argument', 'setParams', 'attribute', 'set_override']
+
+# ── updated inputs are normalised exactly like initialised ones (D16f) ────────
+NORMALISED_CASES = [('slope', -10), ('aspect', -5), ('ws', -1), ('ffmc', -1), ('bui', -1),
+                    ('pc', -1), ('pdf', -1), ('gfl', -1), ('gcf', 0)]
+
+# ── no fuel is consumed when the fire does not spread ─────────────────────────
+CONSUMPTION = ['ffc', 'wfc', 'sfc', 'cfc', 'tfc']
+
+# ── a user-provided fmc gives the matching foliar moisture effect ─────────────
+PYROCELL_STEPS = ['calcISI_RSI_BE', 'calcROS', 'calcSFC', 'getCBH_CFL', 'calcCSFI', 'calcRSO', 'calcC6BlendCFB',
+                  'calcC6BlendCFC', 'calcC6CROS', 'calcC6HROS', 'calcPercentileCFB', 'calcRosPercentileGrowth',
+                  'calcCFB', 'calcAccelParam', 'calcFireType', 'calcCFC', 'calcTFC', 'calcHFI',
+                  'calcFireIntensityClass']
+C6_OUTPUTS = ['hros', 'cfb', 'hfi', 'fire_type', 'fi_class', 'tfc', 'accel', 'cros']
+
+
+# ---- helpers ----
+def _assert_outputs_equal(actual, expected):
+    for name, left, right in zip(ALL_OUTPUTS, actual, expected, strict=True):
+        np.testing.assert_array_equal(left, right, err_msg=name)
+
+
+# ── Own-and-return convention (python/core.py shared-template optimization) ────────
+def _assert_untouched(arr, data_snapshot, mask_snapshot):
+    np.testing.assert_array_equal(arr.data, data_snapshot)
+    np.testing.assert_array_equal(np.ma.getmaskarray(arr), mask_snapshot)
+
+
+def _consumption(**changes):
+    fbp = FBP()
+    fbp.initialize(**dict(BASE_KWARGS, out_request=CONSUMPTION + ['hros', 'hfi']) | changes)
+    return dict(zip(CONSUMPTION + ['hros', 'hfi'], fbp.runFBP(), strict=True))
+
+
+def _hros_for(fuel):
+    fbp = FBP()
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=fuel, out_request=['hros']))
+    return fbp.runFBP()[0][0]
+
+
+def _inject_fmc_and_run(fmc, route, **extra):
+    fbp = _model(fuel_type=6, **extra)
+    for step in ('invertWindAspect', 'calcSF', 'calcISZ'):
+        getattr(fbp, step)()
+    if route == 'setParams':
+        fbp.setParams({'fmc': fmc})
+    else:
+        fbp.fmc = fmc
+    for step in PYROCELL_STEPS:
+        getattr(fbp, step)()
+    return fbp
+
+
+def _model(**changes):
+    fbp = FBP()
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2, out_request=ALL_OUTPUTS) | changes)
+    return fbp
+
+
+def _override_model(name, value, route, **changes):
+    fbp = _model(**changes)
+    if route == 'initialize':
+        fbp = _model(**(changes | {name: value}))
+    elif route == 'argument':
+        fbp.calcFMC(**{name: value})
+    elif route == 'setParams':
+        fbp.setParams({name: value})
+    elif route == 'attribute':
+        setattr(fbp, name, value)
+    else:
+        fbp.set_override(name, value)
+    return fbp
+
+
+def _percentile_edge(percentile, cfb_value):
+    from cffdrs.cffbps.python.equations.growth import calc_ros_percentile_growth
+
+    one = np.ma.array([1.0], mask=False)
+    cfb = np.ma.array([cfb_value], mask=False)
+    with np.errstate(invalid='ignore', over='ignore'):
+        return calc_ros_percentile_growth(
+            percentile_growth=percentile,
+            fuel_type=np.ma.array([2], dtype=np.int8, mask=False),
+            hros_cfb=cfb, bros_cfb=cfb, wsv=np.ma.array([0.0], mask=False),
+            hros=one.copy(), bros=one.copy(),
+        )
+
 
 def _run(fuel_type, out_request, **overrides):
     kwargs = dict(BASE_KWARGS, fuel_type=fuel_type, out_request=list(out_request), **overrides)
@@ -31,13 +124,152 @@ def _run(fuel_type, out_request, **overrides):
     return [float(np.asarray(v).ravel()[0]) for v in fbp.runFBP()]
 
 
-# ── Alphanumeric fuel-type input ───────────────────────────────────────────────
-def test_alpha_fuel_type_equals_numeric():
-    """fuel_type='C2' must produce identical outputs to fuel_type=2."""
-    out_req = ['hros', 'hfi', 'fire_type', 'wsv', 'raz', 'sfc', 'cfb']
-    assert _run('C2', out_req) == _run(2, out_req)
+# ---- c6 tests ----
+# ── C6 percentile-growth pipeline ──────────────────────────────────────────────
+def test_c6_cros_and_hros_are_separate_ros_equations():
+    """C6 CROS and HROS must be independently callable from equations.ros."""
+    from cffdrs.cffbps.python.equations.ros import calc_c6_cros, calc_c6_hros
+
+    fuel_type = np.ma.array([6, 2], dtype=np.int8, mask=False)
+    cfc = np.ma.array([0.5, 0.5], mask=False)
+    isi = np.ma.array([10.0, 10.0], mask=False)
+    fme = np.ma.array([0.8, 0.8], mask=False)
+    cros_in = np.ma.array([0.0, 7.0], mask=False)
+    cros = calc_c6_cros(fuel_type=fuel_type, cfc=cfc, isi=isi, fme=fme, cros=cros_in)
+
+    expected_cros = 60 * (1 - np.exp(-0.0497 * 10.0)) * (0.8 / 0.778237)
+    assert float(cros[0]) == pytest.approx(expected_cros)
+    assert float(cros[1]) == 7.0
+
+    sros = np.ma.array([4.0, 4.0], mask=False)
+    hros_in = np.ma.array([4.0, 9.0], mask=False)
+    blend_cfb = np.ma.array([0.25, 0.25], mask=False)
+    hros = calc_c6_hros(
+        fuel_type=fuel_type, sros=sros, cros=cros,
+        c6_blend_cfb=blend_cfb, hros=hros_in,
+    )
+
+    assert float(hros[0]) == pytest.approx(4.0 + 0.25 * (expected_cros - 4.0))
+    assert float(hros[1]) == 9.0
 
 
+def test_c6_percentile_pipeline_uses_blended_hros_and_recalculates_cfb():
+    """C6 percentile growth must adjust blended HROS and final CFB must use it."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=6, percentile_growth=90, out_request=['hros'], **BASE_KWARGS)
+    fbp.runFBP()
+
+    deterministic_hros = (
+        float(fbp.sros[0])
+        + float(fbp.c6_blend_cfb[0]) * (float(fbp.cros[0]) - float(fbp.sros[0]))
+    )
+    expected_regime_cfb = 1 - np.exp(-0.23 * (deterministic_hros - float(fbp.rso[0])))
+    expected_final_cfb = 1 - np.exp(-0.23 * (float(fbp.hros[0]) - float(fbp.rso[0])))
+    expected_final_bros_cfb = 1 - np.exp(-0.23 * (float(fbp.bros[0]) - float(fbp.rso[0])))
+
+    assert float(fbp.hros[0]) != pytest.approx(deterministic_hros)
+    assert float(fbp.percentile_cfb[0]) == pytest.approx(np.clip(expected_regime_cfb, 0, 1))
+    assert float(fbp.cfb[0]) == pytest.approx(np.clip(expected_final_cfb, 0, 1))
+    assert float(fbp.bros_cfb[0]) == pytest.approx(np.clip(expected_final_bros_cfb, 0, 1))
+    assert float(fbp.c6_blend_cfc[0]) == pytest.approx(float(fbp.c6_blend_cfb[0] * fbp.cfl[0]))
+    assert float(fbp.cfc[0]) == pytest.approx(float(fbp.cfb[0] * fbp.cfl[0]))
+
+
+def test_c6_percentile_50_keeps_blended_hros_but_uses_generic_final_cfb():
+    """At percentile 50, C6 ROS is unchanged but final CFB is based on blended HROS."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=6, percentile_growth=50, out_request=['hros'], **BASE_KWARGS)
+    fbp.runFBP()
+
+    deterministic_hros = (
+        float(fbp.sros[0])
+        + float(fbp.c6_blend_cfb[0]) * (float(fbp.cros[0]) - float(fbp.sros[0]))
+    )
+    expected_final_cfb = 1 - np.exp(-0.23 * (deterministic_hros - float(fbp.rso[0])))
+
+    assert float(fbp.hros[0]) == pytest.approx(deterministic_hros)
+    assert float(fbp.cfb[0]) == pytest.approx(np.clip(expected_final_cfb, 0, 1))
+    assert float(fbp.cfb[0]) != pytest.approx(float(fbp.c6_blend_cfb[0]))
+
+
+# ---- calc tests ----
+def test_calc_cfb_preserves_fuel_mask():
+    """A masked fuel cell stays masked in CFB even when ROS and RSO are valid there, so invalid fuel
+    cells are never turned into a computed (or zero) CFB."""
+    from cffdrs.cffbps.python.equations import crown as crown_eq
+
+    fuel = np.ma.array([2, 2, 6], mask=[False, True, False], dtype=np.int8)
+    ros = np.ma.array([10.0, 10.0, 10.0])
+    rso = np.ma.array([2.0, 2.0, 2.0])
+    cfb = crown_eq.calc_cfb(fuel_type=fuel, ftypes=list(range(1, 14)), non_crowning_fuels=[8, 9], rso=rso, ros=ros)
+    assert list(np.ma.getmaskarray(cfb)) == [False, True, False]
+    assert float(cfb[0]) > 0
+
+
+def test_calc_cfb_backing_uses_bros_not_hros():
+    """Directional CFB must differ when HROS and BROS differ.
+
+    This applies to every crowning fuel type, including C6; otherwise the two
+    directional facade calls would be silently redundant.
+    """
+    from cffdrs.cffbps.python.equations.crown import calc_cfb
+
+    fuel_type = np.ma.array([2, 6], dtype=np.int8, mask=False)
+    ftypes = [2, 6]
+    non_crowning_fuels = constants.non_crowning_fuels
+    rso = np.ma.array([2.0, 2.0], mask=False)
+
+    hros_based = calc_cfb(fuel_type=fuel_type, ftypes=ftypes, non_crowning_fuels=non_crowning_fuels,
+                          rso=rso, ros=np.ma.array([15.0, 15.0], mask=False))
+    bros_based = calc_cfb(fuel_type=fuel_type, ftypes=ftypes, non_crowning_fuels=non_crowning_fuels,
+                          rso=rso, ros=np.ma.array([3.0, 3.0], mask=False))
+
+    assert np.all(np.asarray(hros_based) != np.asarray(bros_based))
+
+
+def test_the_calc_fmc_argument_sets_the_override():
+    fbp = _model(fuel_type=6)
+    fbp.calcFMC(fmc=90.0)
+    assert fbp.getParams(['fmc']) == [90.0]
+    fbp.calcFMC()                                    # omitted arguments preserve the override
+    assert fbp.getParams(['fmc']) == [90.0]
+
+
+# ---- cbh tests ----
+# ── C6 canopy overrides ────────────────────────────────────────────────────────
+def test_cbh_cfl_override_applies_for_c6():
+    """C6 cbh/cfl overrides must change CSFI/CFC-dependent outputs."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=6, out_request=['csfi'], **BASE_KWARGS)
+    fbp.invertWindAspect()
+    fbp.calcSF()
+    fbp.calcISZ()
+    fbp.calcFMC()
+    fbp.calcISI_RSI_BE()
+    fbp.getCBH_CFL(ftype=6, cbh=3.0, cfl=1.0)
+    assert float(np.asarray(fbp.cbh).ravel()[0]) == 3.0
+    assert float(np.asarray(fbp.cfl).ravel()[0]) == 1.0
+
+
+def test_cbh_cfl_override_rejected_for_non_c6():
+    """Only C-6 may have canopy values adjusted; other types must raise."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, out_request=['csfi'], **BASE_KWARGS)
+    with pytest.raises(ValueError, match='C-6'):
+        fbp.getCBH_CFL(ftype=2, cbh=3.0)
+
+
+# ── Unknown fuel-type code on the explicit-ftype path ──────────────────────────
+def test_cbh_cfl_unknown_ftype_raises_keyerror():
+    """An ftype absent from the LUT must fail with a KeyError naming the code,
+    not an opaque NoneType subscript error."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, out_request=['csfi'], **BASE_KWARGS)
+    with pytest.raises(KeyError):
+        fbp.getCBH_CFL(ftype=25)
+
+
+# ---- convert tests ----
 # ── R grid-code conversion ─────────────────────────────────────────────────────
 def test_convert_grid_codes_mapping():
     """cffdrs-R codes 9-13 shift up by one; 19 (R water) becomes 20."""
@@ -53,6 +285,407 @@ def test_convert_fuel_type_codes_flag_matches_manual_conversion():
     assert _run(9, out_req, convert_fuel_type_codes=True) == _run(10, out_req)
 
 
+# ---- d2 tests ----
+@pytest.mark.parametrize('bui', [0., 30., 60., 69.9])
+def test_d2_below_bui_70_consumes_no_fuel(bui):
+    out = _consumption(fuel_type=9, bui=bui)
+    assert out['hros'] == 0
+    assert [out[name] for name in CONSUMPTION] == [0, 0, 0, 0, 0]
+    assert out['hfi'] == 0
+
+
+@pytest.mark.parametrize('bui', [70., 80.])
+def test_d2_from_bui_70_consumes_fuel(bui):
+    out = _consumption(fuel_type=9, bui=bui)
+    assert out['hros'] > 0
+    assert out['sfc'] > 0 and out['tfc'] > 0
+
+
+# ---- dj tests ----
+@pytest.mark.parametrize('route', OVERRIDE_ROUTES)
+@pytest.mark.parametrize('year', [1999, 2000, 2023, 2024, 2100])
+def test_dj_floor_clip_and_masks_on_every_route(route, year):
+    import warnings
+    top = 366 if year in (2000, 2024) else 365
+    supplied = np.ma.array([2.4, 2.6, 1.999, 166.9, .3, 0, -5, 365, 366, 366.9, 400,
+                            np.nan, 999, np.inf], mask=[False] * 12 + [True, True])
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter('always')
+        fbp = _override_model('dj', supplied, route, wx_date=year * 10000 + 101,
+                              lat=np.full(supplied.shape, 55.))
+        fbp.calcFMC()
+        fbp.calcFMC()
+    # the -5 cell is a calculate request (derived day 1 on 1 January), not a clipped value
+    count = 3 if top == 366 else 5
+    assert [str(w.message) for w in seen] == [
+        f'dj override: {count} value(s) outside 1..{top} (year {year}) were clipped']
+    actual = fbp.getParams(['dj'])[0]
+    assert actual.dtype == np.float64
+    np.testing.assert_array_equal(actual, [2, 2, 1, 166, 1, 1, 1, 365, top, top, top,
+                                          np.nan, np.nan, np.nan])
+    assert np.isnan(fbp.getParams(['fmc'])[0][-3:]).all()
+    assert np.isnan(fbp.getParams(['fme'])[0][-3:]).all()
+
+
+@pytest.mark.parametrize('route', OVERRIDE_ROUTES)
+@pytest.mark.parametrize('value', [np.inf, -np.inf])
+def test_dj_rejects_unmasked_infinity_on_every_route(route, value):
+    with pytest.raises(ValueError, match='infin'):
+        fbp = _override_model('dj', value, route)
+        fbp.calcFMC()
+
+
+@pytest.mark.parametrize('value', [365., 166.9, np.nan, np.ma.array([400.], mask=True)])
+def test_dj_in_range_fraction_and_missing_do_not_warn(value):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        fbp = _model(dj=value)
+        fbp.calcFMC()
+
+
+@pytest.mark.parametrize('value', [0., 366., 367., 400.])
+def test_dj_clipping_is_a_user_warning(value):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        with pytest.raises(UserWarning, match='clipped'):
+            fbp = _model(dj=value)
+            fbp.calcFMC()
+
+
+def test_dj_supplied_value_is_sticky_across_years():
+    import warnings
+    fbp = _model(dj=366, wx_date=20240101)
+    fbp.calcFMC()
+    assert fbp.getParams(['dj']) == [366]
+    for year, expected in [(2023, 365), (2000, 366), (1999, 365), (2100, 365), (2024, 366)]:
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter('always')
+            fbp.wx_date = year * 10000 + 101
+            fbp.calcFMC()
+        assert len(seen) == (expected == 365)
+        assert fbp.getParams(['dj']) == [expected]
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        fbp.wx_date = 20230101
+        fbp.calcFMC()
+
+
+def test_dj_complete_override_exports_int64():
+    fbp = _model(dj=np.array([2.4, 166.9]), lat=np.array([55., 55.]))
+    fbp.calcFMC()
+    assert fbp.getParams(['dj'])[0].dtype == np.int64
+
+
+# ---- fmc tests ----
+def test_fmc_result_field_order_matches_positional_unpack():
+    """FoliarMoistureResult is unpacked positionally, not via setattr (python/core.py calcFMC):
+        self.latn, self._d0_res, ... = fm_eq.calc_foliar_moisture(...)
+    A field reorder in FoliarMoistureResult's class body would silently scramble which value
+    lands on which attribute — hasattr can't catch that, only order can."""
+    from cffdrs.cffbps.python.equations.foliar_moisture import FoliarMoistureResult
+
+    assert FoliarMoistureResult._fields == ('latn', 'd0', 'dj', 'nd', 'fmc', 'fme')
+
+
+@pytest.mark.parametrize('name,new', [('lat', 45.), ('long', -52.), ('elevation', 1200.),
+                                     ('wx_date', 20240102)])
+@pytest.mark.parametrize('route', ['argument', 'attribute', 'setParams'])
+def test_fmc_changes_follow_current_inputs(name, new, route):
+    fbp = _model()
+    fbp.calcFMC()
+    if route == 'argument':
+        fbp.calcFMC(**{name: new})
+    elif route == 'attribute':
+        setattr(fbp, name, new)
+    else:
+        fbp.setParams({name: new})
+    fbp.calcFMC()
+    fresh = _model(**{name: new})
+    fresh.calcFMC()
+    np.testing.assert_array_equal(fbp.getParams(FMC_OUTPUTS), fresh.getParams(FMC_OUTPUTS))
+
+
+@pytest.mark.parametrize('caller_edit', [False, True])
+def test_fmc_tracks_in_place_latitude_edits(caller_edit):
+    lat = np.array([55., 55.])
+    fbp = _model(lat=lat)
+    fbp.calcFMC()
+    (lat if caller_edit else fbp.lat)[0] = 45
+    fbp.calcFMC()
+    fresh = _model(lat=np.array([45., 55.]))
+    fresh.calcFMC()
+    for actual, expected in zip(fbp.getParams(FMC_OUTPUTS), fresh.getParams(FMC_OUTPUTS), strict=True):
+        np.testing.assert_array_equal(actual, expected)
+
+
+def test_fmc_missing_longitude_becomes_valid():
+    fbp = _model(long=np.array([np.nan]))
+    fbp.calcFMC()
+    fbp.long[0] = 110
+    fbp.calcFMC()
+    assert fbp.getParams(['dj'])[0][0] == 182
+
+
+@pytest.mark.parametrize('route', OVERRIDE_ROUTES)
+@pytest.mark.parametrize('name', ['d0', 'dj'])
+def test_fmc_overrides_replace_persist_and_clear(name, route):
+    fbp = _override_model(name, 150, route)
+    fbp.calcFMC()
+    assert fbp.getParams([name]) == [150]
+    fbp.calcFMC(**{name: 160})
+    fbp.calcFMC()
+    assert fbp.getParams([name]) == [160]
+    fbp.setParams({name: None})
+    fbp.calcFMC()
+    fresh = _model()
+    fresh.calcFMC()
+    assert fbp.getParams([name]) == fresh.getParams([name])
+
+
+@pytest.mark.parametrize('name', ['d0', 'dj'])
+def test_fmc_masked_override_keeps_hidden_finite_data_masked(name):
+    value = np.ma.array([150, 150], mask=[False, True])
+    fbp = _override_model(name, value, 'set_override', lat=np.array([55., 55.]))
+    fbp.calcFMC()
+    assert np.isnan(fbp.getParams(['fmc'])[0][1])
+    fbp2 = _override_model(name, value, 'attribute', lat=np.array([55., 55.]))
+    fbp2.calcFMC()
+    np.testing.assert_array_equal(fbp.getParams(['fmc']), fbp2.getParams(['fmc']))
+
+
+def test_fmc_reinitialize_clears_overrides():
+    fbp = _model(d0=1, dj=2)
+    fbp.calcFMC()
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2))
+    fbp.calcFMC()
+    fresh = _model()
+    fresh.calcFMC()
+    np.testing.assert_array_equal(fbp.getParams(FMC_OUTPUTS), fresh.getParams(FMC_OUTPUTS))
+
+
+def test_fmc_cache_reuses_exact_inputs_and_owns_results(monkeypatch):
+    from cffdrs.cffbps.python.equations import foliar_moisture as fmc
+    real = fmc.calc_foliar_moisture
+    calls = []
+
+    def counted(**kw):
+        calls.append(None)
+        return real(**kw)
+
+    monkeypatch.setattr(fmc, 'calc_foliar_moisture', counted)
+    fbp = _model(lat=np.array([55., 55.]))
+    fbp.calcFMC()
+    expected = [v.copy() for v in fbp.getParams(FMC_OUTPUTS)]
+    fbp.calcFMC()
+    assert len(calls) == 1
+    fbp.fmc[...] = 0
+    fbp.d0[...] = 0
+    fbp.getParams(['fme'])[0][...] = 0
+    fbp.setParams({'fme': 1})
+    fbp.calcFMC()
+    assert len(calls) == 1
+    for actual, want in zip(fbp.getParams(FMC_OUTPUTS), expected, strict=True):
+        np.testing.assert_array_equal(actual, want)
+    fbp.lat.mask = [True, False]
+    fbp.calcFMC()
+    assert len(calls) == 2
+    fbp.lat = fbp.lat.astype(np.float32)
+    fbp.calcFMC()
+    assert len(calls) == 3
+    fbp.lat = fbp.lat.reshape(1, 2)
+    fbp.calcFMC()
+    assert len(calls) == 4
+
+
+def test_a_fmc_override_survives_reset_and_calc_fmc_still_uses_it():
+    fbp = _model(fuel_type=6)
+    fbp.setParams({'fmc': 100.0})
+    fbp.reset()
+    assert fbp.getParams(['fmc']) == [100.0]
+    assert fbp.getParams(['fme'])[0] == pytest.approx(0.7383198002049183, rel=1e-12)   # derived again after reset
+    fbp.calcFMC()
+    assert fbp.getParams(['fmc']) == [100.0]
+
+
+def test_fmc_given_at_initialize_is_used_by_every_run_until_a_new_initialize():
+    fbp = _model(fuel_type=6, fmc=100.0)
+    first, second = fbp.runFBP(), fbp.runFBP()
+    _assert_outputs_equal(first, second)
+    assert fbp.getParams(['fmc']) == [100.0]
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=6, out_request=ALL_OUTPUTS))      # a new initialize starts clean
+    fbp.runFBP()
+    assert fbp.getParams(['fmc'])[0] != 100.0
+
+
+def test_a_fmc_override_replaces_only_fmc_and_fme_and_the_rest_stays_calculated():
+    calculated = _model(fuel_type=6)
+    calculated.calcFMC()
+    overridden = _model(fuel_type=6, fmc=100.0)
+    overridden.calcFMC()
+    names = ['latn', 'd0', 'dj', 'nd']
+    assert overridden.getParams(names) == calculated.getParams(names)
+    assert overridden.getParams(['fmc']) == [100.0]
+    assert overridden.getParams(['fme'])[0] == pytest.approx(1000 * (1.5 - 0.00275 * 100.0) ** 4 / (460 + 25.9 * 100.0))
+
+
+@pytest.mark.parametrize('route', ['setParams', 'set_override', 'attribute', 'calcFMC'])
+def test_the_fmc_override_can_be_cleared_with_none(route):
+    fbp = _model(fuel_type=6, fmc=100.0)
+    calculated = _model(fuel_type=6)
+    calculated.calcFMC()
+    if route == 'setParams':
+        fbp.setParams({'fmc': None})
+    elif route == 'set_override':
+        fbp.set_override('fmc', None)
+    elif route == 'attribute':
+        fbp.fmc = None
+    else:
+        fbp.set_override('fmc', None)
+    fbp.calcFMC()
+    assert fbp.getParams(['fmc', 'fme']) == calculated.getParams(['fmc', 'fme'])
+
+
+def test_the_fmc_cache_follows_the_override(monkeypatch):
+    from cffdrs.cffbps.python.equations import foliar_moisture as fm
+    real = fm.calc_foliar_moisture
+    calls = []
+
+    def counted(**kw):
+        calls.append(kw['fmc_override'])
+        return real(**kw)
+
+    monkeypatch.setattr(fm, 'calc_foliar_moisture', counted)
+    fbp = _model(fuel_type=6, fmc=100.0)
+    fbp.calcFMC()
+    fbp.calcFMC()
+    assert len(calls) == 1                           # identical inputs reuse the result
+    fbp.set_override('fmc', 95.0)
+    fbp.calcFMC()
+    assert len(calls) == 2 and fbp.getParams(['fmc']) == [95.0]
+
+
+# ---- injected tests ----
+def test_injected_zero_ros_consumes_no_fuel():
+    fbp = FBP()
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2, out_request=CONSUMPTION))
+    fbp.runFBP()
+    fbp.reset()
+    for step in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcFMC', 'calcISI_RSI_BE', 'calcROS'):
+        getattr(fbp, step)()
+    fbp.setParams({'hros': 0.0})
+    for step in ('calcSFC', 'getCBH_CFL', 'calcCSFI', 'calcRSO', 'calcC6BlendCFB', 'calcC6BlendCFC', 'calcC6CROS',
+                 'calcC6HROS', 'calcPercentileCFB', 'calcRosPercentileGrowth', 'calcCFB', 'calcAccelParam',
+                 'calcFireType', 'calcCFC', 'calcTFC'):
+        getattr(fbp, step)()
+    assert fbp.getParams(CONSUMPTION) == [0, 0, 0, 0, 0]
+
+
+@pytest.mark.parametrize('route', ['setParams', 'attribute'])
+def test_injected_fmc_gives_the_same_c6_result_as_calc_fmc(route):
+    reference = _model(fuel_type=6, ws=40, ffmc=95, bui=90)
+    computed = reference.runFBP()
+    fmc = reference.getParams(['fmc'])[0]
+    fme = reference.getParams(['fme'])[0]
+    assert fme > 0
+    injected = _inject_fmc_and_run(fmc, route, ws=40, ffmc=95, bui=90)
+    assert injected.getParams(['fme'])[0] == pytest.approx(fme, rel=1e-12)
+    expected = dict(zip(ALL_OUTPUTS, computed, strict=True))
+    for name, value in zip(C6_OUTPUTS, injected.getParams(C6_OUTPUTS), strict=True):
+        np.testing.assert_allclose(value, expected[name], rtol=1e-12, err_msg=name)
+    assert expected['cros'] > 0
+
+
+def test_injected_fmc_derives_fme_from_the_formula():
+    fbp = _model(fuel_type=6)
+    fbp.setParams({'fmc': 100.0})
+    expected = 1000 * (1.5 - 0.00275 * 100.0) ** 4 / (460 + 25.9 * 100.0)
+    assert fbp.getParams(['fme']) == [pytest.approx(expected, rel=1e-12)]
+    fbp.setParams({'fmc': np.nan})
+    assert np.ma.is_masked(fbp.fme)          # a missing fmc gives a missing fme
+
+
+# ---- multiprocess tests ----
+# ── Multiprocessing driver ─────────────────────────────────────────────────────
+def test_multiprocess_matches_direct_run():
+    """fbpMultiprocessArray block results must equal a direct FBP run."""
+    ft = np.array([[[1, 2, 3, 6, 14], [7, 8, 9, 10, 16]]], dtype=np.int8)
+    shape = ft.shape
+
+    def full(v):
+        return np.full(shape, v, dtype=np.float64)
+
+    arrays = dict(
+        lat=full(55.0), long=full(-110.0), elevation=full(500), slope=full(10),
+        aspect=full(180), ws=full(20), wd=full(0), ffmc=full(90), bui=full(80),
+        pc=full(50), pdf=full(35), gfl=full(0.35), gcf=full(80),
+    )
+    out_req = ['hros', 'hfi', 'fire_type']
+
+    mp_out = fbpMultiprocessArray(
+        fuel_type=ft, wx_date=20230701, out_request=out_req,
+        num_processors=2, block_size=2, **arrays,
+    )
+
+    fbp = FBP()
+    fbp.initialize(fuel_type=ft, wx_date=20230701, out_request=out_req, **arrays)
+    direct = fbp.runFBP()
+
+    for name, mp_arr, direct_arr in zip(out_req, mp_out, direct, strict=True):
+        np.testing.assert_allclose(
+            np.asarray(mp_arr, dtype=np.float64),
+            np.ma.filled(np.ma.asarray(direct_arr), np.nan).astype(np.float64),
+            rtol=0, atol=0, err_msg=f'multiprocess {name} != direct',
+        )
+
+
+# ── Multiprocessing driver edge cases ──────────────────────────────────────────
+def test_multiprocess_default_out_request():
+    """Omitting out_request must use the runFBP defaults, not crash."""
+    ft = np.array([[[2, 3], [7, 8]]], dtype=np.int8)
+    shape = ft.shape
+
+    def full(v):
+        return np.full(shape, v, dtype=np.float64)
+
+    out = fbpMultiprocessArray(
+        fuel_type=ft, wx_date=20230701,
+        lat=full(55.0), long=full(-110.0), elevation=full(500), slope=full(10),
+        aspect=full(180), ws=full(20), wd=full(0), ffmc=full(90), bui=full(80),
+        num_processors=2, block_size=1,
+    )
+    assert len(out) == 3  # hros, hfi, fire_type
+    assert np.isfinite(out[0]).all()
+
+
+# ---- non tests ----
+def test_non_c6_downstream_outputs_use_post_percentile_cfb():
+    """Fire type, acceleration, and CFC must consume recalculated final CFB."""
+    fbp = FBP()
+    fbp.initialize(fuel_type=2, percentile_growth=90, out_request=['hros'], **BASE_KWARGS)
+    fbp.runFBP()
+
+    expected_cfb = np.clip(1 - np.exp(-0.23 * (float(fbp.hros[0]) - float(fbp.rso[0]))), 0, 1)
+    expected_fire_type = 1 if expected_cfb <= 0.1 else 2 if expected_cfb < 0.9 else 3
+    expected_accel = 0.115 - 18.8 * expected_cfb ** 2.5 * np.exp(-8 * expected_cfb)
+
+    assert float(fbp.cfb[0]) == pytest.approx(expected_cfb)
+    assert int(fbp.fire_type[0]) == expected_fire_type
+    assert float(fbp.accel_param[0]) == pytest.approx(expected_accel)
+    assert float(fbp.cfc[0]) == pytest.approx(expected_cfb * float(fbp.cfl[0]))
+
+
+@pytest.mark.parametrize('fuel', [19, 20, 0, 99])
+def test_non_fuel_cells_stay_missing_not_zero(fuel):
+    kwargs = {k: np.full((1, 1), v) for k, v in BASE_KWARGS.items() if k != 'wx_date'}
+    kwargs.update(wx_date=BASE_KWARGS['wx_date'], fuel_type=np.array([[fuel]]))
+    fbp = FBP()
+    fbp.initialize(**kwargs, out_request=CONSUMPTION + ['hros'])
+    assert all(np.isnan(v).all() for v in fbp.runFBP())
+
+
+# ---- percentile tests ----
 # ── Percentile growth branch (Han & Braun 2014, "Dionysus") ────────────────────
 def test_percentile_growth_locks_current_behavior():
     """Lock hros/bros under percentile_growth=90 (branch is a no-op at 50).
@@ -248,16 +881,6 @@ def test_percentile_growth_mask_contract():
         assert float(out[2]) == 5.0                            # masked fuel: unchanged, ROS not masked
 
 
-def test_tinv_agrees_with_standard_normal_quantile():
-    """The retained Student's t (freedom=9999999) quantile equals the paper's standard normal quantile to ~1e-7."""
-    from scipy.stats import norm
-
-    from cffdrs.cffbps.python.equations.growth import _tinv
-
-    for p in (0.1, 0.25, 0.75, 0.9, 0.95):
-        assert _tinv(p) == pytest.approx(norm.ppf(p), rel=1e-6)
-
-
 def test_percentile_growth_zero_ros_crown_guard_returns_zero_not_nan():
     """R = 0 at a low percentile makes the radicand negative; the guard must give 0, not NaN."""
     from cffdrs.cffbps.python.equations.growth import calc_ros_percentile_growth
@@ -350,20 +973,6 @@ def test_percentile_growth_uses_direction_specific_cfb():
     assert float(hros90[0]) != pytest.approx(float(bros90[0]), rel=1e-9)
 
 
-def _percentile_edge(percentile, cfb_value):
-    from cffdrs.cffbps.python.equations.growth import calc_ros_percentile_growth
-
-    one = np.ma.array([1.0], mask=False)
-    cfb = np.ma.array([cfb_value], mask=False)
-    with np.errstate(invalid='ignore', over='ignore'):
-        return calc_ros_percentile_growth(
-            percentile_growth=percentile,
-            fuel_type=np.ma.array([2], dtype=np.int8, mask=False),
-            hros_cfb=cfb, bros_cfb=cfb, wsv=np.ma.array([0.0], mask=False),
-            hros=one.copy(), bros=one.copy(),
-        )
-
-
 @pytest.mark.parametrize('cfb_value', [0.0, 0.9], ids=['surface', 'crown'])
 @pytest.mark.parametrize('percentile, capped', [(0, 'min'), (-1, 'min'), (-1e9, 'min'),
                                                 (100, 'max'), (101, 'max'), (1e9, 'max')])
@@ -401,123 +1010,6 @@ def test_percentile_growth_nan_percentile_propagates_nan(cfb_value):
         assert np.isnan(float(out[0]))
 
 
-def test_calc_cfb_preserves_fuel_mask():
-    """A masked fuel cell stays masked in CFB even when ROS and RSO are valid there, so invalid fuel
-    cells are never turned into a computed (or zero) CFB."""
-    from cffdrs.cffbps.python.equations import crown as crown_eq
-
-    fuel = np.ma.array([2, 2, 6], mask=[False, True, False], dtype=np.int8)
-    ros = np.ma.array([10.0, 10.0, 10.0])
-    rso = np.ma.array([2.0, 2.0, 2.0])
-    cfb = crown_eq.calc_cfb(fuel_type=fuel, ftypes=list(range(1, 14)), non_crowning_fuels=[8, 9], rso=rso, ros=ros)
-    assert list(np.ma.getmaskarray(cfb)) == [False, True, False]
-    assert float(cfb[0]) > 0
-
-
-def test_calc_cfb_backing_uses_bros_not_hros():
-    """Directional CFB must differ when HROS and BROS differ.
-
-    This applies to every crowning fuel type, including C6; otherwise the two
-    directional facade calls would be silently redundant.
-    """
-    from cffdrs.cffbps.python.equations.crown import calc_cfb
-
-    fuel_type = np.ma.array([2, 6], dtype=np.int8, mask=False)
-    ftypes = [2, 6]
-    non_crowning_fuels = constants.non_crowning_fuels
-    rso = np.ma.array([2.0, 2.0], mask=False)
-
-    hros_based = calc_cfb(fuel_type=fuel_type, ftypes=ftypes, non_crowning_fuels=non_crowning_fuels,
-                          rso=rso, ros=np.ma.array([15.0, 15.0], mask=False))
-    bros_based = calc_cfb(fuel_type=fuel_type, ftypes=ftypes, non_crowning_fuels=non_crowning_fuels,
-                          rso=rso, ros=np.ma.array([3.0, 3.0], mask=False))
-
-    assert np.all(np.asarray(hros_based) != np.asarray(bros_based))
-
-
-# ── C6 percentile-growth pipeline ──────────────────────────────────────────────
-def test_c6_cros_and_hros_are_separate_ros_equations():
-    """C6 CROS and HROS must be independently callable from equations.ros."""
-    from cffdrs.cffbps.python.equations.ros import calc_c6_cros, calc_c6_hros
-
-    fuel_type = np.ma.array([6, 2], dtype=np.int8, mask=False)
-    cfc = np.ma.array([0.5, 0.5], mask=False)
-    isi = np.ma.array([10.0, 10.0], mask=False)
-    fme = np.ma.array([0.8, 0.8], mask=False)
-    cros_in = np.ma.array([0.0, 7.0], mask=False)
-    cros = calc_c6_cros(fuel_type=fuel_type, cfc=cfc, isi=isi, fme=fme, cros=cros_in)
-
-    expected_cros = 60 * (1 - np.exp(-0.0497 * 10.0)) * (0.8 / 0.778237)
-    assert float(cros[0]) == pytest.approx(expected_cros)
-    assert float(cros[1]) == 7.0
-
-    sros = np.ma.array([4.0, 4.0], mask=False)
-    hros_in = np.ma.array([4.0, 9.0], mask=False)
-    blend_cfb = np.ma.array([0.25, 0.25], mask=False)
-    hros = calc_c6_hros(
-        fuel_type=fuel_type, sros=sros, cros=cros,
-        c6_blend_cfb=blend_cfb, hros=hros_in,
-    )
-
-    assert float(hros[0]) == pytest.approx(4.0 + 0.25 * (expected_cros - 4.0))
-    assert float(hros[1]) == 9.0
-
-
-def test_c6_percentile_pipeline_uses_blended_hros_and_recalculates_cfb():
-    """C6 percentile growth must adjust blended HROS and final CFB must use it."""
-    fbp = FBP()
-    fbp.initialize(fuel_type=6, percentile_growth=90, out_request=['hros'], **BASE_KWARGS)
-    fbp.runFBP()
-
-    deterministic_hros = (
-        float(fbp.sros[0])
-        + float(fbp.c6_blend_cfb[0]) * (float(fbp.cros[0]) - float(fbp.sros[0]))
-    )
-    expected_regime_cfb = 1 - np.exp(-0.23 * (deterministic_hros - float(fbp.rso[0])))
-    expected_final_cfb = 1 - np.exp(-0.23 * (float(fbp.hros[0]) - float(fbp.rso[0])))
-    expected_final_bros_cfb = 1 - np.exp(-0.23 * (float(fbp.bros[0]) - float(fbp.rso[0])))
-
-    assert float(fbp.hros[0]) != pytest.approx(deterministic_hros)
-    assert float(fbp.percentile_cfb[0]) == pytest.approx(np.clip(expected_regime_cfb, 0, 1))
-    assert float(fbp.cfb[0]) == pytest.approx(np.clip(expected_final_cfb, 0, 1))
-    assert float(fbp.bros_cfb[0]) == pytest.approx(np.clip(expected_final_bros_cfb, 0, 1))
-    assert float(fbp.c6_blend_cfc[0]) == pytest.approx(float(fbp.c6_blend_cfb[0] * fbp.cfl[0]))
-    assert float(fbp.cfc[0]) == pytest.approx(float(fbp.cfb[0] * fbp.cfl[0]))
-
-
-def test_c6_percentile_50_keeps_blended_hros_but_uses_generic_final_cfb():
-    """At percentile 50, C6 ROS is unchanged but final CFB is based on blended HROS."""
-    fbp = FBP()
-    fbp.initialize(fuel_type=6, percentile_growth=50, out_request=['hros'], **BASE_KWARGS)
-    fbp.runFBP()
-
-    deterministic_hros = (
-        float(fbp.sros[0])
-        + float(fbp.c6_blend_cfb[0]) * (float(fbp.cros[0]) - float(fbp.sros[0]))
-    )
-    expected_final_cfb = 1 - np.exp(-0.23 * (deterministic_hros - float(fbp.rso[0])))
-
-    assert float(fbp.hros[0]) == pytest.approx(deterministic_hros)
-    assert float(fbp.cfb[0]) == pytest.approx(np.clip(expected_final_cfb, 0, 1))
-    assert float(fbp.cfb[0]) != pytest.approx(float(fbp.c6_blend_cfb[0]))
-
-
-def test_non_c6_downstream_outputs_use_post_percentile_cfb():
-    """Fire type, acceleration, and CFC must consume recalculated final CFB."""
-    fbp = FBP()
-    fbp.initialize(fuel_type=2, percentile_growth=90, out_request=['hros'], **BASE_KWARGS)
-    fbp.runFBP()
-
-    expected_cfb = np.clip(1 - np.exp(-0.23 * (float(fbp.hros[0]) - float(fbp.rso[0]))), 0, 1)
-    expected_fire_type = 1 if expected_cfb <= 0.1 else 2 if expected_cfb < 0.9 else 3
-    expected_accel = 0.115 - 18.8 * expected_cfb ** 2.5 * np.exp(-8 * expected_cfb)
-
-    assert float(fbp.cfb[0]) == pytest.approx(expected_cfb)
-    assert int(fbp.fire_type[0]) == expected_fire_type
-    assert float(fbp.accel_param[0]) == pytest.approx(expected_accel)
-    assert float(fbp.cfc[0]) == pytest.approx(expected_cfb * float(fbp.cfl[0]))
-
-
 def test_percentile_regime_is_selected_once(monkeypatch):
     """Final CFB recalculation must not trigger a second percentile adjustment."""
     from cffdrs.cffbps.python import core
@@ -537,60 +1029,180 @@ def test_percentile_regime_is_selected_once(monkeypatch):
     assert float(fbp.cfb[0]) != pytest.approx(float(calls[0][0][0]))
 
 
-# ── Multiprocessing driver ─────────────────────────────────────────────────────
-def test_multiprocess_matches_direct_run():
-    """fbpMultiprocessArray block results must equal a direct FBP run."""
-    ft = np.array([[[1, 2, 3, 6, 14], [7, 8, 9, 10, 16]]], dtype=np.int8)
-    shape = ft.shape
-
-    def full(v):
-        return np.full(shape, v, dtype=np.float64)
-
-    arrays = dict(
-        lat=full(55.0), long=full(-110.0), elevation=full(500), slope=full(10),
-        aspect=full(180), ws=full(20), wd=full(0), ffmc=full(90), bui=full(80),
-        pc=full(50), pdf=full(35), gfl=full(0.35), gcf=full(80),
-    )
-    out_req = ['hros', 'hfi', 'fire_type']
-
-    mp_out = fbpMultiprocessArray(
-        fuel_type=ft, wx_date=20230701, out_request=out_req,
-        num_processors=2, block_size=2, **arrays,
-    )
-
+# ---- prepare tests ----
+# ── shared input preparation (Rust backend uses the same function) ────────────
+def test_prepare_inputs_matches_initialize_state():
+    from cffdrs.cffbps.common.inputs import prepare_inputs
+    kw = dict(fuel_type=np.array([[2, 3]]), wx_date=20230615, lat=np.full((1, 2), 55.0),
+              long=np.full((1, 2), -110.0), elevation=np.full((1, 2), 500.0),
+              slope=np.full((1, 2), 10.0), aspect=np.full((1, 2), 270.0),
+              ws=np.full((1, 2), 20.0), wd=np.zeros((1, 2)), ffmc=91.0, bui=76.0)
     fbp = FBP()
-    fbp.initialize(fuel_type=ft, wx_date=20230701, out_request=out_req, **arrays)
-    direct = fbp.runFBP()
+    fbp.initialize(**kw)
+    p = prepare_inputs(pc=50, pdf=35, gfl=0.35, gcf=80, d0=None, dj=None, out_request=None,
+                       convert_fuel_type_codes=False, **kw)
+    for name, value in p.verified._asdict().items():
+        if name == 'ftypes':
+            assert fbp.ftypes == value
+        elif name in ('d0', 'dj', 'fmc'):
+            assert value is None
+        else:
+            assert np.ma.allequal(getattr(fbp, name), value), name
+    assert p.return_array is True
+    assert p.ref_array.shape == (1, 2)
 
-    for name, mp_arr, direct_arr in zip(out_req, mp_out, direct, strict=True):
-        np.testing.assert_allclose(
-            np.asarray(mp_arr, dtype=np.float64),
-            np.ma.filled(np.ma.asarray(direct_arr), np.nan).astype(np.float64),
-            rtol=0, atol=0, err_msg=f'multiprocess {name} != direct',
-        )
+
+def test_prepare_inputs_reports_every_missing_required_parameter():
+    from cffdrs.cffbps.common.inputs import prepare_inputs
+    with pytest.raises(ValueError, match="Missing required parameters"):
+        prepare_inputs(fuel_type=2, wx_date=None, lat=None, long=None, elevation=None, slope=None,
+                       aspect=None, ws=None, wd=None, ffmc=None, bui=None, pc=50, pdf=35, gfl=0.35,
+                       gcf=80, d0=None, dj=None, out_request=None, convert_fuel_type_codes=False)
 
 
-# ── C6 canopy overrides ────────────────────────────────────────────────────────
-def test_cbh_cfl_override_applies_for_c6():
-    """C6 cbh/cfl overrides must change CSFI/CFC-dependent outputs."""
-    fbp = FBP()
-    fbp.initialize(fuel_type=6, out_request=['csfi'], **BASE_KWARGS)
-    fbp.invertWindAspect()
+# ---- reset tests ----
+def test_reset_after_stages_equals_a_fresh_model_and_steps_repeat():
+    fbp = _model()
     fbp.calcSF()
     fbp.calcISZ()
     fbp.calcFMC()
-    fbp.calcISI_RSI_BE()
-    fbp.getCBH_CFL(ftype=6, cbh=3.0, cfl=1.0)
-    assert float(np.asarray(fbp.cbh).ravel()[0]) == 3.0
-    assert float(np.asarray(fbp.cfl).ravel()[0]) == 1.0
+    fbp.reset()
+    _assert_outputs_equal(fbp.getParams(ALL_OUTPUTS), _model().getParams(ALL_OUTPUTS))
+    fbp.calcSF()
+    fbp.calcISZ()
+    fresh = _model()
+    fresh.calcSF()
+    fresh.calcISZ()
+    _assert_outputs_equal(fbp.getParams(ALL_OUTPUTS), fresh.getParams(ALL_OUTPUTS))
 
 
-def test_cbh_cfl_override_rejected_for_non_c6():
-    """Only C-6 may have canopy values adjusted; other types must raise."""
+def test_reset_keeps_inputs_overrides_and_tables():
+    fbp = _model()
+    fbp.lat = np.array([45.0])
+    fbp.setParams({'ws': 35})
+    fbp.set_override('d0', 150)
+    fbp.rosParams = dict(fbp.rosParams, marker=1)
+    table = fbp.rosParams
+    fbp.runFBP()
+    fbp.reset()
+    assert fbp.lat[0] == 45.0 and fbp.ws[0] == 35
+    assert fbp.getParams(['d0']) == [150]
+    assert fbp.rosParams is table
+
+
+def test_reset_before_initialize_raises():
+    with pytest.raises(ValueError, match='initialize'):
+        FBP().reset()
+
+
+# ---- run tests ----
+def test_run_fbp_twice_is_idempotent():
+    fbp = _model()
+    _assert_outputs_equal(fbp.runFBP(), fbp.runFBP())
+
+
+# ── reset() and a runFBP that starts from the initialised inputs (D16a) ───────
+@pytest.mark.parametrize('name,value', [('hros', 1.0), ('cbh', 3.0), ('cfl', 0.5)])
+def test_run_fbp_discards_injected_results(name, value):
+    fbp = _model(fuel_type=np.array([[2, 6, 3]]))
+    fbp.runFBP()
+    fbp.setParams({name: np.full((1, 3), value)})
+    _assert_outputs_equal(fbp.runFBP(), _model(fuel_type=np.array([[2, 6, 3]])).runFBP())
+
+
+# ---- updated tests ----
+@pytest.mark.parametrize('name,value', NORMALISED_CASES)
+@pytest.mark.parametrize('route', ['setParams', 'attribute'])
+def test_updated_inputs_are_normalised_like_initialised_ones(name, value, route):
+    fbp = _model()
+    if route == 'setParams':
+        fbp.setParams({name: value})
+    else:
+        setattr(fbp, name, value)
+    expected = _model(**{name: value})
+    stored, reference = getattr(fbp, name), getattr(expected, name)
+    assert (type(stored), stored.shape, stored.dtype) == (type(reference), reference.shape, reference.dtype)
+    np.testing.assert_array_equal(np.ma.getdata(stored), np.ma.getdata(reference))
+    _assert_outputs_equal(fbp.runFBP(), expected.runFBP())
+    _assert_outputs_equal(fbp.runFBP(), expected.runFBP())
+
+
+@pytest.mark.parametrize('route', ['setParams', 'attribute'])
+def test_updated_array_inputs_keep_masks_and_normalise(route):
+    new = np.array([[-10., np.nan, 5.]])
+    fbp = _model(fuel_type=np.array([[2, 2, 2]]), slope=np.array([[1., 2., 3.]]))
+    if route == 'setParams':
+        fbp.setParams({'slope': new})
+    else:
+        fbp.slope = new
+    expected = _model(fuel_type=np.array([[2, 2, 2]]), slope=new)
+    assert fbp.slope.mask.tolist() == expected.slope.mask.tolist() == [[False, True, False]]
+    np.testing.assert_array_equal(np.ma.getdata(fbp.slope)[~fbp.slope.mask], [0., 5.])
+    _assert_outputs_equal(fbp.runFBP(), expected.runFBP())
+
+
+# ---- valid tests ----
+def test_valid_out_request_still_works():
+    """Sanity check: valid names must still run cleanly after the validation is added."""
     fbp = FBP()
-    fbp.initialize(fuel_type=2, out_request=['csfi'], **BASE_KWARGS)
-    with pytest.raises(ValueError, match='C-6'):
-        fbp.getCBH_CFL(ftype=2, cbh=3.0)
+    fbp.initialize(fuel_type=2, out_request=['hros', 'hfi', 'fire_type'], **BASE_KWARGS)
+    result = fbp.runFBP()
+    assert len(result) == 3
+
+
+@pytest.mark.parametrize('dtype', FUEL_DTYPES)
+def test_valid_fuel_codes_agree_for_every_dtype(dtype):
+    codes = [list(range(1, 21))]
+    np.testing.assert_array_equal(_hros_for(np.array(codes, dtype=dtype)),
+                                  _hros_for(np.array(codes, dtype=np.int8)))
+
+
+# ---- wind tests ----
+@pytest.mark.parametrize('name,new', [('wd', 45), ('aspect', 90)])
+@pytest.mark.parametrize('route', ['attribute', 'setParams'])
+@pytest.mark.parametrize('run_first', [False, True])
+def test_wind_aspect_updates_match_fresh_model(name, new, route, run_first):
+    fbp = _model()
+    if run_first:
+        fbp.runFBP()
+    if route == 'attribute':
+        setattr(fbp, name, new)
+    else:
+        fbp.setParams({name: new})
+    _assert_outputs_equal(fbp.runFBP(), _model(**{name: new}).runFBP())
+
+
+def test_wind_aspect_reinitialize_clears_inversion():
+    fbp = _model()
+    fbp.runFBP()
+    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2))
+    assert fbp.getParams(['wd']) == [0]
+    fbp.calcSF()
+    fbp.calcISZ()
+    fbp.calcISI_RSI_BE()
+    fresh = _model()
+    fresh.calcSF()
+    fresh.calcISZ()
+    fresh.calcISI_RSI_BE()
+    _assert_outputs_equal(fbp.getParams(ALL_OUTPUTS), fresh.getParams(ALL_OUTPUTS))
+
+
+# ---- other tests ----
+# ── Alphanumeric fuel-type input ───────────────────────────────────────────────
+def test_alpha_fuel_type_equals_numeric():
+    """fuel_type='C2' must produce identical outputs to fuel_type=2."""
+    out_req = ['hros', 'hfi', 'fire_type', 'wsv', 'raz', 'sfc', 'cfb']
+    assert _run('C2', out_req) == _run(2, out_req)
+
+
+def test_tinv_agrees_with_standard_normal_quantile():
+    """The retained Student's t (freedom=9999999) quantile equals the paper's standard normal quantile to ~1e-7."""
+    from scipy.stats import norm
+
+    from cffdrs.cffbps.python.equations.growth import _tinv
+
+    for p in (0.1, 0.25, 0.75, 0.9, 0.95):
+        assert _tinv(p) == pytest.approx(norm.ppf(p), rel=1e-6)
 
 
 # ── Season grass curing helper ─────────────────────────────────────────────────
@@ -626,25 +1238,6 @@ def test_instance_tables_are_isolated_and_mutable():
     assert 99 not in constants.open_fuel_types
 
 
-# ── Multiprocessing driver edge cases ──────────────────────────────────────────
-def test_multiprocess_default_out_request():
-    """Omitting out_request must use the runFBP defaults, not crash."""
-    ft = np.array([[[2, 3], [7, 8]]], dtype=np.int8)
-    shape = ft.shape
-
-    def full(v):
-        return np.full(shape, v, dtype=np.float64)
-
-    out = fbpMultiprocessArray(
-        fuel_type=ft, wx_date=20230701,
-        lat=full(55.0), long=full(-110.0), elevation=full(500), slope=full(10),
-        aspect=full(180), ws=full(20), wd=full(0), ffmc=full(90), bui=full(80),
-        num_processors=2, block_size=1,
-    )
-    assert len(out) == 3  # hros, hfi, fire_type
-    assert np.isfinite(out[0]).all()
-
-
 def test_block_size_estimator_never_returns_zero():
     """Small rasters must not crash the stride-0 path (3x3 previously did)."""
     from cffdrs.cffbps.python.parallel import _estimate_optimal_block_size
@@ -674,22 +1267,6 @@ def test_low_num_processors_warns_not_prints(capsys):
         )
     captured = capsys.readouterr()
     assert 'Defaulting num_processors to 2' not in captured.out
-
-
-# ── Unknown fuel-type code on the explicit-ftype path ──────────────────────────
-def test_cbh_cfl_unknown_ftype_raises_keyerror():
-    """An ftype absent from the LUT must fail with a KeyError naming the code,
-    not an opaque NoneType subscript error."""
-    fbp = FBP()
-    fbp.initialize(fuel_type=2, out_request=['csfi'], **BASE_KWARGS)
-    with pytest.raises(KeyError):
-        fbp.getCBH_CFL(ftype=25)
-
-
-# ── Own-and-return convention (python/core.py shared-template optimization) ────────
-def _assert_untouched(arr, data_snapshot, mask_snapshot):
-    np.testing.assert_array_equal(arr.data, data_snapshot)
-    np.testing.assert_array_equal(np.ma.getmaskarray(arr), mask_snapshot)
 
 
 def test_equations_do_not_mutate_input_arrays():
@@ -768,16 +1345,6 @@ def test_setattr_namedtuples_match_facade_attributes():
         assert not missing, f'{named_tuple_cls.__name__} fields not found on FBP: {missing}'
 
 
-def test_fmc_result_field_order_matches_positional_unpack():
-    """FoliarMoistureResult is unpacked positionally, not via setattr (python/core.py calcFMC):
-        self.latn, self._d0_res, ... = fm_eq.calc_foliar_moisture(...)
-    A field reorder in FoliarMoistureResult's class body would silently scramble which value
-    lands on which attribute — hasattr can't catch that, only order can."""
-    from cffdrs.cffbps.python.equations.foliar_moisture import FoliarMoistureResult
-
-    assert FoliarMoistureResult._fields == ('latn', 'd0', 'dj', 'nd', 'fmc', 'fme')
-
-
 def test_slope_wind_isi_fields_are_wired_into_isi_rsi_be_result():
     """SlopeWindISI is internal to calc_isi_rsi_be (never touches the facade
     directly); its fields are folded into ISIRSIBEResult one by one
@@ -797,14 +1364,6 @@ def test_unknown_out_request_raises():
     fbp.initialize(fuel_type=2, out_request=['hors'], **BASE_KWARGS)  # typo: 'hors' not 'hros'
     with pytest.raises(ValueError, match='hors'):
         fbp.runFBP()
-
-
-def test_valid_out_request_still_works():
-    """Sanity check: valid names must still run cleanly after the validation is added."""
-    fbp = FBP()
-    fbp.initialize(fuel_type=2, out_request=['hros', 'hfi', 'fire_type'], **BASE_KWARGS)
-    result = fbp.runFBP()
-    assert len(result) == 3
 
 
 # ── pc/pdf/gfl/gcf NaN-to-default coercion (inputs.py:_coerce) ─────────────────
@@ -850,15 +1409,6 @@ def test_importing_cffbps_does_not_import_rust_or_cupy():
     subprocess.run([sys.executable, '-c', code], check=True)
 
 
-FUEL_DTYPES = [np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.float32, np.float64]
-
-
-def _hros_for(fuel):
-    fbp = FBP()
-    fbp.initialize(**dict(BASE_KWARGS, fuel_type=fuel, out_request=['hros']))
-    return fbp.runFBP()[0][0]
-
-
 @pytest.mark.parametrize('dtype', FUEL_DTYPES)
 def test_masked_fuel_grid_keeps_its_mask_for_every_dtype(dtype):
     fuel = np.ma.array([[2, 2, 2]], dtype=dtype, mask=[[False, True, False]])
@@ -879,35 +1429,9 @@ def test_invalid_float_fuel_codes_are_masked(dtype, bad):
     assert np.isfinite(hros[0]) and np.isnan(hros[1]) and np.isfinite(hros[2])
 
 
-@pytest.mark.parametrize('dtype', FUEL_DTYPES)
-def test_valid_fuel_codes_agree_for_every_dtype(dtype):
-    codes = [list(range(1, 21))]
-    np.testing.assert_array_equal(_hros_for(np.array(codes, dtype=dtype)),
-                                  _hros_for(np.array(codes, dtype=np.int8)))
-
-
 @pytest.mark.parametrize('bad', [255, -9999, 65535])
 def test_nodata_fuel_codes_stay_masked(bad):
     assert np.isnan(_hros_for(np.array([[2, bad, 2]]))[1])
-
-
-ALL_OUTPUTS = sorted(constants.valid_outputs)
-
-
-def _model(**changes):
-    fbp = FBP()
-    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2, out_request=ALL_OUTPUTS) | changes)
-    return fbp
-
-
-def _assert_outputs_equal(actual, expected):
-    for name, left, right in zip(ALL_OUTPUTS, actual, expected, strict=True):
-        np.testing.assert_array_equal(left, right, err_msg=name)
-
-
-def test_run_fbp_twice_is_idempotent():
-    fbp = _model()
-    _assert_outputs_equal(fbp.runFBP(), fbp.runFBP())
 
 
 def test_invert_wind_aspect_twice_is_idempotent_and_getter_tracks_stage():
@@ -919,196 +1443,6 @@ def test_invert_wind_aspect_twice_is_idempotent_and_getter_tracks_stage():
     fbp.invertWindAspect()
     np.testing.assert_array_equal(fbp.wd, first[0])
     np.testing.assert_array_equal(fbp.aspect, first[1])
-
-
-@pytest.mark.parametrize('name,new', [('wd', 45), ('aspect', 90)])
-@pytest.mark.parametrize('route', ['attribute', 'setParams'])
-@pytest.mark.parametrize('run_first', [False, True])
-def test_wind_aspect_updates_match_fresh_model(name, new, route, run_first):
-    fbp = _model()
-    if run_first:
-        fbp.runFBP()
-    if route == 'attribute':
-        setattr(fbp, name, new)
-    else:
-        fbp.setParams({name: new})
-    _assert_outputs_equal(fbp.runFBP(), _model(**{name: new}).runFBP())
-
-
-def test_wind_aspect_reinitialize_clears_inversion():
-    fbp = _model()
-    fbp.runFBP()
-    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2))
-    assert fbp.getParams(['wd']) == [0]
-    fbp.calcSF()
-    fbp.calcISZ()
-    fbp.calcISI_RSI_BE()
-    fresh = _model()
-    fresh.calcSF()
-    fresh.calcISZ()
-    fresh.calcISI_RSI_BE()
-    _assert_outputs_equal(fbp.getParams(ALL_OUTPUTS), fresh.getParams(ALL_OUTPUTS))
-
-
-FMC_OUTPUTS = ['latn', 'd0', 'dj', 'nd', 'fmc', 'fme']
-OVERRIDE_ROUTES = ['initialize', 'argument', 'setParams', 'attribute', 'set_override']
-
-
-def _override_model(name, value, route, **changes):
-    fbp = _model(**changes)
-    if route == 'initialize':
-        fbp = _model(**(changes | {name: value}))
-    elif route == 'argument':
-        fbp.calcFMC(**{name: value})
-    elif route == 'setParams':
-        fbp.setParams({name: value})
-    elif route == 'attribute':
-        setattr(fbp, name, value)
-    else:
-        fbp.set_override(name, value)
-    return fbp
-
-
-@pytest.mark.parametrize('name,new', [('lat', 45.), ('long', -52.), ('elevation', 1200.),
-                                     ('wx_date', 20240102)])
-@pytest.mark.parametrize('route', ['argument', 'attribute', 'setParams'])
-def test_fmc_changes_follow_current_inputs(name, new, route):
-    fbp = _model()
-    fbp.calcFMC()
-    if route == 'argument':
-        fbp.calcFMC(**{name: new})
-    elif route == 'attribute':
-        setattr(fbp, name, new)
-    else:
-        fbp.setParams({name: new})
-    fbp.calcFMC()
-    fresh = _model(**{name: new})
-    fresh.calcFMC()
-    np.testing.assert_array_equal(fbp.getParams(FMC_OUTPUTS), fresh.getParams(FMC_OUTPUTS))
-
-
-@pytest.mark.parametrize('caller_edit', [False, True])
-def test_fmc_tracks_in_place_latitude_edits(caller_edit):
-    lat = np.array([55., 55.])
-    fbp = _model(lat=lat)
-    fbp.calcFMC()
-    (lat if caller_edit else fbp.lat)[0] = 45
-    fbp.calcFMC()
-    fresh = _model(lat=np.array([45., 55.]))
-    fresh.calcFMC()
-    for actual, expected in zip(fbp.getParams(FMC_OUTPUTS), fresh.getParams(FMC_OUTPUTS), strict=True):
-        np.testing.assert_array_equal(actual, expected)
-
-
-def test_fmc_missing_longitude_becomes_valid():
-    fbp = _model(long=np.array([np.nan]))
-    fbp.calcFMC()
-    fbp.long[0] = 110
-    fbp.calcFMC()
-    assert fbp.getParams(['dj'])[0][0] == 182
-
-
-@pytest.mark.parametrize('route', OVERRIDE_ROUTES)
-@pytest.mark.parametrize('name', ['d0', 'dj'])
-def test_fmc_overrides_replace_persist_and_clear(name, route):
-    fbp = _override_model(name, 150, route)
-    fbp.calcFMC()
-    assert fbp.getParams([name]) == [150]
-    fbp.calcFMC(**{name: 160})
-    fbp.calcFMC()
-    assert fbp.getParams([name]) == [160]
-    fbp.setParams({name: None})
-    fbp.calcFMC()
-    fresh = _model()
-    fresh.calcFMC()
-    assert fbp.getParams([name]) == fresh.getParams([name])
-
-
-@pytest.mark.parametrize('route', OVERRIDE_ROUTES)
-@pytest.mark.parametrize('year', [1999, 2000, 2023, 2024, 2100])
-def test_dj_floor_clip_and_masks_on_every_route(route, year):
-    import warnings
-    top = 366 if year in (2000, 2024) else 365
-    supplied = np.ma.array([2.4, 2.6, 1.999, 166.9, .3, 0, -5, 365, 366, 366.9, 400,
-                            np.nan, 999, np.inf], mask=[False] * 12 + [True, True])
-    with warnings.catch_warnings(record=True) as seen:
-        warnings.simplefilter('always')
-        fbp = _override_model('dj', supplied, route, wx_date=year * 10000 + 101,
-                              lat=np.full(supplied.shape, 55.))
-        fbp.calcFMC()
-        fbp.calcFMC()
-    # the -5 cell is a calculate request (derived day 1 on 1 January), not a clipped value
-    count = 3 if top == 366 else 5
-    assert [str(w.message) for w in seen] == [
-        f'dj override: {count} value(s) outside 1..{top} (year {year}) were clipped']
-    actual = fbp.getParams(['dj'])[0]
-    assert actual.dtype == np.float64
-    np.testing.assert_array_equal(actual, [2, 2, 1, 166, 1, 1, 1, 365, top, top, top,
-                                          np.nan, np.nan, np.nan])
-    assert np.isnan(fbp.getParams(['fmc'])[0][-3:]).all()
-    assert np.isnan(fbp.getParams(['fme'])[0][-3:]).all()
-
-
-@pytest.mark.parametrize('route', OVERRIDE_ROUTES)
-@pytest.mark.parametrize('value', [np.inf, -np.inf])
-def test_dj_rejects_unmasked_infinity_on_every_route(route, value):
-    with pytest.raises(ValueError, match='infin'):
-        fbp = _override_model('dj', value, route)
-        fbp.calcFMC()
-
-
-@pytest.mark.parametrize('value', [365., 166.9, np.nan, np.ma.array([400.], mask=True)])
-def test_dj_in_range_fraction_and_missing_do_not_warn(value):
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter('error')
-        fbp = _model(dj=value)
-        fbp.calcFMC()
-
-
-@pytest.mark.parametrize('value', [0., 366., 367., 400.])
-def test_dj_clipping_is_a_user_warning(value):
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter('error')
-        with pytest.raises(UserWarning, match='clipped'):
-            fbp = _model(dj=value)
-            fbp.calcFMC()
-
-
-def test_dj_supplied_value_is_sticky_across_years():
-    import warnings
-    fbp = _model(dj=366, wx_date=20240101)
-    fbp.calcFMC()
-    assert fbp.getParams(['dj']) == [366]
-    for year, expected in [(2023, 365), (2000, 366), (1999, 365), (2100, 365), (2024, 366)]:
-        with warnings.catch_warnings(record=True) as seen:
-            warnings.simplefilter('always')
-            fbp.wx_date = year * 10000 + 101
-            fbp.calcFMC()
-        assert len(seen) == (expected == 365)
-        assert fbp.getParams(['dj']) == [expected]
-    with warnings.catch_warnings():
-        warnings.simplefilter('error')
-        fbp.wx_date = 20230101
-        fbp.calcFMC()
-
-
-@pytest.mark.parametrize('name', ['d0', 'dj'])
-def test_fmc_masked_override_keeps_hidden_finite_data_masked(name):
-    value = np.ma.array([150, 150], mask=[False, True])
-    fbp = _override_model(name, value, 'set_override', lat=np.array([55., 55.]))
-    fbp.calcFMC()
-    assert np.isnan(fbp.getParams(['fmc'])[0][1])
-    fbp2 = _override_model(name, value, 'attribute', lat=np.array([55., 55.]))
-    fbp2.calcFMC()
-    np.testing.assert_array_equal(fbp.getParams(['fmc']), fbp2.getParams(['fmc']))
-
-
-def test_dj_complete_override_exports_int64():
-    fbp = _model(dj=np.array([2.4, 166.9]), lat=np.array([55., 55.]))
-    fbp.calcFMC()
-    assert fbp.getParams(['dj'])[0].dtype == np.int64
 
 
 @pytest.mark.parametrize('lat,long,elevation,expected', [(83, -52, 5959, 370.), (0, -110, 0, 0.)])
@@ -1127,16 +1461,6 @@ def test_d0_regression_is_not_calendar_limited(lat, long, elevation, expected):
     assert fbp.getParams(['d0']) == [0]
 
 
-def test_fmc_reinitialize_clears_overrides():
-    fbp = _model(d0=1, dj=2)
-    fbp.calcFMC()
-    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2))
-    fbp.calcFMC()
-    fresh = _model()
-    fresh.calcFMC()
-    np.testing.assert_array_equal(fbp.getParams(FMC_OUTPUTS), fresh.getParams(FMC_OUTPUTS))
-
-
 def test_scalar_parameters_and_replacement_fuel_persist():
     fbp = _model(fuel_type=np.array([[2, 2, 2]]))
     fbp.runFBP()
@@ -1148,192 +1472,10 @@ def test_scalar_parameters_and_replacement_fuel_persist():
     _assert_outputs_equal(fbp.runFBP(), fresh.runFBP())
 
 
-def test_fmc_cache_reuses_exact_inputs_and_owns_results(monkeypatch):
-    from cffdrs.cffbps.python.equations import foliar_moisture as fmc
-    real = fmc.calc_foliar_moisture
-    calls = []
-
-    def counted(**kw):
-        calls.append(None)
-        return real(**kw)
-
-    monkeypatch.setattr(fmc, 'calc_foliar_moisture', counted)
-    fbp = _model(lat=np.array([55., 55.]))
-    fbp.calcFMC()
-    expected = [v.copy() for v in fbp.getParams(FMC_OUTPUTS)]
-    fbp.calcFMC()
-    assert len(calls) == 1
-    fbp.fmc[...] = 0
-    fbp.d0[...] = 0
-    fbp.getParams(['fme'])[0][...] = 0
-    fbp.setParams({'fme': 1})
-    fbp.calcFMC()
-    assert len(calls) == 1
-    for actual, want in zip(fbp.getParams(FMC_OUTPUTS), expected, strict=True):
-        np.testing.assert_array_equal(actual, want)
-    fbp.lat.mask = [True, False]
-    fbp.calcFMC()
-    assert len(calls) == 2
-    fbp.lat = fbp.lat.astype(np.float32)
-    fbp.calcFMC()
-    assert len(calls) == 3
-    fbp.lat = fbp.lat.reshape(1, 2)
-    fbp.calcFMC()
-    assert len(calls) == 4
-
-
-# ── reset() and a runFBP that starts from the initialised inputs (D16a) ───────
-@pytest.mark.parametrize('name,value', [('hros', 1.0), ('cbh', 3.0), ('cfl', 0.5)])
-def test_run_fbp_discards_injected_results(name, value):
-    fbp = _model(fuel_type=np.array([[2, 6, 3]]))
-    fbp.runFBP()
-    fbp.setParams({name: np.full((1, 3), value)})
-    _assert_outputs_equal(fbp.runFBP(), _model(fuel_type=np.array([[2, 6, 3]])).runFBP())
-
-
-def test_reset_after_stages_equals_a_fresh_model_and_steps_repeat():
-    fbp = _model()
-    fbp.calcSF()
-    fbp.calcISZ()
-    fbp.calcFMC()
-    fbp.reset()
-    _assert_outputs_equal(fbp.getParams(ALL_OUTPUTS), _model().getParams(ALL_OUTPUTS))
-    fbp.calcSF()
-    fbp.calcISZ()
-    fresh = _model()
-    fresh.calcSF()
-    fresh.calcISZ()
-    _assert_outputs_equal(fbp.getParams(ALL_OUTPUTS), fresh.getParams(ALL_OUTPUTS))
-
-
-def test_reset_keeps_inputs_overrides_and_tables():
-    fbp = _model()
-    fbp.lat = np.array([45.0])
-    fbp.setParams({'ws': 35})
-    fbp.set_override('d0', 150)
-    fbp.rosParams = dict(fbp.rosParams, marker=1)
-    table = fbp.rosParams
-    fbp.runFBP()
-    fbp.reset()
-    assert fbp.lat[0] == 45.0 and fbp.ws[0] == 35
-    assert fbp.getParams(['d0']) == [150]
-    assert fbp.rosParams is table
-
-
-def test_reset_before_initialize_raises():
-    with pytest.raises(ValueError, match='initialize'):
-        FBP().reset()
-
-
-# ── updated inputs are normalised exactly like initialised ones (D16f) ────────
-NORMALISED_CASES = [('slope', -10), ('aspect', -5), ('ws', -1), ('ffmc', -1), ('bui', -1),
-                    ('pc', -1), ('pdf', -1), ('gfl', -1), ('gcf', 0)]
-
-
-@pytest.mark.parametrize('name,value', NORMALISED_CASES)
-@pytest.mark.parametrize('route', ['setParams', 'attribute'])
-def test_updated_inputs_are_normalised_like_initialised_ones(name, value, route):
-    fbp = _model()
-    if route == 'setParams':
-        fbp.setParams({name: value})
-    else:
-        setattr(fbp, name, value)
-    expected = _model(**{name: value})
-    stored, reference = getattr(fbp, name), getattr(expected, name)
-    assert (type(stored), stored.shape, stored.dtype) == (type(reference), reference.shape, reference.dtype)
-    np.testing.assert_array_equal(np.ma.getdata(stored), np.ma.getdata(reference))
-    _assert_outputs_equal(fbp.runFBP(), expected.runFBP())
-    _assert_outputs_equal(fbp.runFBP(), expected.runFBP())
-
-
-@pytest.mark.parametrize('route', ['setParams', 'attribute'])
-def test_updated_array_inputs_keep_masks_and_normalise(route):
-    new = np.array([[-10., np.nan, 5.]])
-    fbp = _model(fuel_type=np.array([[2, 2, 2]]), slope=np.array([[1., 2., 3.]]))
-    if route == 'setParams':
-        fbp.setParams({'slope': new})
-    else:
-        fbp.slope = new
-    expected = _model(fuel_type=np.array([[2, 2, 2]]), slope=new)
-    assert fbp.slope.mask.tolist() == expected.slope.mask.tolist() == [[False, True, False]]
-    np.testing.assert_array_equal(np.ma.getdata(fbp.slope)[~fbp.slope.mask], [0., 5.])
-    _assert_outputs_equal(fbp.runFBP(), expected.runFBP())
-
-
 def test_in_range_updates_are_untouched():
     fbp = _model()
     fbp.setParams({'slope': 25, 'aspect': 90, 'gcf': 40})
     _assert_outputs_equal(fbp.runFBP(), _model(slope=25, aspect=90, gcf=40).runFBP())
-
-
-# ── shared input preparation (Rust backend uses the same function) ────────────
-def test_prepare_inputs_matches_initialize_state():
-    from cffdrs.cffbps.common.inputs import prepare_inputs
-    kw = dict(fuel_type=np.array([[2, 3]]), wx_date=20230615, lat=np.full((1, 2), 55.0),
-              long=np.full((1, 2), -110.0), elevation=np.full((1, 2), 500.0),
-              slope=np.full((1, 2), 10.0), aspect=np.full((1, 2), 270.0),
-              ws=np.full((1, 2), 20.0), wd=np.zeros((1, 2)), ffmc=91.0, bui=76.0)
-    fbp = FBP()
-    fbp.initialize(**kw)
-    p = prepare_inputs(pc=50, pdf=35, gfl=0.35, gcf=80, d0=None, dj=None, out_request=None,
-                       convert_fuel_type_codes=False, **kw)
-    for name, value in p.verified._asdict().items():
-        if name == 'ftypes':
-            assert fbp.ftypes == value
-        elif name in ('d0', 'dj', 'fmc'):
-            assert value is None
-        else:
-            assert np.ma.allequal(getattr(fbp, name), value), name
-    assert p.return_array is True
-    assert p.ref_array.shape == (1, 2)
-
-
-def test_prepare_inputs_reports_every_missing_required_parameter():
-    from cffdrs.cffbps.common.inputs import prepare_inputs
-    with pytest.raises(ValueError, match="Missing required parameters"):
-        prepare_inputs(fuel_type=2, wx_date=None, lat=None, long=None, elevation=None, slope=None,
-                       aspect=None, ws=None, wd=None, ffmc=None, bui=None, pc=50, pdf=35, gfl=0.35,
-                       gcf=80, d0=None, dj=None, out_request=None, convert_fuel_type_codes=False)
-
-
-# ── no fuel is consumed when the fire does not spread ─────────────────────────
-CONSUMPTION = ['ffc', 'wfc', 'sfc', 'cfc', 'tfc']
-
-
-def _consumption(**changes):
-    fbp = FBP()
-    fbp.initialize(**dict(BASE_KWARGS, out_request=CONSUMPTION + ['hros', 'hfi']) | changes)
-    return dict(zip(CONSUMPTION + ['hros', 'hfi'], fbp.runFBP(), strict=True))
-
-
-@pytest.mark.parametrize('bui', [0., 30., 60., 69.9])
-def test_d2_below_bui_70_consumes_no_fuel(bui):
-    out = _consumption(fuel_type=9, bui=bui)
-    assert out['hros'] == 0
-    assert [out[name] for name in CONSUMPTION] == [0, 0, 0, 0, 0]
-    assert out['hfi'] == 0
-
-
-@pytest.mark.parametrize('bui', [70., 80.])
-def test_d2_from_bui_70_consumes_fuel(bui):
-    out = _consumption(fuel_type=9, bui=bui)
-    assert out['hros'] > 0
-    assert out['sfc'] > 0 and out['tfc'] > 0
-
-
-def test_injected_zero_ros_consumes_no_fuel():
-    fbp = FBP()
-    fbp.initialize(**dict(BASE_KWARGS, fuel_type=2, out_request=CONSUMPTION))
-    fbp.runFBP()
-    fbp.reset()
-    for step in ('invertWindAspect', 'calcSF', 'calcISZ', 'calcFMC', 'calcISI_RSI_BE', 'calcROS'):
-        getattr(fbp, step)()
-    fbp.setParams({'hros': 0.0})
-    for step in ('calcSFC', 'getCBH_CFL', 'calcCSFI', 'calcRSO', 'calcC6BlendCFB', 'calcC6BlendCFC', 'calcC6CROS',
-                 'calcC6HROS', 'calcPercentileCFB', 'calcRosPercentileGrowth', 'calcCFB', 'calcAccelParam',
-                 'calcFireType', 'calcCFC', 'calcTFC'):
-        getattr(fbp, step)()
-    assert fbp.getParams(CONSUMPTION) == [0, 0, 0, 0, 0]
 
 
 @pytest.mark.parametrize('missing', ['ws', 'wd', 'slope', 'aspect'])
@@ -1351,121 +1493,11 @@ def test_missing_ros_inputs_make_every_consumption_output_missing(missing):
     assert all(np.isfinite(out[name][0, 1]) and out[name][0, 1] > 0 for name in ('sfc', 'tfc', 'hros'))
 
 
-@pytest.mark.parametrize('fuel', [19, 20, 0, 99])
-def test_non_fuel_cells_stay_missing_not_zero(fuel):
-    kwargs = {k: np.full((1, 1), v) for k, v in BASE_KWARGS.items() if k != 'wx_date'}
-    kwargs.update(wx_date=BASE_KWARGS['wx_date'], fuel_type=np.array([[fuel]]))
-    fbp = FBP()
-    fbp.initialize(**kwargs, out_request=CONSUMPTION + ['hros'])
-    assert all(np.isnan(v).all() for v in fbp.runFBP())
-
-
-# ── a user-provided fmc gives the matching foliar moisture effect ─────────────
-PYROCELL_STEPS = ['calcISI_RSI_BE', 'calcROS', 'calcSFC', 'getCBH_CFL', 'calcCSFI', 'calcRSO', 'calcC6BlendCFB',
-                  'calcC6BlendCFC', 'calcC6CROS', 'calcC6HROS', 'calcPercentileCFB', 'calcRosPercentileGrowth',
-                  'calcCFB', 'calcAccelParam', 'calcFireType', 'calcCFC', 'calcTFC', 'calcHFI',
-                  'calcFireIntensityClass']
-C6_OUTPUTS = ['hros', 'cfb', 'hfi', 'fire_type', 'fi_class', 'tfc', 'accel', 'cros']
-
-
-def _inject_fmc_and_run(fmc, route, **extra):
-    fbp = _model(fuel_type=6, **extra)
-    for step in ('invertWindAspect', 'calcSF', 'calcISZ'):
-        getattr(fbp, step)()
-    if route == 'setParams':
-        fbp.setParams({'fmc': fmc})
-    else:
-        fbp.fmc = fmc
-    for step in PYROCELL_STEPS:
-        getattr(fbp, step)()
-    return fbp
-
-
-@pytest.mark.parametrize('route', ['setParams', 'attribute'])
-def test_injected_fmc_gives_the_same_c6_result_as_calc_fmc(route):
-    reference = _model(fuel_type=6, ws=40, ffmc=95, bui=90)
-    computed = reference.runFBP()
-    fmc = reference.getParams(['fmc'])[0]
-    fme = reference.getParams(['fme'])[0]
-    assert fme > 0
-    injected = _inject_fmc_and_run(fmc, route, ws=40, ffmc=95, bui=90)
-    assert injected.getParams(['fme'])[0] == pytest.approx(fme, rel=1e-12)
-    expected = dict(zip(ALL_OUTPUTS, computed, strict=True))
-    for name, value in zip(C6_OUTPUTS, injected.getParams(C6_OUTPUTS), strict=True):
-        np.testing.assert_allclose(value, expected[name], rtol=1e-12, err_msg=name)
-    assert expected['cros'] > 0
-
-
-def test_injected_fmc_derives_fme_from_the_formula():
-    fbp = _model(fuel_type=6)
-    fbp.setParams({'fmc': 100.0})
-    expected = 1000 * (1.5 - 0.00275 * 100.0) ** 4 / (460 + 25.9 * 100.0)
-    assert fbp.getParams(['fme']) == [pytest.approx(expected, rel=1e-12)]
-    fbp.setParams({'fmc': np.nan})
-    assert np.ma.is_masked(fbp.fme)          # a missing fmc gives a missing fme
-
-
 def test_an_explicit_fme_wins_over_the_derived_one_in_either_key_order():
     for update in ({'fmc': 100.0, 'fme': 0.7}, {'fme': 0.7, 'fmc': 100.0}):
         fbp = _model(fuel_type=6)
         fbp.setParams(update)
         assert fbp.getParams(['fme']) == [0.7]
-
-
-def test_a_fmc_override_survives_reset_and_calc_fmc_still_uses_it():
-    fbp = _model(fuel_type=6)
-    fbp.setParams({'fmc': 100.0})
-    fbp.reset()
-    assert fbp.getParams(['fmc']) == [100.0]
-    assert fbp.getParams(['fme'])[0] == pytest.approx(0.7383198002049183, rel=1e-12)   # derived again after reset
-    fbp.calcFMC()
-    assert fbp.getParams(['fmc']) == [100.0]
-
-
-def test_fmc_given_at_initialize_is_used_by_every_run_until_a_new_initialize():
-    fbp = _model(fuel_type=6, fmc=100.0)
-    first, second = fbp.runFBP(), fbp.runFBP()
-    _assert_outputs_equal(first, second)
-    assert fbp.getParams(['fmc']) == [100.0]
-    fbp.initialize(**dict(BASE_KWARGS, fuel_type=6, out_request=ALL_OUTPUTS))      # a new initialize starts clean
-    fbp.runFBP()
-    assert fbp.getParams(['fmc'])[0] != 100.0
-
-
-def test_a_fmc_override_replaces_only_fmc_and_fme_and_the_rest_stays_calculated():
-    calculated = _model(fuel_type=6)
-    calculated.calcFMC()
-    overridden = _model(fuel_type=6, fmc=100.0)
-    overridden.calcFMC()
-    names = ['latn', 'd0', 'dj', 'nd']
-    assert overridden.getParams(names) == calculated.getParams(names)
-    assert overridden.getParams(['fmc']) == [100.0]
-    assert overridden.getParams(['fme'])[0] == pytest.approx(1000 * (1.5 - 0.00275 * 100.0) ** 4 / (460 + 25.9 * 100.0))
-
-
-@pytest.mark.parametrize('route', ['setParams', 'set_override', 'attribute', 'calcFMC'])
-def test_the_fmc_override_can_be_cleared_with_none(route):
-    fbp = _model(fuel_type=6, fmc=100.0)
-    calculated = _model(fuel_type=6)
-    calculated.calcFMC()
-    if route == 'setParams':
-        fbp.setParams({'fmc': None})
-    elif route == 'set_override':
-        fbp.set_override('fmc', None)
-    elif route == 'attribute':
-        fbp.fmc = None
-    else:
-        fbp.set_override('fmc', None)
-    fbp.calcFMC()
-    assert fbp.getParams(['fmc', 'fme']) == calculated.getParams(['fmc', 'fme'])
-
-
-def test_the_calc_fmc_argument_sets_the_override():
-    fbp = _model(fuel_type=6)
-    fbp.calcFMC(fmc=90.0)
-    assert fbp.getParams(['fmc']) == [90.0]
-    fbp.calcFMC()                                    # omitted arguments preserve the override
-    assert fbp.getParams(['fmc']) == [90.0]
 
 
 def test_an_array_fmc_override_with_a_nan_cell_makes_that_cell_missing():
@@ -1478,22 +1510,3 @@ def test_an_array_fmc_override_with_a_nan_cell_makes_that_cell_missing():
     fmc, fme = fbp.runFBP()
     assert fmc.tolist()[0][0] == 90.0 and np.isnan(fmc[0, 1]) and fmc[0, 2] == 110.0
     assert np.isnan(fme[0, 1]) and np.isfinite(fme[0, 0])
-
-
-def test_the_fmc_cache_follows_the_override(monkeypatch):
-    from cffdrs.cffbps.python.equations import foliar_moisture as fm
-    real = fm.calc_foliar_moisture
-    calls = []
-
-    def counted(**kw):
-        calls.append(kw['fmc_override'])
-        return real(**kw)
-
-    monkeypatch.setattr(fm, 'calc_foliar_moisture', counted)
-    fbp = _model(fuel_type=6, fmc=100.0)
-    fbp.calcFMC()
-    fbp.calcFMC()
-    assert len(calls) == 1                           # identical inputs reuse the result
-    fbp.set_override('fmc', 95.0)
-    fbp.calcFMC()
-    assert len(calls) == 2 and fbp.getParams(['fmc']) == [95.0]

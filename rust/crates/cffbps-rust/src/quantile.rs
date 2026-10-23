@@ -47,14 +47,14 @@ fn erfc_nonneg(x: f64) -> f64 {
     }
 }
 
-/// Standard normal CDF for `z <= 0` (the lower tail used by the solver).
-fn phi_lower(z: f64) -> f64 {
-    0.5 * erfc_nonneg(-z / SQRT_2)
-}
-
 /// Standard normal density.
 fn pdf(z: f64) -> f64 {
     (-0.5 * z * z).exp() / (2.0 * PI).sqrt()
+}
+
+/// Standard normal CDF for `z <= 0` (the lower tail used by the solver).
+fn phi_lower(z: f64) -> f64 {
+    0.5 * erfc_nonneg(-z / SQRT_2)
 }
 
 /// Standard normal quantile. `p <= 0` gives `-inf`, `p >= 1` gives `+inf`,
@@ -124,24 +124,7 @@ mod tests {
         (0.99999, 4.264_892_839_930_939),
     ];
 
-    #[test]
-    fn t_quantile_matches_scipy_at_df_9999999() {
-        for &(p, expected) in SCIPY_T {
-            let got = t_quantile_large_df(p, 9_999_999.0);
-            let rel = ((got - expected) / expected).abs();
-            assert!(
-                rel <= 1e-11,
-                "p={p}: expected {expected}, got {got} (rel {rel:e})"
-            );
-        }
-    }
-
-    #[test]
-    fn median_is_exactly_zero() {
-        assert_eq!(t_quantile_large_df(0.5, 9_999_999.0), 0.0);
-        assert_eq!(normal_quantile(0.5), 0.0);
-    }
-
+    // ---- normal tests ----
     #[test]
     fn normal_quantile_is_odd_symmetric() {
         // dyadic p so that 1 - p is exact in floating point
@@ -159,6 +142,25 @@ mod tests {
         // Standard references: z(0.975) = 1.959963984540054, z(0.995) = 2.5758293035489004
         assert!((normal_quantile(0.975) - 1.959_963_984_540_054).abs() <= 1e-13);
         assert!((normal_quantile(0.995) - 2.575_829_303_548_900_4).abs() <= 1e-13);
+    }
+
+    // ---- other tests ----
+    #[test]
+    fn t_quantile_matches_scipy_at_df_9999999() {
+        for &(p, expected) in SCIPY_T {
+            let got = t_quantile_large_df(p, 9_999_999.0);
+            let rel = ((got - expected) / expected).abs();
+            assert!(
+                rel <= 1e-11,
+                "p={p}: expected {expected}, got {got} (rel {rel:e})"
+            );
+        }
+    }
+
+    #[test]
+    fn median_is_exactly_zero() {
+        assert_eq!(t_quantile_large_df(0.5, 9_999_999.0), 0.0);
+        assert_eq!(normal_quantile(0.5), 0.0);
     }
 
     #[test]

@@ -2,15 +2,14 @@
 //! weather step, producing any of the per-cell fields ([`run_grid_fields`]) or
 //! the behaviour grids a fire-growth engine consumes ([`run_grid`]).
 
-use std::fmt;
-use std::sync::Mutex;
-
 use crate::fbp::{run, FbpInput, FbpResult};
 use crate::field::Field;
 use crate::foliar_moisture::{is_leap_year, is_valid_wx_date};
 use crate::fuel::FuelType;
 use crate::stage::Stage;
 use crate::state::CellState;
+use std::fmt;
+use std::sync::Mutex;
 
 /// One grid input: a constant shared by every cell, or one value per cell.
 ///
@@ -59,15 +58,6 @@ impl<'a> From<&'a Vec<f64>> for PerCell<'a> {
 }
 
 impl PerCell<'_> {
-    /// The value for cell `i` (`Cells` must have been length-checked).
-    #[inline]
-    pub(crate) fn at(&self, i: usize) -> f64 {
-        match self {
-            PerCell::Const(v) => *v,
-            PerCell::Cells(values) => values[i],
-        }
-    }
-
     /// Whether this input fits a grid of `n` cells (`Const` always fits).
     fn check_len(&self, n: usize) -> bool {
         match self {
@@ -83,6 +73,15 @@ impl PerCell<'_> {
             PerCell::Cells(values) => values.len(),
         }
     }
+
+    /// The value for cell `i` (`Cells` must have been length-checked).
+    #[inline]
+    pub(crate) fn at(&self, i: usize) -> f64 {
+        match self {
+            PerCell::Const(v) => *v,
+            PerCell::Cells(values) => values[i],
+        }
+    }
 }
 
 /// An owned [`PerCell`]: a constant, or one value per cell.
@@ -95,6 +94,14 @@ pub(crate) enum OwnedPerCell {
 }
 
 impl OwnedPerCell {
+    /// A borrowed view.
+    pub(crate) fn as_per_cell(&self) -> PerCell<'_> {
+        match self {
+            OwnedPerCell::Const(v) => PerCell::Const(*v),
+            OwnedPerCell::Cells(values) => PerCell::Cells(values),
+        }
+    }
+
     /// The value for cell `i`.
     #[inline]
     pub(crate) fn at(&self, i: usize) -> f64 {
@@ -104,11 +111,11 @@ impl OwnedPerCell {
         }
     }
 
-    /// A borrowed view.
-    pub(crate) fn as_per_cell(&self) -> PerCell<'_> {
+    /// Bytes held (a constant counts as one value).
+    pub(crate) fn bytes(&self) -> usize {
         match self {
-            OwnedPerCell::Const(v) => PerCell::Const(*v),
-            OwnedPerCell::Cells(values) => PerCell::Cells(values),
+            OwnedPerCell::Const(_) => std::mem::size_of::<f64>(),
+            OwnedPerCell::Cells(values) => std::mem::size_of_val(values.as_slice()),
         }
     }
 
@@ -119,14 +126,6 @@ impl OwnedPerCell {
             OwnedPerCell::Cells(values) => {
                 OwnedPerCell::Cells(values.iter().map(|&v| f(v)).collect())
             }
-        }
-    }
-
-    /// Bytes held (a constant counts as one value).
-    pub(crate) fn bytes(&self) -> usize {
-        match self {
-            OwnedPerCell::Const(_) => std::mem::size_of::<f64>(),
-            OwnedPerCell::Cells(values) => std::mem::size_of_val(values.as_slice()),
         }
     }
 }
@@ -349,65 +348,6 @@ const BEHAVIOUR_FIELDS: [Field; 10] = [
     Field::Accel,
 ];
 
-/// A supplied `dj` override resolved to the days of the year of `wx_date`
-/// (D15.6 of the FMC contract): each value is floored, then clipped to 1..365,
-/// or 1..366 in a leap year; NaN stays NaN (a masked override) and a negative
-/// value (a request to calculate that cell) is kept as given: it is neither
-/// floored, clipped nor counted. Returns the
-/// resolved values and how many supplied values clipping changed (flooring a
-/// fraction does not count; a `Const` is one value).
-///
-/// # Errors
-///
-/// [`GridError::InfiniteDj`] if any supplied value is infinite.
-pub(crate) fn resolve_dj(
-    supplied: PerCell<'_>,
-    wx_date: i64,
-) -> Result<(OwnedPerCell, usize), GridError> {
-    let last_day = if is_leap_year(wx_date / 10_000) {
-        366.0
-    } else {
-        365.0
-    };
-    // (resolved, changed by clipping); NaN stays NaN and is not counted
-    let one = |v: f64| -> Result<(f64, bool), GridError> {
-        if v.is_infinite() {
-            return Err(GridError::InfiniteDj);
-        }
-        if v < 0.0 {
-            return Ok((v, false));
-        }
-        let day = v.floor();
-        let clipped = day.clamp(1.0, last_day);
-        Ok((clipped, clipped != day && !v.is_nan()))
-    };
-    match supplied {
-        PerCell::Const(v) => {
-            let (day, changed) = one(v)?;
-            Ok((OwnedPerCell::Const(day), usize::from(changed)))
-        }
-        PerCell::Cells(values) => {
-            let mut days = Vec::with_capacity(supplied.supplied_len());
-            let mut changed = 0;
-            for &v in values {
-                let (day, c) = one(v)?;
-                days.push(day);
-                changed += usize::from(c);
-            }
-            Ok((OwnedPerCell::Cells(days), changed))
-        }
-    }
-}
-
-/// A constant negative override asks for every cell to be calculated, which is what no
-/// override does: it is dropped. Arrays keep their negative cells (calculated one by one).
-pub(crate) fn without_constant_request(values: Option<PerCell<'_>>) -> Option<PerCell<'_>> {
-    match values {
-        Some(PerCell::Const(v)) if v < 0.0 && v.is_finite() => None,
-        other => other,
-    }
-}
-
 impl GridInput<'_> {
     /// The checks of [`run_grid_fields`], in its documented order; on success
     /// the resolved `dj` override and its clipped count.
@@ -570,6 +510,17 @@ impl Pass<'_, '_> {
     }
 }
 
+/// Below this many cells the thread start-up cost outweighs the gain.
+const MIN_PARALLEL_CELLS: usize = 4096;
+
+/// Computes every cell of `pass` into `out` (one vector of `n` values per
+/// requested field), on the calling thread or on `threads` workers.
+fn fill_threaded(pass: &Pass<'_, '_>, n: usize, threads: usize, out: &mut [Vec<f64>]) {
+    fill_chunks(n, threads, out, |start, len, part| {
+        pass.fill(start, len, part);
+    });
+}
+
 /// The value of output field `f` in `r` (the order of
 /// [`FbpResult::named_values`]); NaN for a field that is not an output.
 #[inline]
@@ -631,6 +582,60 @@ fn output_value(r: &FbpResult, f: Field) -> f64 {
         Field::FuelType => r.fuel_type,
         _ => f64::NAN,
     }
+}
+
+/// Calls `fill(start, len, part)` for consecutive chunks of the `n` cells,
+/// `part` holding cells `start..start + len` of every vector of `out`: once on
+/// the calling thread when `threads` is 1 or the grid has fewer than
+/// [`MIN_PARALLEL_CELLS`] cells, otherwise from `threads` workers (0 = every
+/// available core) taking small chunks from a shared queue. Every cell is
+/// filled exactly once, so the result does not depend on `threads`.
+pub(crate) fn fill_chunks(
+    n: usize,
+    threads: usize,
+    out: &mut [Vec<f64>],
+    fill: impl Fn(usize, usize, &mut [&mut [f64]]) + Sync,
+) {
+    let threads = if threads == 0 {
+        std::thread::available_parallelism().map_or(1, usize::from)
+    } else {
+        threads
+    };
+    let mut rest: Vec<&mut [f64]> = out.iter_mut().map(Vec::as_mut_slice).collect();
+    if threads <= 1 || n < MIN_PARALLEL_CELLS {
+        fill(0, n, &mut rest);
+        return;
+    }
+    // Many small chunks handed out one at a time keep threads busy when fuel
+    // types cost different amounts (non-modeled cells are nearly free).
+    let chunk_len = n.div_ceil(threads * 8).max(1);
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    while start < n {
+        let len = chunk_len.min(n - start);
+        let part: Vec<&mut [f64]> = rest
+            .iter_mut()
+            .map(|s| {
+                let (head, tail) = std::mem::take(s).split_at_mut(len);
+                *s = tail;
+                head
+            })
+            .collect();
+        chunks.push((start, len, part));
+        start += len;
+    }
+    let queue = Mutex::new(chunks.into_iter());
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| loop {
+                let next = queue.lock().expect("queue poisoned").next();
+                match next {
+                    Some((chunk_start, len, mut part)) => fill(chunk_start, len, &mut part),
+                    None => break,
+                }
+            });
+        }
+    });
 }
 
 /// [`NonModeled::PythonCompat`]: the value the Python package's `getParams`
@@ -747,6 +752,112 @@ pub(crate) fn python_non_modeled(f: Field, ft: FuelType, cell: &FbpInput, comput
     }
 }
 
+/// A supplied `dj` override resolved to the days of the year of `wx_date`
+/// (D15.6 of the FMC contract): each value is floored, then clipped to 1..365,
+/// or 1..366 in a leap year; NaN stays NaN (a masked override) and a negative
+/// value (a request to calculate that cell) is kept as given: it is neither
+/// floored, clipped nor counted. Returns the
+/// resolved values and how many supplied values clipping changed (flooring a
+/// fraction does not count; a `Const` is one value).
+///
+/// # Errors
+///
+/// [`GridError::InfiniteDj`] if any supplied value is infinite.
+pub(crate) fn resolve_dj(
+    supplied: PerCell<'_>,
+    wx_date: i64,
+) -> Result<(OwnedPerCell, usize), GridError> {
+    let last_day = if is_leap_year(wx_date / 10_000) {
+        366.0
+    } else {
+        365.0
+    };
+    // (resolved, changed by clipping); NaN stays NaN and is not counted
+    let one = |v: f64| -> Result<(f64, bool), GridError> {
+        if v.is_infinite() {
+            return Err(GridError::InfiniteDj);
+        }
+        if v < 0.0 {
+            return Ok((v, false));
+        }
+        let day = v.floor();
+        let clipped = day.clamp(1.0, last_day);
+        Ok((clipped, clipped != day && !v.is_nan()))
+    };
+    match supplied {
+        PerCell::Const(v) => {
+            let (day, changed) = one(v)?;
+            Ok((OwnedPerCell::Const(day), usize::from(changed)))
+        }
+        PerCell::Cells(values) => {
+            let mut days = Vec::with_capacity(supplied.supplied_len());
+            let mut changed = 0;
+            for &v in values {
+                let (day, c) = one(v)?;
+                days.push(day);
+                changed += usize::from(c);
+            }
+            Ok((OwnedPerCell::Cells(days), changed))
+        }
+    }
+}
+
+/// The grid pass for a fire-growth engine: the ten [`BehaviourGrids`] for
+/// every cell. One call per weather step; non-modeled cells (codes outside
+/// 1..18) yield NaN behaviour, which engines exclude via their burnable masks.
+/// A NaN input in a modeled cell is a missing/masked value and propagates to
+/// that cell's outputs only.
+///
+/// [`run_grid_fields`] with the ten fields and [`NonModeled::Nan`] on the
+/// calling thread; the Python counterpart is `cffdrs._rust.run_fbp_grid`.
+///
+/// # Errors
+///
+/// The same as [`run_grid_fields`].
+///
+/// # Panics
+///
+/// Never panics: bad input is reported through the `Err` variants above.
+///
+/// # Examples
+///
+/// ```
+/// use cffbps_rust::grid::{run_grid, GridError, GridInput};
+///
+/// let input = GridInput {
+///     fuel_type: &[2, 19], // C-2 and a non-fuel cell
+///     lat: (&[52.0, 52.0]).into(),
+///     long: (&[-115.0, -115.0]).into(),
+///     elevation: (&[800.0, 800.0]).into(),
+///     slope_pct: (&[10.0, 0.0]).into(),
+///     aspect_deg: (&[180.0, 0.0]).into(),
+///     pct_conifer: 0.0.into(),
+///     pct_dead_fir: 0.0.into(),
+///     grass_fuel_load: 0.0.into(),
+///     grass_curing: 0.0.into(),
+///     ws: 20.0.into(),
+///     wd: 270.0.into(),
+///     ffmc: 90.0.into(),
+///     bui: 80.0.into(),
+///     wx_date: 20_230_615,
+///     percentile_growth: 50.0,
+///     d0: None,
+///     dj: None,
+///     fmc: None,
+/// };
+/// let grids = run_grid(&input).unwrap();
+/// assert_eq!(grids.hros.len(), 2);
+/// assert!(grids.hros[0] > 0.0);
+/// assert!(grids.hros[1].is_nan()); // non-fuel cell: NaN behaviour
+///
+/// // An impossible date is rejected up front.
+/// let bad = GridInput { wx_date: 20_231_345, ..input };
+/// assert_eq!(run_grid(&bad).unwrap_err(), GridError::InvalidDate(20_231_345));
+/// ```
+pub fn run_grid(input: &GridInput<'_>) -> Result<BehaviourGrids, GridError> {
+    run_grid_with_threads(input, 1)
+}
+
 /// The grid pass: computes the requested `fields` for every cell.
 ///
 /// Each cell is the scalar [`crate::fbp::run`] of its inputs, with the
@@ -839,124 +950,6 @@ pub fn run_grid_fields(
     })
 }
 
-/// Computes every cell of `pass` into `out` (one vector of `n` values per
-/// requested field), on the calling thread or on `threads` workers.
-fn fill_threaded(pass: &Pass<'_, '_>, n: usize, threads: usize, out: &mut [Vec<f64>]) {
-    fill_chunks(n, threads, out, |start, len, part| {
-        pass.fill(start, len, part);
-    });
-}
-
-/// Calls `fill(start, len, part)` for consecutive chunks of the `n` cells,
-/// `part` holding cells `start..start + len` of every vector of `out`: once on
-/// the calling thread when `threads` is 1 or the grid has fewer than
-/// [`MIN_PARALLEL_CELLS`] cells, otherwise from `threads` workers (0 = every
-/// available core) taking small chunks from a shared queue. Every cell is
-/// filled exactly once, so the result does not depend on `threads`.
-pub(crate) fn fill_chunks(
-    n: usize,
-    threads: usize,
-    out: &mut [Vec<f64>],
-    fill: impl Fn(usize, usize, &mut [&mut [f64]]) + Sync,
-) {
-    let threads = if threads == 0 {
-        std::thread::available_parallelism().map_or(1, usize::from)
-    } else {
-        threads
-    };
-    let mut rest: Vec<&mut [f64]> = out.iter_mut().map(Vec::as_mut_slice).collect();
-    if threads <= 1 || n < MIN_PARALLEL_CELLS {
-        fill(0, n, &mut rest);
-        return;
-    }
-    // Many small chunks handed out one at a time keep threads busy when fuel
-    // types cost different amounts (non-modeled cells are nearly free).
-    let chunk_len = n.div_ceil(threads * 8).max(1);
-    let mut chunks = Vec::new();
-    let mut start = 0;
-    while start < n {
-        let len = chunk_len.min(n - start);
-        let part: Vec<&mut [f64]> = rest
-            .iter_mut()
-            .map(|s| {
-                let (head, tail) = std::mem::take(s).split_at_mut(len);
-                *s = tail;
-                head
-            })
-            .collect();
-        chunks.push((start, len, part));
-        start += len;
-    }
-    let queue = Mutex::new(chunks.into_iter());
-    std::thread::scope(|scope| {
-        for _ in 0..threads {
-            scope.spawn(|| loop {
-                let next = queue.lock().expect("queue poisoned").next();
-                match next {
-                    Some((chunk_start, len, mut part)) => fill(chunk_start, len, &mut part),
-                    None => break,
-                }
-            });
-        }
-    });
-}
-
-/// The grid pass for a fire-growth engine: the ten [`BehaviourGrids`] for
-/// every cell. One call per weather step; non-modeled cells (codes outside
-/// 1..18) yield NaN behaviour, which engines exclude via their burnable masks.
-/// A NaN input in a modeled cell is a missing/masked value and propagates to
-/// that cell's outputs only.
-///
-/// [`run_grid_fields`] with the ten fields and [`NonModeled::Nan`] on the
-/// calling thread; the Python counterpart is `cffdrs._rust.run_fbp_grid`.
-///
-/// # Errors
-///
-/// The same as [`run_grid_fields`].
-///
-/// # Panics
-///
-/// Never panics: bad input is reported through the `Err` variants above.
-///
-/// # Examples
-///
-/// ```
-/// use cffbps_rust::grid::{run_grid, GridError, GridInput};
-///
-/// let input = GridInput {
-///     fuel_type: &[2, 19], // C-2 and a non-fuel cell
-///     lat: (&[52.0, 52.0]).into(),
-///     long: (&[-115.0, -115.0]).into(),
-///     elevation: (&[800.0, 800.0]).into(),
-///     slope_pct: (&[10.0, 0.0]).into(),
-///     aspect_deg: (&[180.0, 0.0]).into(),
-///     pct_conifer: 0.0.into(),
-///     pct_dead_fir: 0.0.into(),
-///     grass_fuel_load: 0.0.into(),
-///     grass_curing: 0.0.into(),
-///     ws: 20.0.into(),
-///     wd: 270.0.into(),
-///     ffmc: 90.0.into(),
-///     bui: 80.0.into(),
-///     wx_date: 20_230_615,
-///     percentile_growth: 50.0,
-///     d0: None,
-///     dj: None,
-///     fmc: None,
-/// };
-/// let grids = run_grid(&input).unwrap();
-/// assert_eq!(grids.hros.len(), 2);
-/// assert!(grids.hros[0] > 0.0);
-/// assert!(grids.hros[1].is_nan()); // non-fuel cell: NaN behaviour
-///
-/// // An impossible date is rejected up front.
-/// let bad = GridInput { wx_date: 20_231_345, ..input };
-/// assert_eq!(run_grid(&bad).unwrap_err(), GridError::InvalidDate(20_231_345));
-/// ```
-pub fn run_grid(input: &GridInput<'_>) -> Result<BehaviourGrids, GridError> {
-    run_grid_with_threads(input, 1)
-}
-
 /// [`run_grid`] with an explicit number of worker threads.
 ///
 /// `threads == 1` computes on the calling thread, exactly like [`run_grid`].
@@ -999,5 +992,11 @@ pub fn run_grid_with_threads(
     })
 }
 
-/// Below this many cells the thread start-up cost outweighs the gain.
-const MIN_PARALLEL_CELLS: usize = 4096;
+/// A constant negative override asks for every cell to be calculated, which is what no
+/// override does: it is dropped. Arrays keep their negative cells (calculated one by one).
+pub(crate) fn without_constant_request(values: Option<PerCell<'_>>) -> Option<PerCell<'_>> {
+    match values {
+        Some(PerCell::Const(v)) if v < 0.0 && v.is_finite() => None,
+        other => other,
+    }
+}

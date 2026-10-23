@@ -11,8 +11,10 @@
 //! the same file the Python suite validates against.
 
 pub use crate::foliar_moisture::is_valid_wx_date;
+
 #[cfg(test)]
 use crate::stage::Stage;
+
 #[cfg(test)]
 use crate::state::CellState;
 
@@ -263,6 +265,16 @@ pub struct FbpResult {
 }
 
 impl FbpResult {
+    /// Value by its Python-package output name (see
+    /// [`FbpResult::named_values`]); `None` for an unknown name.
+    #[must_use]
+    pub fn get(&self, name: &str) -> Option<f64> {
+        self.named_values()
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v)
+    }
+
     /// Every output paired with its Python-package name (the names
     /// `FBP.getParams` accepts, e.g. `hros`, `fF`, `fire_type`), in a fixed
     /// order. This table is the single place the names are defined.
@@ -324,16 +336,6 @@ impl FbpResult {
             ("accel", self.accel),
             ("fuel_type", self.fuel_type),
         ]
-    }
-
-    /// Value by its Python-package output name (see
-    /// [`FbpResult::named_values`]); `None` for an unknown name.
-    #[must_use]
-    pub fn get(&self, name: &str) -> Option<f64> {
-        self.named_values()
-            .into_iter()
-            .find(|(n, _)| *n == name)
-            .map(|(_, v)| v)
     }
 }
 
@@ -403,17 +405,6 @@ impl FbpResult {
 #[must_use]
 pub fn run(input: &FbpInput) -> FbpResult {
     run_fused(input)
-}
-
-/// Every [`Stage`] in [`Stage::ALL`] order applied to [`CellState::from_input`].
-/// The stage-by-stage form of [`run`]; the tests keep the two bit-identical.
-#[cfg(test)]
-pub(crate) fn run_stages(input: &FbpInput) -> FbpResult {
-    let mut s = CellState::from_input(input);
-    for stage in Stage::ALL {
-        s.apply(stage);
-    }
-    s.into_result()
 }
 
 /// The scalar pass as one straight-line body. The stage composition was measured
@@ -614,6 +605,17 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     }
 }
 
+/// Every [`Stage`] in [`Stage::ALL`] order applied to [`CellState::from_input`].
+/// The stage-by-stage form of [`run`]; the tests keep the two bit-identical.
+#[cfg(test)]
+pub(crate) fn run_stages(input: &FbpInput) -> FbpResult {
+    let mut s = CellState::from_input(input);
+    for stage in Stage::ALL {
+        s.apply(stage);
+    }
+    s.into_result()
+}
+
 // The bit-level oracle's input generator (it names the crate `cffbps_rust`,
 // which `lib.rs` aliases for tests). Declared here, not inside `mod tests`, so
 // the path does not climb out of a directory that does not exist (Linux).
@@ -623,36 +625,9 @@ mod cases;
 
 #[cfg(test)]
 mod tests {
+    use super::cases;
     use super::*;
     use std::collections::HashSet;
-
-    use super::cases;
-
-    #[test]
-    fn fused_run_equals_stage_composition() {
-        for (n, (fuel, percentile, input)) in cases::cases().iter().enumerate() {
-            let fused = run_fused(input).named_values();
-            let staged = run_stages(input).named_values();
-            for ((name, a), (_, b)) in fused.iter().zip(staged.iter()) {
-                assert!(
-                    cases::same_bits(*a, *b),
-                    "case {n} (fuel {fuel}, percentile {percentile}) {name}: fused {a} staged {b}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn field_name_table_is_complete_and_unique() {
-        let names: Vec<&str> = FbpResult::default()
-            .named_values()
-            .iter()
-            .map(|(n, _)| *n)
-            .collect();
-        assert_eq!(names.len(), 54);
-        let unique: HashSet<&str> = names.iter().copied().collect();
-        assert_eq!(unique.len(), 54, "duplicate output names");
-    }
 
     /// Python `getParams` names, each with the value of the field it must read
     /// in `named_values_pair_each_name_with_its_own_field`.
@@ -712,6 +687,33 @@ mod tests {
         ("accel", 53.0),
         ("fuel_type", 54.0),
     ];
+
+    // ---- other tests ----
+    #[test]
+    fn fused_run_equals_stage_composition() {
+        for (n, (fuel, percentile, input)) in cases::cases().iter().enumerate() {
+            let fused = run_fused(input).named_values();
+            let staged = run_stages(input).named_values();
+            for ((name, a), (_, b)) in fused.iter().zip(staged.iter()) {
+                assert!(
+                    cases::same_bits(*a, *b),
+                    "case {n} (fuel {fuel}, percentile {percentile}) {name}: fused {a} staged {b}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn field_name_table_is_complete_and_unique() {
+        let names: Vec<&str> = FbpResult::default()
+            .named_values()
+            .iter()
+            .map(|(n, _)| *n)
+            .collect();
+        assert_eq!(names.len(), 54);
+        let unique: HashSet<&str> = names.iter().copied().collect();
+        assert_eq!(unique.len(), 54, "duplicate output names");
+    }
 
     /// Every field holds a distinct value (1.0..=54.0 in declaration order), so
     /// a name wired to the wrong field in `named_values` no longer matches
