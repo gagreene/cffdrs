@@ -36,7 +36,7 @@ plan to change), **open** (should be revisited), **fixed** (kept for history).
 
 | ID | Area | Python | Rust | Impact | Status |
 |---|---|---|---|---|---|
-| BD-01 | Shape with mixed scalar / array inputs | Fields derived only from scalar inputs (`bui`, `ffmc`, `ws`, `wd` before inversion, `fF`, `fmc`, `fme`, `latn`, `nd`, `sf`, `d0`, `dj`, `m`) keep shape `(1,)`; the rest have the grid shape | Every field has the grid shape | Callers that index results get the same values; shapes differ | intentional (D12c); parity tests broadcast |
+| BD-01 | Shape with mixed scalar / array inputs | Fields derived only from scalar inputs (`bui`, `ffmc`, `ws`, `wd` before inversion, `fF`, `fmc`, `fme`, `latn`, `nd`, `sf`, `d0`, `dj`, `m`) keep shape `(1,)`; the rest have the grid shape. Exception: when the fuel grid has masked or invalid cells the fuel mask gives every input and result the grid shape (BD-F6), so these fields match Rust and the shape-difference counts of `tools/compare_backends.py` for invalid fuel codes 0 and 99 drop (for example `bui` 1,452 to 1,320) | Every field has the grid shape | Callers that index results get the same values; shapes differ | intentional (D12c); parity tests broadcast |
 | BD-02 | `d0` / `dj` before `calcFMC`, array input | A bare `nan` (the getter returns `np.nan` for an unset attribute) | A full-shape array of NaN | None in practice; code that checks `np.isnan(x)` works for both | accepted |
 | BD-03 | Dtype of `fire_type` / `fi_class` before the producing stage runs, array input | `fire_type` float64, `fi_class` int8 (leftover templates) | int64 for both | None; after `runFBP()` both are int64 | accepted |
 

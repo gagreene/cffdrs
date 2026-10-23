@@ -112,6 +112,23 @@ mod tests {
         }
     }
 
+    // ---- c1 tests ----
+    #[test]
+    fn c1_surface_consumption_follows_ffmc_on_both_sides_of_84() {
+        // values of the Python reference (`calc_sfc` for C-1)
+        for (ffmc, want) in [
+            (60.0, 0.001_503_700_388_189),
+            (80.0, 0.168_335_973_787_307),
+            (83.5, 0.502_802_621_267_119),
+            (84.0, 0.75),
+            (84.5, 0.997_197_378_732_881),
+            (90.0, 1.398_835_159_269_199),
+        ] {
+            let got = calc_sfc(FuelType::C1, &normalized(ffmc, 80.0)).sfc;
+            assert!((got - want).abs() < 1e-12, "ffmc {ffmc}: {got} vs {want}");
+        }
+    }
+
     // ---- c7 tests ----
     #[test]
     fn c7_missing_ffmc_gives_nan_ffc_and_sfc() {

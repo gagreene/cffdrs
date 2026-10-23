@@ -592,6 +592,28 @@ fn fmc_scalar_parameters(d: &Data) {
     assert_staged_equals_fused(&g, "percentile 95");
 }
 
+/// A given 0 is a value, not a request: only a negative value asks for a calculation.
+fn fmc_zero_overrides_are_overrides(d: &Data) {
+    let all = outputs();
+    let mut cells = vec![100.0; d.fuel.len()];
+    cells[0] = 0.0;
+    let mut g = d.grid(90.0, &all);
+    g.set_override(Field::FmcOverride, Some(PerCell::Cells(&cells)))
+        .unwrap();
+    assert_eq!(g.get(Field::Fmc).unwrap()[0], 0.0);
+    assert!(same(
+        g.get(Field::Fme).unwrap()[0],
+        1000.0 * 1.5_f64.powi(4) / 460.0
+    ));
+    // a constant 0 is kept too, it is not dropped as "calculate"
+    for (field, col) in [(Field::D0Override, 1), (Field::FmcOverride, 4)] {
+        let mut g = d.grid(90.0, &all);
+        g.set_override(field, Some(PerCell::Const(0.0))).unwrap();
+        let got = calc_fmc(&mut g);
+        assert!(got[col].iter().all(|v| *v == 0.0), "{field:?}");
+    }
+}
+
 /// The stages that are freed (`get` gives `FreedRead`).
 fn freed(g: &FbpGrid) -> Vec<Field> {
     Field::ALL
@@ -1246,6 +1268,7 @@ fn fmc_contract() {
     fmc_repeats_are_cached(&d);
     fmc_overrides(&d);
     fmc_calculate_cells(&d);
+    fmc_zero_overrides_are_overrides(&d);
     fmc_d0_is_not_range_limited();
     fmc_dj_overrides_are_floored_and_clipped();
     fmc_scalar_parameters(&d);
