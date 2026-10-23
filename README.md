@@ -353,6 +353,13 @@ Existing golden fixtures are the behavior-preservation oracle. Do not regenerate
 them to accommodate a refactor. Release publishing remains disabled in the
 workflow; version tags and publication require owner authorization.
 
+### Contributing
+
+Read [`docs/CONTRIBUTION_PROCEDURES.md`](docs/CONTRIBUTION_PROCEDURES.md) before opening a pull request: it
+covers branch routing (major and minor changes go to `pre_release`, patches to `master`), commit rules, the
+local checks and large tests that are recorded in every pull request, and the rules for numerical changes.
+Tests are run locally and never automatically on a schedule.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). © 2024 Gregory A. Greene.
