@@ -108,9 +108,12 @@ def check_array(input_list: list) -> tuple[bool, mask.MaskedArray, mask.MaskedAr
                 raise ValueError('Unknown fuel type code found, conversion failed.')
             first_array = converted_fuel_type.astype(np.int8)
 
+        # The template is never masked: it is the zero-filled pre-run value of every computed result and the base
+        # of the stages that copy it. (It used to take the NaN cells of the first array, which made a NaN fuel cell
+        # export NaN diagnostics (a, b, c, ...) where a masked or invalid fuel gives the zero templates.)
         ref_array = mask.array(
             np.full(first_array.shape, 0, dtype=np.float64),
-            mask=np.isnan([first_array]),
+            mask=False,
             fill_value=np.nan
         )
 

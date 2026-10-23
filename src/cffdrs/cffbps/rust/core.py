@@ -323,6 +323,9 @@ class FBP:
                     dtype = supplied.dtype
             if name in ('ws', 'ffmc', 'bui', 'wd'):
                 dtype = self._inputs[name].dtype
+                if name == 'wd':
+                    # the inverted direction is computed with Python numbers: integers widen to int64, floats to float64
+                    dtype = np.result_type(dtype, np.int64)
             elif name == 'nd' and self._overrides['d0'] is not None:
                 supplied = self._overrides['d0']
                 dj_supplied = self._overrides['dj']

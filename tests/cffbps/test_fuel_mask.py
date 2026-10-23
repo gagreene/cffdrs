@@ -156,3 +156,18 @@ def test_updates_after_initialize_keep_the_fuel_mask(backend, route):
         reference.calcFMC(lat=np.r_[np.nan, np.full(2, 50.)], d0=np.r_[np.nan, np.full(2, 150.)])
     same(cell(out, 0), cell(reference.runFBP(), 0), route)
     assert np.isnan(cell(out, 0)['ws']) or cell(out, 0)['ws'] == 0
+
+
+@pytest.mark.parametrize('backend', BACKENDS)
+@pytest.mark.parametrize('dtype', [np.float64, np.float32])
+def test_a_nan_fuel_cell_is_a_masked_fuel_cell(backend, dtype):
+    nan_fuel = cell(model(backend, np.array([2, np.nan, 6], dtype=dtype)).runFBP(), 1)
+    masked = cell(model(backend, np.ma.array([2, 2, 6], mask=[False, True, False])).runFBP(), 1)
+    same(nan_fuel, masked, 'NaN fuel')
+    assert nan_fuel['a'] == 0 and nan_fuel['cbh'] == 0 and np.isnan(nan_fuel['fmc'])
+
+
+def test_python_and_rust_agree_on_a_nan_fuel_cell():
+    fuel = np.array([2., np.nan, 6.])
+    py, rs = (cell(model(b, fuel).runFBP(), 1) for b in BACKENDS)
+    same(py, rs, 'python vs rust')

@@ -100,6 +100,18 @@ Inside `python.equations`, the module `fmc` is now `foliar_moisture`: `calc_fmc`
 (it gives the foliar moisture content from `nd`); `calc_foliar_moisture()` chains `calc_latn`, `calc_d0`,
 `calc_dj`, `calc_nd`, `calc_fmc` and `calc_fme`, and returns a `FoliarMoistureResult` (was `FMCResult`).
 
+The historical `calcC6hros` stage no longer exists. A custom stage sequence replaces it with `calcC6BlendCFB`,
+`calcC6BlendCFC`, `calcC6CROS` and `calcC6HROS` (in that order), computes `calcPercentileCFB` before
+`calcRosPercentileGrowth`, calls `calcCFB` again after growth, and runs `calcAccelParam` after the final CFB (see
+[Upgrading PyroCell](docs/CODEBASE.md#upgrading-pyrocell)). Replacing only the old method name is not enough.
+
+**C6 acceleration changes.** Acceleration is now computed from the final (post-blend) CFB, so for C-6 the head ROS is
+unchanged but `cfb`, `accel` and `hfi` change. For C-6 at ws 20, flat ground, 49.48 N, 115.69 W, 100 m,
+date 2023-07-15, ffmc 90, bui 80 (float32 1x1 grid): `cfb` 0.1286 -> 0.3676, `accel` 0.0751 -> 0.0336,
+`hfi` 5752 -> 6843 (the earlier values are those of the previous stage order, reported from a PyroCell run; `hros` 8.448
+is unchanged). Reference rasters or goldens of a model that accelerates C-6 fires need to be regenerated, after checking
+the new values against `alpha = 0.115 - 18.8 * CFB^2.5 * exp(-8 * CFB)`.
+
 ### Choosing a backend
 
 ```python

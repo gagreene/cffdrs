@@ -55,6 +55,7 @@ plan to change), **open** (should be revisited), **fixed** (kept for history).
 | BD-12 | Threads | Argument ignored | `threads=1` default, 0 = all cores, results independent of the count | intentional (D6) |
 | BD-13 | Direct crate API | n/a | `run_grid` and `BehaviourGrids` give all-NaN for non-modeled cells; `PythonCompat` (used by the Python package) reproduces Python | intentional |
 | BD-14 | CuPy backend | Experimental, not audited for the NaN leak, not covered by the Rust comparison | n/a | open |
+| BD-15 | Near-zero intermediates on a flat cell (`wse1`, `wse`): the PYroCell Linux run gave Python `+4.4e-15` and Rust `-2.2e-15` (absolute difference 6.6e-15, `hros`/`hfi` identical) for a synthetic flat cell; the same inputs give identical values on Windows (the PYroCell Windows run and a re-run here), so it is last-digit platform arithmetic noise around zero, not a model difference. A relative comparison fails near zero: compare with an absolute tolerance (the parity tests use `atol=1e-12`) | `tests/cffbps/test_rust_backend.py::equal`; not reproduced here |
 
 ### Fixed during this work
 
@@ -65,6 +66,8 @@ plan to change), **open** (should be revisited), **fixed** (kept for history).
 | BD-F4 | `fmc` became an override like `d0` / `dj` (sticky, `initialize(fmc=...)`, missing cell exports NaN); the CuPy backend has no override and only derives `fme` from a `fmc` given to `setParams` | Python/Rust `set_override('fmc')`; tests `test_fmc_override_*`, `test_override_routes[fmc-*]` |
 | BD-F5 | Negative `d0`/`dj`/`fmc` override cells (documented -1) ask for a calculation; a negative scalar is `None`; array cells of `fmc`/`fme` are NaN until `calcFMC`; the CuPy backend has no such override | `common/fmc_inputs.py`, `foliar_moisture.rs`; tests `test_calculate_sentinel.py`, `test_calculate_cells_match_python` |
 | BD-F6 | The fuel mask applies to every input and override (fuel-masked cells are missing everywhere; `fuel_type` exports 0; `dj` 0); the CuPy backend is unchanged | `inputs.apply_fuel_mask`; tests `test_fuel_mask.py` |
+| BD-F7 | A NaN in a float fuel grid: Python exported NaN diagnostics (`a b c q bui0 be_max cbh cfl accel`) because its template took the NaN cells of the first array; Rust (and a masked or invalid fuel) gives the zero templates. The template is no longer masked, so both give the zero templates (found by the PYroCell Windows and Linux validation) | `inputs.check_array`; tests `test_a_nan_fuel_cell_is_a_masked_fuel_cell`, `test_python_and_rust_agree_on_a_nan_fuel_cell` |
+| BD-F8 | The inverted wind direction (`wd`) of a float32 or narrow-integer input exported at the input precision in Rust (float32, int16) but as float64 / int64 in Python, so the values differed in the last digits (`189.94021606445312` against `189.9402093887329`). Rust now exports `np.result_type(input dtype, int64)` like Python (found by the PYroCell validation) | `rust/core.py` `getParams`; test `test_wind_direction_export_matches_python_in_value_and_dtype` |
 | BD-F3 | Fuel dtype / mask / wrap, repeated `runFBP`, stale FMC results, stale injected values, unnormalised updates (five owner-authorised reference changes, D13) | Python reference, `docs/CODEBASE.md` |
 
 ## Where to focus next

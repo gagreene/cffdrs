@@ -562,3 +562,13 @@ def test_array_calculate_cells_are_missing_before_calcfmc_and_c6_follows():
     a.calcFMC()
     b.calcFMC()
     compare()
+
+
+@pytest.mark.parametrize('dtype', [np.float32, np.float64, np.int16, np.int32])
+def test_wind_direction_export_matches_python_in_value_and_dtype(dtype):
+    wd = np.array([9.940209, 117.02329]).astype(dtype)
+    kw = dict(fuel_type=np.array([2, 2]), wd=wd, out_request=['wd', 'hros'])
+    py, rs = make('python', **kw).runFBP(), make('rust', **kw).runFBP()
+    assert py[0].dtype == rs[0].dtype
+    np.testing.assert_array_equal(py[0], rs[0])
+    np.testing.assert_allclose(py[1], rs[1], rtol=1e-9)

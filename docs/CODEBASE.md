@@ -554,6 +554,11 @@ Update the custom `run_model` sequence using the 23-stage table above:
    not the final post-growth value. Retain all Rust outputs needed after stages
    in `out_request`, and reset before stages after a fused run.
 
+Because acceleration now follows the final CFB, C-6 `accel` changes with the new stage order (head ROS does not): for
+the C-6 cell in the README's breaking-changes note, `cfb` is 0.3676 (was 0.1286), `accel` 0.0336 (was 0.0751) and `hfi`
+6843 (was 5752). Regenerate any C-6 acceleration reference of a custom pipeline after checking it against
+`alpha = 0.115 - 18.8 * CFB^2.5 * exp(-8 * CFB)`.
+
 ## Versions, delivery and branch routing
 
 Maturin reads distribution 0.2.0 from `rust/crates/cffdrs-py/Cargo.toml`; the
