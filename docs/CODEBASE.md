@@ -86,9 +86,11 @@ One file per concern, all operating on `numpy.ma.MaskedArray` only (no separate
 scalar path — scalars are coerced upstream):
 - `slope_wind.py` — wind/slope geometry, zero-wind ISI, wind/slope-adjusted ISI, RSI, BUI effect
 - `ros.py` — head/backing rate of spread, D2 handling, and separate C6 CROS/HROS equations
-- `surface.py` — surface fuel consumption (one formula per fuel type/group)
-- `crown.py` — CBH/CFL, CSFI, RSO, directional/temporary C6 blend CFB, fire type, CFC
-- `consumption.py` — total fuel consumption, HFI, fire intensity class
+- `crown.py` — crown fire determination: CBH/CFL, CSFI, RSO, directional and temporary C6 blend CFB
+- `consumption.py` — all fuel consumption: surface (`calc_sfc`: FFC, WFC, SFC, one formula per fuel type/group),
+  crown (`calc_cfc`), total (`calc_tfc`) and the no-spread rule (`zero_without_spread`)
+- `behavior.py` — fire behavior calculated from the other results: fire type, head fire intensity (HFI) and
+  fire intensity class
 - `foliar_moisture.py` — one function per quantity (`calc_latn`, `calc_d0`, `calc_dj`, `calc_nd`, `calc_fmc`,
   `calc_fme`) and `calc_foliar_moisture()`, which chains them (Rust: `foliar_moisture.rs`, same names)
 - `growth.py` — growth-percentile ROS adjustment, point-ignition acceleration
@@ -204,7 +206,7 @@ A Cargo workspace beside `src/`, with no root `Cargo.toml` (always pass
 `--manifest-path rust/Cargo.toml`):
 
 - `crates/cffbps-rust` (0.3.0, MSRV 1.78, no runtime dependencies): the module map is in
-  the crate docs (`src/lib.rs`): `fbp` (scalar `run()`), `field`/`stage`/`state` (75
+  the crate docs (`src/lib.rs`): `fbp` (scalar `run()`), `field`/`stage`/`state` (76
   fields, 23 stages, one cell), `grid` (per-cell or constant inputs, any requested
   outputs, threads), `fbp_grid` (stages over whole grids with freeing) and one module
   per equation family mirroring `python/equations/`.

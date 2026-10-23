@@ -9,10 +9,9 @@
 //! [`FbpResult`] at any point. Running [`Stage::ALL`] in order on
 //! [`CellState::from_input`] is [`fbp::run`](crate::fbp::run).
 
-use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc, without_spread};
-use crate::crown::{
-    calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
-};
+use crate::behavior::{calc_fire_intensity_class, calc_fire_type, calc_hfi};
+use crate::consumption::{calc_cfc, calc_sfc, calc_tfc, without_spread, SurfaceFuel};
+use crate::crown::{calc_csfi, calc_rso, cfb_from_ros, directional_cfb, final_cfb};
 use crate::fbp::{FbpInput, FbpResult};
 use crate::field::Field;
 use crate::foliar_moisture::{calc_foliar_moisture, FoliarMoisture};
@@ -23,7 +22,6 @@ use crate::percentile::{percentile_ros, percentile_tinv, wind_decay};
 use crate::ros::{c6_cros, c6_hros, calc_ros, Ros};
 use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
 use crate::stage::Stage;
-use crate::surface::{calc_sfc, SurfaceFuel};
 
 /// The scalar (not per-field) inputs of the stages.
 #[derive(Clone, Copy, Debug, PartialEq)]

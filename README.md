@@ -100,6 +100,11 @@ Inside `python.equations`, the module `fmc` is now `foliar_moisture`: `calc_fmc`
 (it gives the foliar moisture content from `nd`); `calc_foliar_moisture()` chains `calc_latn`, `calc_d0`,
 `calc_dj`, `calc_nd`, `calc_fmc` and `calc_fme`, and returns a `FoliarMoistureResult` (was `FMCResult`).
 
+Inside `python.equations`, `surface.py` is gone: `calc_sfc` and `calc_cfc` live in `consumption.py` (all fuel
+consumption), and `calc_fire_type`, `calc_hfi` and `calc_fire_intensity_class` live in the new `behavior.py`
+(`crown.py` keeps only the crown determination). The Rust crate has the same modules (`consumption.rs`,
+`behavior.rs`).
+
 The historical `calcC6hros` stage no longer exists. A custom stage sequence replaces it with `calcC6BlendCFB`,
 `calcC6BlendCFC`, `calcC6CROS` and `calcC6HROS` (in that order), computes `calcPercentileCFB` before
 `calcRosPercentileGrowth`, calls `calcCFB` again after growth, and runs `calcAccelParam` after the final CFB (see

@@ -13,13 +13,13 @@ from ..common import constants, inputs
 from ..common.fingerprint import fingerprint
 from ..common.fmc_inputs import CALCULATE, coerce_override, resolve_dj_override
 from ..common.season import getSeasonGrassCuring as getSeasonGrassCuring
+from .equations import behavior as behavior_eq
 from .equations import consumption as consumption_eq
 from .equations import crown as crown_eq
 from .equations import foliar_moisture as fm_eq
 from .equations import growth as growth_eq
 from .equations import ros as ros_eq
 from .equations import slope_wind as sw_eq
-from .equations import surface as surface_eq
 
 
 class _Normalised:
@@ -761,7 +761,7 @@ class FBP:
         and total surface fuel consumption (SFC) for all fuel types.
         :return: None
         """
-        self.ffc, self.wfc, self.sfc = surface_eq.calc_sfc(
+        self.ffc, self.wfc, self.sfc = consumption_eq.calc_sfc(
             fuel_type=self.fuel_type, ffmc=self.ffmc, bui=self.bui,
             pc=self.pc, gfl=self.gfl, ref_array=self.ref_array,
         )
@@ -812,7 +812,7 @@ class FBP:
 
     def calcC6BlendCFC(self) -> None:
         """Calculate temporary CFC from C6 blend CFB for CROS activation."""
-        self.c6_blend_cfc = crown_eq.calc_cfc(
+        self.c6_blend_cfc = consumption_eq.calc_cfc(
             fuel_type=self.fuel_type, cfb=self.c6_blend_cfb,
             cfl=self.cfl, pc=self.pc, pdf=self.pdf,
         )
@@ -905,7 +905,7 @@ class FBP:
 
         :return: None
         """
-        self.fire_type = crown_eq.calc_fire_type(fuel_type=self.fuel_type, cfb=self.cfb)
+        self.fire_type = behavior_eq.calc_fire_type(fuel_type=self.fuel_type, cfb=self.cfb)
         return
 
     def calcCFC(self) -> None:
@@ -914,7 +914,7 @@ class FBP:
 
         :return: None
         """
-        self.cfc = crown_eq.calc_cfc(
+        self.cfc = consumption_eq.calc_cfc(
             fuel_type=self.fuel_type, cfb=self.cfb, cfl=self.cfl, pc=self.pc, pdf=self.pdf,
         )
         return
@@ -940,7 +940,7 @@ class FBP:
 
         :returns: None
         """
-        self.hfi = consumption_eq.calc_hfi(hros=self.hros, tfc=self.tfc)
+        self.hfi = behavior_eq.calc_hfi(hros=self.hros, tfc=self.tfc)
         return
 
     def calcFireIntensityClass(self) -> None:
@@ -949,7 +949,7 @@ class FBP:
 
         :return: None
         """
-        self.fi_class = consumption_eq.calc_fire_intensity_class(hfi=self.hfi)
+        self.fi_class = behavior_eq.calc_fire_intensity_class(hfi=self.hfi)
         return
 
     def setParams(self, set_dict: dict) -> None:

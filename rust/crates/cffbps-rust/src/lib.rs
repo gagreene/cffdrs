@@ -25,10 +25,10 @@
 //!
 //! The remaining modules are private implementation stages: input
 //! normalisation (`common/inputs.py`), foliar moisture (`python/equations/foliar_moisture.py`), slope and
-//! wind effects (`python/equations/slope_wind.py`), surface fuel consumption
-//! (`python/equations/surface.py`), rate of spread (`python/equations/ros.py`), crown fire
-//! (`python/equations/crown.py`), fire growth (`python/equations/growth.py`) and total
-//! consumption / intensity (`python/equations/consumption.py`).
+//! wind effects (`python/equations/slope_wind.py`), rate of spread (`python/equations/ros.py`), crown fire
+//! determination (`python/equations/crown.py`), fire growth and acceleration (`python/equations/growth.py`),
+//! fuel consumption (`python/equations/consumption.py`) and the fire behavior calculated from the other results
+//! (`python/equations/behavior.py`).
 //!
 //! # Conventions
 //!
@@ -114,6 +114,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg(test)]
 extern crate self as cffbps_rust;
 
+mod behavior;
 mod consumption;
 mod crown;
 pub mod fbp;
@@ -131,7 +132,6 @@ mod ros;
 mod slope_wind;
 pub mod stage;
 pub mod state;
-mod surface;
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,4 @@
-//! Crown fire initiation and fraction burned: CSFI, RSO, CFB, fire type and
-//! crown fuel consumption.
+//! Crown fire determination: CSFI, RSO and CFB.
 
 use crate::fuel::FuelType;
 
@@ -67,49 +66,10 @@ pub(crate) fn final_cfb(ft: FuelType, hros: f64, growth_made_nan: bool, rso: f64
     }
 }
 
-/// `calc_fire_type`: 1 surface, 2 passive crown, 3 active crown.
-pub(crate) fn calc_fire_type(ft: FuelType, cfb: f64) -> f64 {
-    // Unknown negative codes take this branch on purpose (decision D3, see
-    // `FuelType::is_fuel`); the oracle pins it.
-    if ft.is_fuel() {
-        if cfb.is_nan() {
-            0.0 // masked cell: grid-truth observable is 0, not a class
-        } else if cfb <= 0.1 {
-            1.0
-        } else if cfb < 0.9 {
-            2.0
-        } else {
-            3.0
-        }
-    } else {
-        0.0
-    }
-}
-
-/// `calc_cfc`: crown fuel consumption.
-pub(crate) fn calc_cfc(ft: FuelType, cfb: f64, cfl: f64, pc: f64, pdf: f64) -> f64 {
-    match ft {
-        FuelType::M1 | FuelType::M2 => cfb * cfl * pc / 100.0,
-        FuelType::M3 | FuelType::M4 => cfb * cfl * pdf / 100.0,
-        _ => cfb * cfl,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::fuel::FuelType;
-
-    #[test]
-    fn fire_type_boundaries() {
-        let ft = FuelType::C2;
-        assert_eq!(calc_fire_type(ft, 0.0), 1.0);
-        assert_eq!(calc_fire_type(ft, 0.1), 1.0);
-        assert_eq!(calc_fire_type(ft, 0.1001), 2.0);
-        assert_eq!(calc_fire_type(ft, 0.8999), 2.0);
-        assert_eq!(calc_fire_type(ft, 0.9), 3.0);
-        assert_eq!(calc_fire_type(ft, 1.0), 3.0);
-    }
 
     #[test]
     fn rso_propagates_missing_sfc() {
@@ -155,12 +115,5 @@ mod tests {
                 directional_cfb(ft, hros, rso).to_bits()
             );
         }
-    }
-
-    #[test]
-    fn fire_type_nan_and_non_fuel_are_zero() {
-        assert_eq!(calc_fire_type(FuelType::C2, f64::NAN), 0.0);
-        assert_eq!(calc_fire_type(FuelType::from_code(19), 0.5), 0.0);
-        assert_eq!(calc_fire_type(FuelType::from_code(20), 0.95), 0.0);
     }
 }

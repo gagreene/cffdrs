@@ -422,10 +422,9 @@ pub(crate) fn run_stages(input: &FbpInput) -> FbpResult {
 // One straight-line pass that mirrors the Python `FBP` pipeline stage by stage.
 #[allow(clippy::too_many_lines)]
 pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
-    use crate::consumption::{calc_fire_intensity_class, calc_hfi, calc_tfc, without_spread};
-    use crate::crown::{
-        calc_cfc, calc_csfi, calc_fire_type, calc_rso, cfb_from_ros, directional_cfb, final_cfb,
-    };
+    use crate::behavior::{calc_fire_intensity_class, calc_fire_type, calc_hfi};
+    use crate::consumption::{calc_cfc, calc_sfc, calc_tfc, without_spread, SurfaceFuel};
+    use crate::crown::{calc_csfi, calc_rso, cfb_from_ros, directional_cfb, final_cfb};
     use crate::foliar_moisture::calc_foliar_moisture;
     use crate::fuel::{CrownFuel, FuelType, RosParams};
     use crate::growth::calc_accel_param;
@@ -433,7 +432,6 @@ pub(crate) fn run_fused(input: &FbpInput) -> FbpResult {
     use crate::percentile::{percentile_ros, percentile_tinv, wind_decay};
     use crate::ros::{c6_cros, c6_hros, calc_ros, Ros};
     use crate::slope_wind::{calc_isi_rsi_be, calc_isz, calc_sf, Isz, SpreadIndices};
-    use crate::surface::{calc_sfc, SurfaceFuel};
 
     let ft = FuelType::from_code(input.fuel_type);
 

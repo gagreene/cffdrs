@@ -1,4 +1,4 @@
-"""Crown fire equations: CBH/CFL, CSFI, RSO, CFB, fire type, and CFC."""
+"""Crown fire determination: CBH/CFL, CSFI, RSO and CFB."""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -115,38 +115,3 @@ def _sanitize_cfb(cfb: MaskedArray) -> MaskedArray:
     """Replace non-finite CFB values and constrain the result to [0, 1]."""
     cfb = mask.where(np.isfinite(cfb), cfb, 0)
     return mask.clip(cfb, 0, 1)
-
-
-def calc_fire_type(*, fuel_type: MaskedArray, cfb: MaskedArray) -> MaskedArray:
-    """Calculate fire type (1: surface, 2: intermittent crown, 3: active crown)."""
-    return mask.where((fuel_type < 19),
-                      mask.where(cfb <= 0.1,
-                                 # Surface fire
-                                 1,
-                                 mask.where((cfb > 0.1) & (cfb < 0.9),
-                                            # Intermittent crown fire
-                                            2,
-                                            mask.where(cfb >= 0.9,
-                                                       # Active crown fire
-                                                       3,
-                                                       # No fire type
-                                                       0
-                                                       )
-                                            )
-                                 ),
-                      0
-                      )
-
-
-def calc_cfc(*,
-             fuel_type: MaskedArray,
-             cfb: MaskedArray,
-             cfl: MaskedArray,
-             pc: MaskedArray,
-             pdf: MaskedArray) -> MaskedArray:
-    """Calculate crown fuel consumed (kg/m^2)."""
-    return mask.where((fuel_type == 10) | (fuel_type == 11),
-                      cfb * cfl * pc / 100,
-                      mask.where((fuel_type == 12) | (fuel_type == 13),
-                                 cfb * cfl * pdf / 100,
-                                 cfb * cfl))

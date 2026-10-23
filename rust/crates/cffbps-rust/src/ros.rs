@@ -45,7 +45,7 @@ pub(crate) fn calc_ros(
 }
 
 // The deterministic C-6 blend is four stages: SROS-derived CFB
-// (`crown::cfb_from_ros(sros, rso)`) -> CFC (`crown::calc_cfc`, which is
+// (`crown::cfb_from_ros(sros, rso)`) -> CFC (`consumption::calc_cfc`, which is
 // `blend_cfb * cfl` for C-6) -> CROS (`c6_cros`) -> blended HROS (`c6_hros`).
 // The blend CFB is temporary; it is not the CFB used downstream.
 
@@ -68,7 +68,8 @@ pub(crate) fn c6_hros(sros: f64, blend_cfb: f64, cros: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crown::{calc_cfc, cfb_from_ros};
+    use crate::consumption::calc_cfc;
+    use crate::crown::cfb_from_ros;
 
     /// The four C-6 stage functions composed in pipeline order.
     fn composed(sros: f64, rso: f64, cfl: f64, isi: f64, fme: f64) -> (f64, f64) {
