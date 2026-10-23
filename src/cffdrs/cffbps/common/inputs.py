@@ -283,8 +283,9 @@ def verify_inputs(*,
 
 
 #: The inputs and overrides that carry the fuel mask: a cell whose fuel is masked or invalid is missing in all of them.
-FUEL_MASKED_NAMES = ('lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui', 'pc', 'pdf', 'gfl',
-                     'gcf', 'd0', 'dj', 'fmc')
+#: ``pc``, ``pdf``, ``gfl`` and ``gcf`` only feed fuel-dependent results, which the fuel mask already masks, so they are
+#: left alone (masking them would only add four full-size masks and slow every masked-array operation).
+FUEL_MASKED_NAMES = ('lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui', 'd0', 'dj', 'fmc')
 
 
 def fuel_mask_of(fuel_type) -> np.ndarray | None:
@@ -306,7 +307,7 @@ def apply_fuel_mask(value, fuel_mask):
     data, missing = np.ma.getdata(value), np.ma.getmaskarray(value)
     shape = np.broadcast_shapes(data.shape, fuel_mask.shape)
     if data.shape != shape:
-        data, missing = np.broadcast_to(data, shape).copy(), np.broadcast_to(missing, shape)
+        data, missing = np.broadcast_to(data, shape), np.broadcast_to(missing, shape)
     return mask.array(data, mask=missing | fuel_mask, copy=False)
 
 

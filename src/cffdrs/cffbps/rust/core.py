@@ -191,7 +191,7 @@ class FBP:
     def _refresh_fuel_mask(self):
         """Send every input and override to the grid again with the mask of the current fuel grid applied."""
         fuel_mask = inputs.fuel_mask_of(self._fuel)
-        for name in _INPUTS:
+        for name in (n for n in _INPUTS if n in inputs.FUEL_MASKED_NAMES):
             arr = inputs.apply_fuel_mask(self._raw[name], fuel_mask)
             self._grid.set(name, self._boundary(arr, self._grid.shape))
             self._inputs[name] = arr.copy()
@@ -220,7 +220,8 @@ class FBP:
                 arr = np.absolute(arr)
             if name in _INPUTS:
                 self._raw[name] = arr
-                arr = inputs.apply_fuel_mask(arr, inputs.fuel_mask_of(self._fuel))
+                if name in inputs.FUEL_MASKED_NAMES:
+                    arr = inputs.apply_fuel_mask(arr, inputs.fuel_mask_of(self._fuel))
             self._grid.set(_ALIASES.get(name, name), self._boundary(arr, self._grid.shape))
             if self._scalar_masks is not None:
                 self._scalar_masks.set(_ALIASES.get(name, name), arr)

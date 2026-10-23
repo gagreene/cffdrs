@@ -34,7 +34,7 @@ class _Normalised:
     def __set__(self, obj, value):
         normalised = None if value is None else inputs.normalize_input(self.name, value)
         obj._raw[self.name] = normalised
-        setattr(obj, self.slot, obj._fuel_masked(normalised))
+        setattr(obj, self.slot, obj._fuel_masked(normalised, self.name))
 
 
 class _Input:
@@ -152,8 +152,10 @@ class FBP:
             self._fmc_supplied, self._fmc_res = supplied, None
             self._derive_fme_from_the_override()
 
-    def _fuel_masked(self, value):
+    def _fuel_masked(self, value, name=None):
         """``value`` with the mask of the fuel grid applied: a cell whose fuel is masked or invalid is missing."""
+        if name not in inputs.FUEL_MASKED_NAMES and name is not None:
+            return value
         return inputs.apply_fuel_mask(value, inputs.fuel_mask_of(self.fuel_type))
 
     def _set_fuel(self, value) -> None:
@@ -164,7 +166,7 @@ class FBP:
             return
         for name, raw in self._raw.items():
             if name in inputs.NORMALISED_INPUTS and name != 'aspect':
-                setattr(self, '_' + name, self._fuel_masked(raw))
+                setattr(self, '_' + name, self._fuel_masked(raw, name))
             elif name == 'aspect':
                 self._aspect_in = self._fuel_masked(raw)
             elif name == 'wd':
