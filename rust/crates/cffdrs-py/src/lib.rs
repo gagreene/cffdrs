@@ -1,14 +1,9 @@
-//! Python bindings over cffdrs-core. Kept intentionally thin: the science
-//! lives in cffdrs-core; the cffdrs Python package remains the reference
+//! Python bindings over cffbps-rust. Kept intentionally thin: the science
+//! lives in cffbps-rust; the cffdrs Python package remains the reference
 //! implementation and the spec.
 
-// pyo3 0.22's `#[pyfunction]` expansion converts `PyErr` into `PyErr`, which clippy
-// reports as a useless conversion at the signature of every pyfunction. The lint
-// fires in macro-generated code, so an attribute on the function does not reach
-// it; drop this allow when pyo3 is upgraded past the affected releases.
-#![allow(clippy::useless_conversion)]
-
-use cffdrs_core::grid::{run_grid_with_threads, GridInput};
+mod fbp_grid;
+use cffbps_rust::grid::{run_grid_with_threads, GridInput, PerCell};
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -16,8 +11,18 @@ use pyo3::types::PyDict;
 
 /// Default percent dead balsam fir for a NaN scalar, as in the Python package.
 const PCT_DEAD_FIR_DEFAULT: f64 = 35.0;
+
 /// Default grass fuel load (kg/m^2) for a NaN scalar, as in the Python package.
 const GRASS_FUEL_LOAD_DEFAULT: f64 = 0.35;
+
+/// The compiled backend exposed as `cffdrs._rust` by the mixed Python/Rust wheel.
+#[pymodule]
+fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("__core_version__", cffbps_rust::VERSION)?;
+    m.add_function(wrap_pyfunction!(run_fbp_grid, m)?)?;
+    m.add_class::<fbp_grid::FbpGrid>()?;
+    Ok(())
+}
 
 /// Copy a 2-D array into an owned `Vec` in logical row-major order, whatever
 /// its memory layout (C, Fortran or strided).
@@ -136,29 +141,33 @@ fn run_fbp_grid<'py>(
         grass_fuel_load
     };
 
+    // Arrays are per cell, scalars constant for every cell.
     let input = GridInput {
         fuel_type: &fuel,
-        lat: &lat_s,
-        long: &long_s,
-        elevation: &elev_s,
-        slope_pct: &slope_s,
-        aspect_deg: &aspect_s,
-        pct_conifer: &pc_s,
-        grass_curing: &gc_s,
-        ws: &ws_s,
-        wd: &wd_s,
+        lat: PerCell::Cells(&lat_s),
+        long: PerCell::Cells(&long_s),
+        elevation: PerCell::Cells(&elev_s),
+        slope_pct: PerCell::Cells(&slope_s),
+        aspect_deg: PerCell::Cells(&aspect_s),
+        pct_conifer: PerCell::Cells(&pc_s),
+        pct_dead_fir: PerCell::Const(pct_dead_fir),
+        grass_fuel_load: PerCell::Const(grass_fuel_load),
+        grass_curing: PerCell::Cells(&gc_s),
+        ws: PerCell::Cells(&ws_s),
+        wd: PerCell::Cells(&wd_s),
+        ffmc: PerCell::Const(ffmc),
+        bui: PerCell::Const(bui),
         wx_date,
-        ffmc,
-        bui,
-        pct_dead_fir,
-        grass_fuel_load,
         percentile_growth,
+        d0: None,
+        dj: None,
+        fmc: None,
     };
     let grids = py
-        .allow_threads(|| run_grid_with_threads(&input, threads))
+        .detach(|| run_grid_with_threads(&input, threads))
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-    let out = PyDict::new_bound(py);
+    let out = PyDict::new(py);
     for (name, v) in [
         ("hros", grids.hros),
         ("bros", grids.bros),
@@ -173,16 +182,8 @@ fn run_fbp_grid<'py>(
     ] {
         out.set_item(
             name,
-            numpy::PyArray1::from_vec_bound(py, v).reshape([nrows, ncols])?,
+            numpy::PyArray1::from_vec(py, v).reshape([nrows, ncols])?,
         )?;
     }
     Ok(out)
-}
-
-/// The compiled backend exposed as `cffdrs._rust` by the mixed Python/Rust wheel.
-#[pymodule]
-fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("__core_version__", cffdrs_core::VERSION)?;
-    m.add_function(wrap_pyfunction!(run_fbp_grid, m)?)?;
-    Ok(())
 }
