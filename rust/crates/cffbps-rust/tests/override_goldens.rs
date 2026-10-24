@@ -136,6 +136,8 @@ const CASES: [Case; 5] = [
     },
 ];
 
+// ---- override goldens tests ----
+
 #[test]
 fn override_chain_matches_python_sequence() {
     for (i, case) in CASES.iter().enumerate() {

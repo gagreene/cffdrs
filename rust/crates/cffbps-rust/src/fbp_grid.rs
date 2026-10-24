@@ -1074,6 +1074,8 @@ fn normalized(field: Field, p: PerCell<'_>) -> OwnedPerCell {
 mod tests {
     use super::*;
 
+    // ---- fbp grid tests ----
+
     #[test]
     fn the_stored_inputs_are_the_non_computed_fields() {
         let not_computed: Vec<Field> = Field::ALL

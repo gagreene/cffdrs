@@ -28,6 +28,8 @@ def cupy_core(monkeypatch):
     _drop_cupy_backend_modules()
 
 
+# ---- cupy consumption tests ----
+
 @pytest.mark.parametrize('dtype', [np.float32, np.float64])
 def test_calc_tfc_consumes_no_fuel_without_spread(cupy_core, dtype):
     fbp = object.__new__(cupy_core.FBP)

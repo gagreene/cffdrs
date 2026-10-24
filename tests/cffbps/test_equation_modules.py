@@ -15,6 +15,8 @@ LAYOUT = {
 }
 
 
+# ---- equation modules tests ----
+
 @pytest.mark.parametrize('module,names', LAYOUT.items())
 def test_every_equation_is_defined_in_its_module(module, names):
     mod = importlib.import_module(f'{PACKAGE}.{module}')

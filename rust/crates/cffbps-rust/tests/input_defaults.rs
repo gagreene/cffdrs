@@ -4,6 +4,8 @@
 
 use cffbps_rust::fbp::{run, FbpInput};
 
+// ---- input defaults tests ----
+
 #[test]
 fn new_has_the_python_initialize_defaults() {
     let input = FbpInput::new(2, 20_230_615);

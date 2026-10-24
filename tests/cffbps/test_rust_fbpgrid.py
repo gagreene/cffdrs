@@ -28,6 +28,8 @@ def make(**kwargs):
     return _rust.FbpGrid(**(inputs() | kwargs))
 
 
+# ---- rust fbpgrid tests ----
+
 @pytest.mark.parametrize('shape', [(), (7,), (2, 3)])
 def test_shape_scalar_array_mix(shape):
     grid = _rust.FbpGrid(**inputs(shape))

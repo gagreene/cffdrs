@@ -8,6 +8,8 @@ mod common;
 
 use common::parse_inputs;
 
+// ---- percentile goldens tests ----
+
 #[test]
 fn scalar_core_matches_percentile_snapshot() {
     let inputs = parse_inputs();

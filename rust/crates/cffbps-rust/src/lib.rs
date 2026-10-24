@@ -135,6 +135,8 @@ pub mod state;
 
 #[cfg(test)]
 mod tests {
+    // ---- lib tests ----
+
     #[test]
     fn version_is_the_core_crate_version() {
         assert_ne!(super::VERSION, "");
