@@ -15,13 +15,52 @@ import numpy as np
 import pytest
 
 from cffdrs import _rust as rust_backend
-from cffdrs.cffbps import FBP
+from cffdrs.cffbps.python import FBP
 
 RNG = np.random.default_rng(42)
 SHAPE = (12, 18)  # every modeled fuel type appears more than once
 
 # outputs consumed by fire-growth engines, in the order we request them
 FIELDS = ['hros', 'bros', 'raz', 'wsv', 'hfi', 'rso', 'sros', 'sfc', 'fmc', 'accel']
+
+SCALARS = dict(wx_date=20230615, ffmc=91.2, bui=76.4, pdf=42.0, gfl=0.41)
+
+
+# ---- helpers ----
+def _big(g, reps=20):
+    """The module grid tiled to well over the 4,096-cell threshold for threaded runs."""
+    return {k: np.tile(v, (reps, 1)) for k, v in g.items()}
+
+
+def _copy(g):
+    return {k: v.copy() for k, v in g.items()}
+
+
+def _rust_threads(g, **kwargs):
+    sc = SCALARS
+    res = rust_backend.run_fbp_grid(
+        g['fuel_type'], g['lat'], g['long'], g['elevation'], g['slope'], g['aspect'], g['pc'], g['gcf'],
+        g['ws'], g['wd'], sc['wx_date'], sc['ffmc'], sc['bui'], sc['pdf'], sc['gfl'], 90.0, **kwargs,
+    )
+    return {name: np.asarray(res[name]) for name in FIELDS}
+
+
+def assert_grid_parity(grids, percentile, wx_date=None, scalars=None):
+    """Every field agrees on every modeled cell. ``scalars`` overrides ``SCALARS`` for one call."""
+    py = python_reference(grids, percentile, wx_date, scalars)
+    rs = rust_grid(grids, float(percentile), wx_date, scalars)
+    modeled = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18)
+    for name in FIELDS:
+        a, b = py[name], rs[name]
+        assert a.shape == b.shape == SHAPE, name
+        pa, pb = a[modeled], b[modeled]
+        both_nan = np.isnan(pa) & np.isnan(pb)
+        close = np.isclose(pb, pa, rtol=1e-9, atol=1e-12)
+        bad = ~(both_nan | close)
+        assert not bad.any(), (
+            f'{name}: {int(bad.sum())} modeled cells differ; '
+            f'first: py={pa[bad][0]!r} rs={pb[bad][0]!r}'
+        )
 
 
 @pytest.fixture(scope='module')
@@ -55,9 +94,6 @@ def grids():
     g['pc'][4, 3] = np.nan
     g['gcf'][4, 4] = np.nan
     return g
-
-
-SCALARS = dict(wx_date=20230615, ffmc=91.2, bui=76.4, pdf=42.0, gfl=0.41)
 
 
 def python_reference(g, percentile=50, wx_date=None, scalars=None):
@@ -96,24 +132,7 @@ def rust_grid(g, percentile=50.0, wx_date=None, scalars=None):
     return {name: np.asarray(res[name]) for name in FIELDS}
 
 
-def assert_grid_parity(grids, percentile, wx_date=None, scalars=None):
-    """Every field agrees on every modeled cell. ``scalars`` overrides ``SCALARS`` for one call."""
-    py = python_reference(grids, percentile, wx_date, scalars)
-    rs = rust_grid(grids, float(percentile), wx_date, scalars)
-    modeled = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 18)
-    for name in FIELDS:
-        a, b = py[name], rs[name]
-        assert a.shape == b.shape == SHAPE, name
-        pa, pb = a[modeled], b[modeled]
-        both_nan = np.isnan(pa) & np.isnan(pb)
-        close = np.isclose(pb, pa, rtol=1e-9, atol=1e-12)
-        bad = ~(both_nan | close)
-        assert not bad.any(), (
-            f'{name}: {int(bad.sum())} modeled cells differ; '
-            f'first: py={pa[bad][0]!r} rs={pb[bad][0]!r}'
-        )
-
-
+# ---- grid tests ----
 def test_grid_parity_all_fields(grids):
     assert_grid_parity(grids, 50)
 
@@ -125,21 +144,10 @@ def test_grid_parity_percentile_growth(grids, percentile):
     assert_grid_parity(grids, percentile)
 
 
-def test_percentile_growth_changes_results(grids):
-    """The percentile actually reaches the compiled pass: 90 differs from the median on adjusted fuels."""
-    median = rust_grid(grids, 50.0)['hros']
-    p90 = rust_grid(grids, 90.0)['hros']
-    conifer = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 7)
-    assert (p90[conifer] > median[conifer]).any()
-
-
+# ---- nan tests ----
 def test_nan_percentile_matches_python(grids):
     """NaN is not capped: both implementations propagate it identically."""
     assert_grid_parity(grids, float('nan'))
-
-
-def _copy(g):
-    return {k: v.copy() for k, v in g.items()}
 
 
 def test_nan_geography_matches_python(grids):
@@ -172,6 +180,15 @@ def test_nan_geography_matches_python_at_percentiles(grids, percentile):
     g['long'][6, :] = np.nan
     g['elevation'][7, :] = np.nan
     assert_grid_parity(g, percentile)
+
+
+# ---- other tests ----
+def test_percentile_growth_changes_results(grids):
+    """The percentile actually reaches the compiled pass: 90 differs from the median on adjusted fuels."""
+    median = rust_grid(grids, 50.0)['hros']
+    p90 = rust_grid(grids, 90.0)['hros']
+    conifer = (grids['fuel_type'] >= 1) & (grids['fuel_type'] <= 7)
+    assert (p90[conifer] > median[conifer]).any()
 
 
 @pytest.mark.parametrize('order', ['fortran', 'strided'])
@@ -215,20 +232,6 @@ def test_non_fuel_cells_are_nan(grids):
     assert non_fuel.sum() >= 5
     for name in FIELDS:
         assert np.isnan(rs[name][non_fuel]).all(), name
-
-
-def _big(g, reps=20):
-    """The module grid tiled to well over the 4,096-cell threshold for threaded runs."""
-    return {k: np.tile(v, (reps, 1)) for k, v in g.items()}
-
-
-def _rust_threads(g, **kwargs):
-    sc = SCALARS
-    res = rust_backend.run_fbp_grid(
-        g['fuel_type'], g['lat'], g['long'], g['elevation'], g['slope'], g['aspect'], g['pc'], g['gcf'],
-        g['ws'], g['wd'], sc['wx_date'], sc['ffmc'], sc['bui'], sc['pdf'], sc['gfl'], 90.0, **kwargs,
-    )
-    return {name: np.asarray(res[name]) for name in FIELDS}
 
 
 @pytest.mark.parametrize('threads', [0, 2, 4, 64])

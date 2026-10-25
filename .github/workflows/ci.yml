@@ -36,7 +36,7 @@ jobs:
       # cffdrs-py has no Rust tests and links against Python; pytest covers it
       # in the python job below.
       - name: Tests
-        run: cargo test --manifest-path rust/Cargo.toml -p cffdrs-core
+        run: cargo test --manifest-path rust/Cargo.toml -p cffbps-rust
 
   # The MSRV is declared once, as rust-version in rust/Cargo.toml; read it from
   # there so this job cannot drift from the manifest.
@@ -62,7 +62,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build editable package and run test suite
         run: |
-          uv sync --extra test --extra dev
+          uv sync --python 3.12 --extra test --extra dev
           uv run pytest -q
           uv run ruff check src/
           uv run mypy
+          uv run python tools/check_function_order.py
