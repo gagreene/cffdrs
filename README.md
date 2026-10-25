@@ -67,7 +67,7 @@ The repository is a mixed Python/Rust project. Python package sources live under
   `cffdrs` wheel as the Python package.
 
 The Python implementation is the behavioral reference. The Python distribution
-(`cffdrs-py`) is **0.2.0**; the independent `cffdrs-fire` core is **0.3.0**.
+(`cffdrs-py`) is **0.3.0**; the independent `cffdrs-fire` core is **0.4.0**.
 `cffdrs._rust.FbpGrid` is a low-level stateful grid in a private extension module;
 normal Python callers use `FBP`, which prepares inputs and exports reference-compatible
 results. Keeping `rust/` beside `src/` separates the Cargo workspace from Python imports.

@@ -212,7 +212,7 @@ def test_threads_identical(size):
 
 
 def test_core_version():
-    assert _rust.__core_version__ == '0.3.0'
+    assert _rust.__core_version__ == '0.4.0'
 
 
 

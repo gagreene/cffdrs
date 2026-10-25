@@ -59,6 +59,11 @@
 //! [`grid::GridInput`] stay constructible by struct literal on purpose;
 //! [`fbp::FbpInput::new`] is the forward-compatible constructor.
 //!
+//! # Changes in 0.4.0
+//!
+//! The crate is renamed from `cffbps-rust` to `cffdrs-fire` (library `cffdrs_fire`), the name of the Python
+//! distribution on `PyPI`. There is no API change; update the package name and the `use` paths.
+//!
 //! # Changes in 0.3.0
 //!
 //! Every [`grid::GridInput`] input except `fuel_type` is a [`grid::PerCell`]
@@ -77,7 +82,7 @@
 //! [`grid::BehaviourGrids`]; `run_grid` now returns a `Result` instead of
 //! panicking on bad input.
 //!
-//! Current versions are core 0.3.0 and `cffdrs-py` 0.2.0 (the Python
+//! Current versions are core 0.4.0 and `cffdrs-py` 0.3.0 (the Python
 //! distribution). The historical core 0.2.0 release had an independent binding version.
 //!
 //! # Developing
