@@ -108,6 +108,8 @@ def scenarios():
                         kw[missing] = np.nan
                     if shape == 'mixed':
                         kw['fuel_type'] = np.array([[fuel, fuel]])
+                        if missing == 'fuel':
+                            kw['fuel_type'] = np.ma.masked_array(kw['fuel_type'], mask=[[True, False]])
                         yield f'{shape} fuel={fuel} missing={missing} p={percentile}', kw
                         continue
                     if not scalar:

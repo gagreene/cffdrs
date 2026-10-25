@@ -82,6 +82,25 @@ def test_calculate_cells_mix_with_missing_and_all_three_overrides():
     equal(make(**kw).runFBP(), make('python', **kw).runFBP())
 
 
+@pytest.mark.parametrize('dtype', [np.int16, np.int64, np.float32])
+@pytest.mark.parametrize('name', ['d0', 'dj', 'fmc'])
+def test_calculate_cells_in_an_integer_or_narrow_override_export_the_calculated_values_like_python(name, dtype):
+    values = {'d0': [-1, 150, -9, 130], 'dj': [-1, 170, -5, 90], 'fmc': [-1, 99, -9, 101]}[name]
+    kw = dict(fuel_type=np.full(4, 6), **{name: np.array(values, dtype=dtype)})
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        equal(make(**kw).runFBP(), make('python', **kw).runFBP())
+
+
+@pytest.mark.parametrize('d0, dj', [([140, 150, 160, 170], [-1, 170, -5, 90]),
+                                     ([-1, 150, -9, 130], [170, 171, 172, 173])])
+def test_a_given_d0_with_a_calculated_dj_and_the_reverse_match_python_dtypes(d0, dj):
+    kw = dict(fuel_type=np.full(4, 6), d0=np.array(d0, dtype=np.int16), dj=np.array(dj, dtype=np.int16))
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        equal(make(**kw).runFBP(), make('python', **kw).runFBP())
+
+
 # ---- dj tests ----
 @pytest.mark.parametrize('value', [0, -5, 366, 400, 365, 166.9, np.nan])
 @pytest.mark.parametrize('year', [2023, 2024])

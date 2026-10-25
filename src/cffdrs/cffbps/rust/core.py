@@ -46,6 +46,11 @@ _STAGE_WRITES = {name: fields.split() for name, fields in _STAGE_WRITES.items()}
 _DEFAULT = ['hros', 'hfi', 'fire_type']
 
 
+def _has_calculate(override):
+    """True when an override array has a calculate cell (any negative value), so its exported cells are computed."""
+    return override is not None and bool((np.ma.getdata(override) < 0).any())
+
+
 def _percentile(value):
     """The native percentile: ``None`` means no adjustment, as in the Python reference (the median, 50)."""
     return 50 if value is None else value
@@ -206,18 +211,19 @@ class FBP:
                 supplied = self._overrides['d0']
                 dj_supplied = self._overrides['dj']
                 if not np.ma.getmaskarray(supplied).any() and (
-                        dj_supplied is None or not np.ma.getmaskarray(dj_supplied).any()):
+                        dj_supplied is None or not np.ma.getmaskarray(dj_supplied).any()
+                ) and not _has_calculate(supplied):
                     dtype = np.result_type(supplied.dtype, np.int64)
             if name == 'fuel_type':
                 result = np.broadcast_to(self._fuel.data, self._grid.shape or (1,))
                 dtype = self._fuel.dtype
             elif name == 'd0' and self._overrides['d0'] is not None:
                 supplied = self._overrides['d0']
-                if not np.ma.getmaskarray(supplied).any():
+                if not np.ma.getmaskarray(supplied).any() and not _has_calculate(supplied):
                     dtype = supplied.dtype
             elif name == 'fmc' and self._overrides['fmc'] is not None:
                 supplied = self._overrides['fmc']
-                if not np.ma.getmaskarray(supplied).any():
+                if not np.ma.getmaskarray(supplied).any() and not _has_calculate(supplied):
                     dtype = supplied.dtype
             elif name == 'dj' and self._overrides['dj'] is None and self._fmc_done:
                 result = np.nan_to_num(result, nan=0.)

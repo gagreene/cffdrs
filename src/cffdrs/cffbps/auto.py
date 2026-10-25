@@ -46,12 +46,19 @@ class AutoFBP:
     """
 
     def __getattr__(self, name: str) -> Any:
+        # read the delegate through object.__getattribute__: copy and pickle probe an instance whose
+        # state is not restored yet, and self._backend would re-enter this method forever
+        try:
+            backend = object.__getattribute__(self, '_backend')
+            in_use = object.__getattribute__(self, '_backend_in_use')
+        except AttributeError:
+            raise AttributeError(name) from None
         if name in _TABLES:
-            if self._backend_in_use == 'rust':
+            if in_use == 'rust':
                 raise AttributeError(f"{name} is a Python table; use backend='python'")
-            if self._backend_in_use is None:
+            if in_use is None:
                 object.__setattr__(self, '_python_pinned', True)
-        return getattr(self._backend, name)
+        return getattr(backend, name)
 
     def __init__(self) -> None:
         object.__setattr__(self, '_backend', PythonFBP())

@@ -1,5 +1,7 @@
 """Automatic backend selection and the public no-switching contract."""
+import copy
 import importlib
+import pickle
 import subprocess
 import sys
 import warnings
@@ -22,6 +24,29 @@ def make(cls=FBP, **kwargs):
     model = cls()
     model.initialize(**(BASE | {'out_request': ALL} | kwargs))
     return model
+
+
+# ---- copy tests ----
+def test_an_unrestored_instance_raises_attribute_error_instead_of_recursing():
+    bare = object.__new__(AutoFBP)
+    for name in ('rosParams', 'fire_type', '__setstate__'):
+        with pytest.raises(AttributeError):
+            getattr(bare, name)
+
+
+@pytest.mark.parametrize('how', ['copy', 'deepcopy', 'pickle'])
+def test_a_python_backed_instance_can_be_copied_and_pickled(how):
+    model = make(backend='python')
+    clone = {'copy': copy.copy, 'deepcopy': copy.deepcopy,
+             'pickle': lambda value: pickle.loads(pickle.dumps(value))}[how](model)
+    assert clone.backend_in_use == 'python'
+    equal(clone.runFBP(), make(backend='python').runFBP(), scalar=True)
+
+
+@pytest.mark.parametrize('how', ['copy', 'deepcopy'])
+def test_an_uninitialized_instance_can_be_copied(how):
+    clone = {'copy': copy.copy, 'deepcopy': copy.deepcopy}[how](FBP())
+    assert clone.backend_in_use is None
 
 
 # ---- forced tests ----
