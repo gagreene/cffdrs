@@ -20,8 +20,9 @@ uv run --no-sync python tools/compare_backends.py [--markdown]
 Scenarios: every fuel code 1-20 plus invalid codes 0 and 99, each input missing in
 turn, percentile 50 and 90, scalar / array / mixed (array fuel, scalar weather)
 input, and three states (`init`: before any stage; `run`: after `runFBP()`;
-`calcFMC`: after the first four stages). Last run (2026-10-11, tree after commit
-`0bc0437` plus the fixes below): 4,356 runs, **no value difference**; the shape,
+`calcFMC`: after the first four stages). Last run (2026-10-25, tree at
+`51b4c59`; the later commits to `pre_release` change only dependency metadata and
+documentation): 4,356 runs, **no value difference**; the shape,
 container and dtype differences below are the only ones.
 
 Run the tool after any change to either backend and compare the table with the one

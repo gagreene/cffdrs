@@ -572,9 +572,9 @@ golden rows (C-6, wind speed 20, wind direction 135 and 270) when it adopts this
 Maturin reads distribution 0.3.0 from `rust/crates/cffdrs-py/Cargo.toml`; the
 independent Rust core is 0.4.0. Release tag validation continues to read the
 binding version. A manual `release.yml` run publishes to TestPyPI and a `v*` tag publishes to
-PyPI, both through Trusted Publishing. CI uses `cffdrs-fire`
-and its existing pytest command now covers both CPU backends; no jobs or schedules
-were added for this change.
+PyPI, both through Trusted Publishing. CI runs the Rust checks (`fmt`, `clippy`, docs, `cargo test -p cffdrs-fire`,
+MSRV) and the Python job (pytest, which covers both CPU backends, ruff, mypy and the function-order check); nothing
+is scheduled.
 
 A prebuilt wheel avoids Rust compiler installation for Python consumers. Source
 builds require Rust 1.78 or newer (the MSRV, enforced in CI) and platform build tools.
