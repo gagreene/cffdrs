@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/cffdrs-core", "crates/cffdrs-py"]
+members = ["crates/cffbps-rust", "crates/cffdrs-py"]
 
 [workspace.package]
 edition = "2021"

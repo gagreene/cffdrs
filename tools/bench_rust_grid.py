@@ -38,18 +38,6 @@ def build_grids():
     )
 
 
-def run_once(g):
-    return rust_backend.run_fbp_grid(
-        g['fuel_type'],
-        g['lat'], g['long'], g['elevation'],
-        g['slope'], g['aspect'],
-        g['pc'], g['gcf'],
-        g['ws'], g['wd'],
-        SCALARS['wx_date'], SCALARS['ffmc'], SCALARS['bui'],
-        SCALARS['pdf'], SCALARS['gfl'], PERCENTILE,
-    )
-
-
 def main():
     g = build_grids()
     for _ in range(WARMUP):
@@ -64,6 +52,18 @@ def main():
     print(
         f'min {mn * 1e3:.1f} ms ({mn * 1e9 / cells:.1f} ns/cell), '
         f'median {med * 1e3:.1f} ms ({med * 1e9 / cells:.1f} ns/cell)'
+    )
+
+
+def run_once(g):
+    return rust_backend.run_fbp_grid(
+        g['fuel_type'],
+        g['lat'], g['long'], g['elevation'],
+        g['slope'], g['aspect'],
+        g['pc'], g['gcf'],
+        g['ws'], g['wd'],
+        SCALARS['wx_date'], SCALARS['ffmc'], SCALARS['bui'],
+        SCALARS['pdf'], SCALARS['gfl'], PERCENTILE,
     )
 
 

@@ -33,17 +33,51 @@ _RASTER_FILES = {
 }
 
 
-def load_input_frame() -> pd.DataFrame:
-    """Load the Wotton 2009 input CSV with NA handling."""
-    return pd.read_csv(INPUT_CSV, na_values=["NA", ""])
-
-
 def _cell(row: pd.Series, col: str, default=None):
     """Return a plain Python value for a CSV cell, or ``default`` if NA."""
     val = row[col]
     if pd.isna(val):
         return default
     return val
+
+
+def arrayize(value) -> list:
+    """Normalize an array-path ``getParams`` element to nested lists for JSON.
+
+    Masked/NaN cells become ``None`` so the golden round-trips exactly.
+    """
+    arr = np.ma.filled(np.ma.asarray(value), np.nan)
+    out = arr.astype(object)
+    if np.issubdtype(arr.dtype, np.floating):
+        out[~np.isfinite(arr)] = None
+    return [[(None if v is None else (v.item() if hasattr(v, "item") else v))
+             for v in row] for row in np.atleast_2d(out)]
+
+
+def load_input_frame() -> pd.DataFrame:
+    """Load the Wotton 2009 input CSV with NA handling."""
+    return pd.read_csv(INPUT_CSV, na_values=["NA", ""])
+
+
+def load_raster_inputs() -> dict:
+    """Read the input raster fixtures into a kwargs dict for ``FBP.initialize``.
+
+    All spatial fields load as float64 arrays (fuel_type as int8) to exercise the
+    masked-array/array code path; ``wx_date``/``dj`` are the scalar fixture values.
+    Requires ``rasterio`` (a test-only dependency).
+    """
+    import rasterio as rio
+
+    def read(name, dtype):
+        with rio.open(os.path.join(RASTER_INPUT_DIR, name)) as src:
+            return src.read(1).astype(dtype)
+
+    kwargs = {"fuel_type": read("FuelType.tif", np.int8)}
+    for arg, fname in _RASTER_FILES.items():
+        kwargs[arg] = read(fname, np.float64)
+    kwargs["wx_date"] = RASTER_WX_DATE
+    kwargs["dj"] = RASTER_DJ
+    return kwargs
 
 
 def row_to_kwargs(row: pd.Series, out_request: list[str]) -> dict:
@@ -74,40 +108,6 @@ def row_to_kwargs(row: pd.Series, out_request: list[str]) -> dict:
         dj=None if dj is None else int(dj),
         out_request=list(out_request),
     )
-
-
-def load_raster_inputs() -> dict:
-    """Read the input raster fixtures into a kwargs dict for ``FBP.initialize``.
-
-    All spatial fields load as float64 arrays (fuel_type as int8) to exercise the
-    masked-array/array code path; ``wx_date``/``dj`` are the scalar fixture values.
-    Requires ``rasterio`` (a test-only dependency).
-    """
-    import rasterio as rio
-
-    def read(name, dtype):
-        with rio.open(os.path.join(RASTER_INPUT_DIR, name)) as src:
-            return src.read(1).astype(dtype)
-
-    kwargs = {"fuel_type": read("FuelType.tif", np.int8)}
-    for arg, fname in _RASTER_FILES.items():
-        kwargs[arg] = read(fname, np.float64)
-    kwargs["wx_date"] = RASTER_WX_DATE
-    kwargs["dj"] = RASTER_DJ
-    return kwargs
-
-
-def arrayize(value) -> list:
-    """Normalize an array-path ``getParams`` element to nested lists for JSON.
-
-    Masked/NaN cells become ``None`` so the golden round-trips exactly.
-    """
-    arr = np.ma.filled(np.ma.asarray(value), np.nan)
-    out = arr.astype(object)
-    if np.issubdtype(arr.dtype, np.floating):
-        out[~np.isfinite(arr)] = None
-    return [[(None if v is None else (v.item() if hasattr(v, "item") else v))
-             for v in row] for row in np.atleast_2d(out)]
 
 
 def scalarize(value) -> object:
