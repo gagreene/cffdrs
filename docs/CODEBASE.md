@@ -194,7 +194,7 @@ importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
   `test_auto_backend.py` (automatic dispatch) and `test_final_review_regressions.py`
   (stateful injections and scalar missing-input exports). `conftest.py` provides the
   backend fixtures that run the shared suites on Python and Rust.
-- `rust/crates/cffbps-rust/tests/` — the bit-level oracle `characterization.rs` (local
+- `rust/crates/cffdrs-fire/tests/` — the bit-level oracle `characterization.rs` (local
   `#[ignore]` tool, baseline in `rust/target/`, never re-record it on a refactor), the
   golden tests, `grid_api.rs`, `threads.rs`, `stage_state.rs` and `fbp_grid.rs`.
 - `tests/cffwis/` + `tests/test_cffwis.py` — includes a real BC weather-station
@@ -205,7 +205,7 @@ importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
 A Cargo workspace beside `src/`, with no root `Cargo.toml` (always pass
 `--manifest-path rust/Cargo.toml`):
 
-- `crates/cffbps-rust` (0.3.0, MSRV 1.78, no runtime dependencies): the module map is in
+- `crates/cffdrs-fire` (0.3.0, MSRV 1.78, no runtime dependencies): the module map is in
   the crate docs (`src/lib.rs`): `fbp` (scalar `run()`), `field`/`stage`/`state` (76
   fields, 23 stages, one cell), `grid` (per-cell or constant inputs, any requested
   outputs, threads), `fbp_grid` (stages over whole grids with freeing) and one module
@@ -520,11 +520,13 @@ These old paths are historical migration references, not current imports:
 | `cffdrs.cffbps.parallel` | `cffdrs.cffbps.python.parallel` |
 | `cffdrs.cffbps.inputs`, `.constants` | `cffdrs.cffbps.common.inputs`, `.constants` |
 | `cffdrs.cffbps.cupy_backend` | `cffdrs.cffbps.cupy` |
-| Rust package `cffdrs-core`, module `cffdrs_core` | package `cffbps-rust`, module `cffbps_rust` |
+| Rust package `cffdrs-core`, module `cffdrs_core` | package `cffdrs-fire`, module `cffdrs_fire` |
 
 There are no deep-import compatibility shims. The root FBP import now selects the
 backend once at initialization; explicit Python/Rust imports remain available.
-The distribution version is 0.2.0 (`cffdrs-py`); the core API version is 0.3.0.
+The distribution version is 0.2.0 (`cffdrs-py`); the core API version is 0.3.0. The pure Rust crate is named
+`cffdrs-fire`, like the PyPI distribution (which is built from the `cffdrs-py` binding crate); before the
+rename it was `cffbps-rust` in the 0.2.0 sources, and it has never been published to crates.io.
 `GridInput` numeric fields use `PerCell::Const` or `PerCell::Cells`, and optional
 per-cell d0/dj/fmc overrides. Its fuel field remains a code slice. Consumers of the
 old scalar/slice struct shape must adapt; `run_grid_fields` can select arbitrary fields.
@@ -569,7 +571,7 @@ golden rows (C-6, wind speed 20, wind direction 135 and 270) when it adopts this
 Maturin reads distribution 0.2.0 from `rust/crates/cffdrs-py/Cargo.toml`; the
 independent Rust core is 0.3.0. Release tag validation continues to read the
 binding version. A manual `release.yml` run publishes to TestPyPI and a `v*` tag publishes to
-PyPI, both through Trusted Publishing. CI uses `cffbps-rust`
+PyPI, both through Trusted Publishing. CI uses `cffdrs-fire`
 and its existing pytest command now covers both CPU backends; no jobs or schedules
 were added for this change.
 

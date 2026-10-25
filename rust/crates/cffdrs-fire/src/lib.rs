@@ -91,13 +91,13 @@
 //!   and toolchain, then compare after each change:
 //!
 //!   ```text
-//!   CFFDRS_BASELINE_RECORD=1 cargo test --manifest-path rust/Cargo.toml -p cffbps-rust --test characterization -- --ignored
-//!   cargo test --manifest-path rust/Cargo.toml -p cffbps-rust --test characterization -- --ignored
+//!   CFFDRS_BASELINE_RECORD=1 cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire --test characterization -- --ignored
+//!   cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire --test characterization -- --ignored
 //!   ```
 //!
 //!   The baseline lives in `rust/target/` and is never committed.
 //! - **Benchmarks**: `examples/bench_run.rs` times [`fbp::run`] in the release
-//!   profile (`cargo run --release --manifest-path rust/Cargo.toml -p cffbps-rust --example bench_run`);
+//!   profile (`cargo run --release --manifest-path rust/Cargo.toml -p cffdrs-fire --example bench_run`);
 //!   `tools/bench_rust_grid.py` times the compiled grid pass from Python,
 //!   including array copies (`uv run --no-sync python tools/bench_rust_grid.py`).
 
@@ -105,14 +105,14 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 
-/// This crate's version (`CARGO_PKG_VERSION` of `cffbps-rust`), for example
+/// This crate's version (`CARGO_PKG_VERSION` of `cffdrs-fire`), for example
 /// to report which core a binding or engine was built against.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Lets unit tests share the integration tests' input generator
-// (`tests/common/cases.rs`), which names this crate `cffbps_rust`.
+// (`tests/common/cases.rs`), which names this crate `cffdrs_fire`.
 #[cfg(test)]
-extern crate self as cffbps_rust;
+extern crate self as cffdrs_fire;
 
 mod behavior;
 mod consumption;

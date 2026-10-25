@@ -2,7 +2,7 @@
 //! inputs left missing (NaN) so that forgetting one propagates instead of
 //! silently defaulting.
 
-use cffbps_rust::fbp::{run, FbpInput};
+use cffdrs_fire::fbp::{run, FbpInput};
 
 // ---- input defaults tests ----
 

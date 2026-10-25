@@ -1,6 +1,6 @@
 //! Fixture loading shared by the golden test binaries.
 
-use cffbps_rust::fbp::FbpInput;
+use cffdrs_fire::fbp::FbpInput;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -124,7 +124,7 @@ pub fn parse_inputs() -> HashMap<i64, FbpInput> {
 }
 
 pub fn repo_path(rel: &str) -> PathBuf {
-    // crates/cffbps-rust -> repo root
+    // crates/cffdrs-fire -> repo root
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
         .join(rel)

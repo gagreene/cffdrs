@@ -1,5 +1,5 @@
 [package]
-name = "cffbps-rust"
+name = "cffdrs-fire"
 version = "0.3.0"
 edition.workspace = true
 description = "Pure-Rust implementation of the CFFBPS (FBP) equations: scalar core, grid pass and pipeline stages, mirroring the cffdrs Python package in this repository."

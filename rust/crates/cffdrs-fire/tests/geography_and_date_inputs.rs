@@ -5,7 +5,7 @@
 //! is masked too, never a valid default. Dates are validated as real
 //! YYYYMMDD calendar dates, as `datetime.strptime` does.
 
-use cffbps_rust::fbp::{is_valid_wx_date, run, FbpInput};
+use cffdrs_fire::fbp::{is_valid_wx_date, run, FbpInput};
 
 fn c6() -> FbpInput {
     FbpInput {

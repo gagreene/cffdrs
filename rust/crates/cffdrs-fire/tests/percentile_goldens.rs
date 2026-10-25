@@ -3,7 +3,7 @@
 //! percentile_growth_snapshot.json`). Regenerate with `tools/gen_fbp_goldens.py`
 //! when the Python spec changes.
 
-use cffbps_rust::fbp::run;
+use cffdrs_fire::fbp::run;
 mod common;
 
 use common::parse_inputs;
