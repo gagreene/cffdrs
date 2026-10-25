@@ -6,8 +6,8 @@
 //! engine contract (every requested field NaN).
 
 mod common;
-use cffbps_rust::field::Field;
-use cffbps_rust::grid::{run_grid_fields, GridInput, NonModeled, PerCell};
+use cffdrs_fire::field::Field;
+use cffdrs_fire::grid::{run_grid_fields, GridInput, NonModeled, PerCell};
 use serde_json::Value;
 
 /// Golden tolerance (the shared fixtures' rtol).

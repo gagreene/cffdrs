@@ -59,6 +59,11 @@
 //! [`grid::GridInput`] stay constructible by struct literal on purpose;
 //! [`fbp::FbpInput::new`] is the forward-compatible constructor.
 //!
+//! # Changes in 0.4.0
+//!
+//! The crate is renamed from `cffbps-rust` to `cffdrs-fire` (library `cffdrs_fire`), the name of the Python
+//! distribution on `PyPI`. There is no API change; update the package name and the `use` paths.
+//!
 //! # Changes in 0.3.0
 //!
 //! Every [`grid::GridInput`] input except `fuel_type` is a [`grid::PerCell`]
@@ -77,7 +82,7 @@
 //! [`grid::BehaviourGrids`]; `run_grid` now returns a `Result` instead of
 //! panicking on bad input.
 //!
-//! Current versions are core 0.3.0 and `cffdrs-py` 0.2.0 (the Python
+//! Current versions are core 0.4.0 and `cffdrs-py` 0.3.0 (the Python
 //! distribution). The historical core 0.2.0 release had an independent binding version.
 //!
 //! # Developing
@@ -91,13 +96,13 @@
 //!   and toolchain, then compare after each change:
 //!
 //!   ```text
-//!   CFFDRS_BASELINE_RECORD=1 cargo test --manifest-path rust/Cargo.toml -p cffbps-rust --test characterization -- --ignored
-//!   cargo test --manifest-path rust/Cargo.toml -p cffbps-rust --test characterization -- --ignored
+//!   CFFDRS_BASELINE_RECORD=1 cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire --test characterization -- --ignored
+//!   cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire --test characterization -- --ignored
 //!   ```
 //!
 //!   The baseline lives in `rust/target/` and is never committed.
 //! - **Benchmarks**: `examples/bench_run.rs` times [`fbp::run`] in the release
-//!   profile (`cargo run --release --manifest-path rust/Cargo.toml -p cffbps-rust --example bench_run`);
+//!   profile (`cargo run --release --manifest-path rust/Cargo.toml -p cffdrs-fire --example bench_run`);
 //!   `tools/bench_rust_grid.py` times the compiled grid pass from Python,
 //!   including array copies (`uv run --no-sync python tools/bench_rust_grid.py`).
 
@@ -105,14 +110,14 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 
-/// This crate's version (`CARGO_PKG_VERSION` of `cffbps-rust`), for example
+/// This crate's version (`CARGO_PKG_VERSION` of `cffdrs-fire`), for example
 /// to report which core a binding or engine was built against.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Lets unit tests share the integration tests' input generator
-// (`tests/common/cases.rs`), which names this crate `cffbps_rust`.
+// (`tests/common/cases.rs`), which names this crate `cffdrs_fire`.
 #[cfg(test)]
-extern crate self as cffbps_rust;
+extern crate self as cffdrs_fire;
 
 mod behavior;
 mod consumption;

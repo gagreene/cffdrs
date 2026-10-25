@@ -5,7 +5,7 @@
 //!
 //! Include it with `#[path = "common/cases.rs"] mod cases;`.
 
-use cffbps_rust::fbp::FbpInput;
+use cffdrs_fire::fbp::FbpInput;
 
 pub const CANONICAL_NAN: u64 = 0x7ff8_0000_0000_0000;
 

@@ -1,14 +1,14 @@
 //! Typed grid API: per-cell or constant inputs, validation errors, empty grids,
 //! requested fields, `d0` / `dj` overrides and per-cell parity with `run()`.
 
-use cffbps_rust::fbp::{run, FbpInput};
-use cffbps_rust::field::Field;
-use cffbps_rust::grid::{
+use cffdrs_fire::fbp::{run, FbpInput};
+use cffdrs_fire::field::Field;
+use cffdrs_fire::grid::{
     run_grid, run_grid_fields, BehaviourGrids, GridError, GridFields, GridInput, NonModeled,
     PerCell,
 };
-use cffbps_rust::stage::Stage;
-use cffbps_rust::state::CellState;
+use cffdrs_fire::stage::Stage;
+use cffdrs_fire::state::CellState;
 
 // C-2 and M-4, plus fuels that read the per-cell `pct_conifer` (M-1/M-2 =
 // 10/11), `grass_curing` and `grass_fuel_load` (O-1a/O-1b = 14/15),

@@ -55,7 +55,7 @@ manifest-path = "rust/crates/cffdrs-py/Cargo.toml"
 python-source = "src"
 module-name = "cffdrs._rust"
 bindings = "pyo3"
-# The Cargo workspace has a sibling path dependency (cffbps-rust), so use the
+# The Cargo workspace has a sibling path dependency (cffdrs-fire), so use the
 # repository file set rather than cargo-package's single-crate sdist file set.
 sdist-generator = "git"
 # Keep the ~240 MB of raster test fixtures out of the source distribution; the test
