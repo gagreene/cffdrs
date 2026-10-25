@@ -3,8 +3,8 @@
 Python implementation of the Canadian Forest Fire Danger Rating System: the Fire
 Behaviour Prediction (FBP) System and the Fire Weather Index (FWI) System. Library
 only — no server, no CLI, no event handlers. Scalar and NumPy-array inputs share
-one API; missing/NoData values propagate via masked arrays. `uv`-managed; not yet
-published to PyPI (the publish jobs are disabled). Maturin builds one mixed
+one API; missing/NoData values propagate via masked arrays. `uv`-managed; published
+on PyPI as `cffdrs-fire` (a v* tag publishes through `release.yml`). Maturin builds one mixed
 Python/Rust `cp311-abi3` wheel; its version comes from `rust/crates/cffdrs-py/Cargo.toml`.
 Two interchangeable FBP backends exist (Python reference, Rust); every known
 difference between them is tracked in [BACKEND_DIFFERENCES.md](BACKEND_DIFFERENCES.md).
@@ -568,7 +568,8 @@ golden rows (C-6, wind speed 20, wind direction 135 and 270) when it adopts this
 
 Maturin reads distribution 0.2.0 from `rust/crates/cffdrs-py/Cargo.toml`; the
 independent Rust core is 0.3.0. Release tag validation continues to read the
-binding version. Both publishing jobs remain disabled. CI uses `cffbps-rust`
+binding version. A manual `release.yml` run publishes to TestPyPI and a `v*` tag publishes to
+PyPI, both through Trusted Publishing. CI uses `cffbps-rust`
 and its existing pytest command now covers both CPU backends; no jobs or schedules
 were added for this change.
 
@@ -579,7 +580,7 @@ The ABI3 wheel tag is cp311-abi3 (PyO3 0.27); supported Python is 3.11-3.14
 smoke-tests wheels on 3.11-3.14 for Linux x86-64, macOS x86-64 and arm64, and Windows
 x86-64. Future CPython ABI compatibility
 is not certification of future NumPy/SciPy dependencies. Free-threaded builds
-are unsupported. This local version has not been published by this work.
+are unsupported.
 
 Releases follow `docs/CONTRIBUTION_PROCEDURES.md`: major and minor versions are merged into `pre_release`
 (this work was PR #14) and the owner reviews `pre_release` into `master`; patches go to `master`. Commits,

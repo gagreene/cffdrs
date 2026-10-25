@@ -263,13 +263,16 @@ output or prove that other operating systems passed.
 Rust checks (format, clippy, docs, tests, MSRV) and the Python job (pytest, ruff,
 mypy). `release.yml` runs only on manual dispatch or on a pushed `v*` tag: it builds
 the sdist and the platform wheels, smoke-tests them on every supported Python, and
-runs `twine check`. Publishing to PyPI and TestPyPI is disabled in the workflow
-(`if: false`) until the owner enables it, so a dispatch or tag cannot upload
-anything. Nothing is scheduled.
+runs `twine check`. It then publishes through PyPI Trusted Publishing (no tokens are
+stored): a manual dispatch uploads to TestPyPI and a `v*` tag uploads to PyPI, each
+through its own GitHub environment (`testpypi`, `pypi`). PyPI never accepts the same
+version twice, so a tag is created only after the TestPyPI rehearsal succeeded.
+Nothing is scheduled.
 
 Before a release, run `release.yml` by hand on the release branch and confirm that
-every build and smoke-test job passes. Enabling the publish jobs, creating a tag and
-publishing all require the owner's direct permission, one action at a time.
+every build, smoke-test and TestPyPI job passes, and install the uploaded package in a
+clean environment. A dispatch uploads to TestPyPI and a tag uploads to PyPI, so both
+need the owner's direct permission, one action at a time.
 
 Local checks and the completed PR record remain required whether or not GitHub
 Actions runs. Coding agents must obtain direct permission before dispatching the

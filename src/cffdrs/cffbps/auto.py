@@ -15,7 +15,7 @@ _TABLES = {
     'csfiVarList', 'rsoVarList', 'cfbVarList', 'cfcVarList', 'cfiVarList', 'ftypes',
 }
 _RUST_INSTALL = (
-    'Rust FBP requires the cffdrs extension: install with pip install cffdrs '
+    'Rust FBP requires the cffdrs extension: install with pip install cffdrs-fire '
     'or build the checkout with uv sync --extra test --extra dev'
 )
 

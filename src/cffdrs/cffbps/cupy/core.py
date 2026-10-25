@@ -11,7 +11,7 @@ test guarding it. The reference implementation is :mod:`cffdrs.cffbps` (the
 deliberate GPU experimentation.
 
 Requires the optional ``gpu`` extra (CuPy + a CUDA-capable environment):
-``pip install cffdrs[gpu]`` (or install the CUDA-matched wheel yourself, e.g.
+``pip install cffdrs-fire[gpu]`` (or install the CUDA-matched wheel yourself, e.g.
 ``cupy-cuda12x``). Importing this module without CuPy raises a clear
 :class:`ImportError`.
 
@@ -34,7 +34,7 @@ try:
 except ImportError as exc:  # pragma: no cover - depends on optional GPU stack
     raise ImportError(
         "The CuPy GPU backend requires the optional 'gpu' extra and a CUDA-capable "
-        "environment. Install with: pip install cffdrs[gpu] (or install the "
+        "environment. Install with: pip install cffdrs-fire[gpu] (or install the "
         "CUDA-matched wheel directly, e.g. cupy-cuda12x). The reference CPU "
         "implementation is available as `from cffdrs.cffbps import FBP`."
     ) from exc
