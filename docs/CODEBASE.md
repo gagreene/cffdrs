@@ -561,6 +561,9 @@ the C-6 cell in the README's breaking-changes note, `cfb` is 0.3676 (was 0.1286)
 6843 (was 5752). Regenerate any C-6 acceleration reference of a custom pipeline after checking it against
 `alpha = 0.115 - 18.8 * CFB^2.5 * exp(-8 * CFB)`.
 
+The owner accepted the refreshed C-6 acceleration references on 23 October 2026; PyroCell replaces its two
+golden rows (C-6, wind speed 20, wind direction 135 and 270) when it adopts this release.
+
 ## Versions, delivery and branch routing
 
 Maturin reads distribution 0.2.0 from `rust/crates/cffdrs-py/Cargo.toml`; the
@@ -578,10 +581,6 @@ x86-64. Future CPython ABI compatibility
 is not certification of future NumPy/SciPy dependencies. Free-threaded builds
 are unsupported. This local version has not been published by this work.
 
-The existing v0.1.0 tag activates contribution routing: this minor-version work
-targets `pre_release`; the owner later reviews `pre_release` into `master`.
-Commits, pushes, tags and publication still require separate authorization.
-`docs/CONTRIBUTION_PROCEDURES.md` exists only on `docs/contribution-procedures`,
-so that branch needs a follow-up docs-only patch targeting `master`: record the
-v0.1.0 tag, rename the old core paths/mutation diff command to `cffbps-rust`,
-and name `pre_release` as the target for minor versions. No other branch was edited.
+Releases follow `docs/CONTRIBUTION_PROCEDURES.md`: major and minor versions are merged into `pre_release`
+(this work was PR #14) and the owner reviews `pre_release` into `master`; patches go to `master`. Commits,
+pushes, tags and publication still require separate authorization.
