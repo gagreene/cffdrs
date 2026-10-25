@@ -82,6 +82,19 @@ The `FBP` class is a facade: initialize it with fuel, terrain, and weather input
 run the model, and request any of the 54 output variables. The underlying equations
 live in `cffdrs.cffbps.python.equations` as pure, typed functions if you need them directly.
 
+### Breaking changes in 0.3.0
+
+Python users are not affected: the distribution is `cffdrs-fire` 0.3.0, the import stays `cffdrs`, and the
+public API is unchanged.
+
+- **Rust crate renamed.** The pure Rust crate `cffbps-rust` is now `cffdrs-fire` (library `cffdrs_fire`, crate
+  version 0.4.0), the name of the PyPI distribution. It was never published to crates.io. Rust consumers (a path or
+  git dependency, or a vendored copy) rename the package and the `use` paths: `cffbps-rust` / `cffbps_rust` to
+  `cffdrs-fire` / `cffdrs_fire`.
+- **certifi floor in the extras.** The `io`, `gpu` and `test` extras now require `certifi>=2026.10.19`. certifi
+  2026.10.18 removed the emSign root certificates after the eMudhra CA key compromise, and rasterio, which these
+  extras pull in, requires certifi without a minimum. Installing an extra upgrades an older certifi.
+
 ### Breaking changes in 0.2.0
 
 The public `from cffdrs.cffbps import FBP` import remains supported and now
