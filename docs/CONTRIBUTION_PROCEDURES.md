@@ -85,9 +85,10 @@ in source, tools and tests alike. Each block is ordered on its own.
 - **Tests:** helpers come first, in the same order, under a `# ---- helpers ----`
   comment (Rust: `// ---- helpers ----`). The tests follow in groups, each starting with a
   `# ---- <label> ----` comment; every test is in a group, no helper comes after the
-  first test, the group labels are alphabetical (`other tests` last) and the tests keep
-  their order inside a group. A test file whose tests need a fixed order is excluded
-  from the within-group order only, and the PR says why.
+  first test, and the group labels are alphabetical (`other tests` last). The checker
+  enforces the helper, group and label rules. Inside a group the tests are **not** sorted: they stay in
+  the order they were written (a reviewer checks this, the checker cannot), and a test
+  file whose tests must run in a fixed order keeps that order, with the reason in the PR.
 - **Reordering is its own commit.** A pure reorder never shares a commit with a change
   of behaviour, so a reviewer can read it with `git diff -w --color-moved`.
 
@@ -190,9 +191,9 @@ CI-only PRs mark them not applicable and say why.
   equivalent mutant with a one-line justification. Record the counts (caught,
   missed, unviable, timeouts).
 
-The same large tests can be started by hand from the GitHub Actions tab
-(`workflow_dispatch`) when no suitable machine is available. That is a
-convenience, not a replacement for recording the results in the PR.
+No workflow runs these large tests (to spare Actions credits they are manual and
+local, and nothing runs on a schedule), so they are run on a suitable machine and the
+results are recorded in the PR.
 
 ## Dependency changes and lock files
 
