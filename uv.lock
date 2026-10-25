@@ -101,16 +101,19 @@ dev = [
     { name = "ruff" },
 ]
 gpu = [
+    { name = "certifi" },
     { name = "cupy" },
     { name = "rasterio", version = "1.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "rasterio", version = "1.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
 io = [
+    { name = "certifi" },
     { name = "pandas" },
     { name = "rasterio", version = "1.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "rasterio", version = "1.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
 test = [
+    { name = "certifi" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pytest" },
@@ -120,6 +123,9 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "certifi", marker = "extra == 'gpu'", specifier = ">=2026.10.19" },
+    { name = "certifi", marker = "extra == 'io'", specifier = ">=2026.10.19" },
+    { name = "certifi", marker = "extra == 'test'", specifier = ">=2026.10.19" },
     { name = "cupy", marker = "extra == 'gpu'" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
     { name = "numpy", specifier = ">=1.24" },
