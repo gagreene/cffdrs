@@ -1,9 +1,9 @@
 //! Owned `NumPy` snapshots and Python lifecycle for the Rust stage grid.
 
-use cffbps_rust::fbp_grid::{FbpGrid as CoreGrid, ParamName, StageError};
-use cffbps_rust::field::Field;
-use cffbps_rust::grid::{GridInput, PerCell};
-use cffbps_rust::stage::Stage;
+use cffdrs_fire::fbp_grid::{FbpGrid as CoreGrid, ParamName, StageError};
+use cffdrs_fire::field::Field;
+use cffdrs_fire::grid::{GridInput, PerCell};
+use cffdrs_fire::stage::Stage;
 use numpy::{PyArray1, PyArrayDyn, PyArrayMethods, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -222,7 +222,7 @@ impl FbpGrid {
                 };
                 let mut grid = CoreGrid::new(&input, &outputs)?;
                 grid.plan(&planned, &keep);
-                Ok::<_, cffbps_rust::grid::GridError>(grid)
+                Ok::<_, cffdrs_fire::grid::GridError>(grid)
             })
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(Self {

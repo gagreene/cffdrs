@@ -1,4 +1,4 @@
-//! Local refactoring oracle for `cffbps-rust` (not a CI test).
+//! Local refactoring oracle for `cffdrs-fire` (not a CI test).
 //!
 //! Runs `run()` over a deterministic set of 7,200 inputs and records or compares
 //! all 54 outputs of each as raw `f64` bits (NaN canonicalised). Record a baseline
@@ -8,11 +8,11 @@
 //! Record (once, before refactoring):
 //!
 //!     CFFDRS_BASELINE_RECORD=1 \
-//!       cargo test --manifest-path rust/Cargo.toml -p cffbps-rust --test characterization -- --ignored
+//!       cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire --test characterization -- --ignored
 //!
 //! Compare (after each step):
 //!
-//!     cargo test --manifest-path rust/Cargo.toml -p cffbps-rust --test characterization -- --ignored
+//!     cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire --test characterization -- --ignored
 //!
 //! Record mode is enabled only when `CFFDRS_BASELINE_RECORD` is exactly `1`; any
 //! other value (including `0` or empty) compares, so it cannot overwrite the
@@ -27,7 +27,7 @@
 mod cases;
 
 use cases::{bits, cases};
-use cffbps_rust::fbp::{run, FbpInput};
+use cffdrs_fire::fbp::{run, FbpInput};
 use std::path::PathBuf;
 use std::{env, fs};
 

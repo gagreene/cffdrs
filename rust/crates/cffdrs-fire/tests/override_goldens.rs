@@ -19,7 +19,7 @@
 //! - hfi = 0 yields `fi_class` -99 (case 5); an injected hros of 0 also means no fuel
 //!   is consumed (sfc and tfc are 0 in case 5).
 
-use cffbps_rust::fbp::{run, FbpInput};
+use cffdrs_fire::fbp::{run, FbpInput};
 
 struct Case {
     fuel_type: i32,

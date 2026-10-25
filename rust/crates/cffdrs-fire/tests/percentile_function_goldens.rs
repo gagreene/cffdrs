@@ -3,8 +3,8 @@
 //! percentile_ros_function_snapshot.json`). Regenerate with
 //! `tools/gen_fbp_goldens.py` when the Python spec changes.
 
-use cffbps_rust::fuel::FuelType;
-use cffbps_rust::percentile::{percentile_ros, percentile_tinv, wind_decay};
+use cffdrs_fire::fuel::FuelType;
+use cffdrs_fire::percentile::{percentile_ros, percentile_tinv, wind_decay};
 use std::path::PathBuf;
 
 // ---- helpers ----

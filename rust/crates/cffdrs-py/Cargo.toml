@@ -1,9 +1,9 @@
 [package]
 name = "cffdrs-py"
-# Python distribution version; 0.2.0 exposes the stateful pipeline API.
-version = "0.2.0"
+# Python distribution version; 0.2.0 exposed the stateful pipeline API, 0.3.0 follows the rename of the core crate.
+version = "0.3.0"
 edition.workspace = true
-description = "Python bindings (cffdrs._rust) over cffbps-rust."
+description = "Python bindings (cffdrs._rust) over cffdrs-fire."
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -16,6 +16,6 @@ name = "_rust"
 crate-type = ["cdylib"]
 
 [dependencies]
-cffbps-rust = { path = "../cffbps-rust" }
+cffdrs-fire = { path = "../cffdrs-fire" }
 pyo3 = { version = "0.27", features = ["extension-module", "abi3-py311"] }
 numpy = "0.27"

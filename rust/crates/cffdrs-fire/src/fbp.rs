@@ -85,7 +85,7 @@ impl FbpInput {
     /// itself.
     ///
     /// ```
-    /// use cffbps_rust::fbp::{run, FbpInput};
+    /// use cffdrs_fire::fbp::{run, FbpInput};
     ///
     /// let mut input = FbpInput::new(2, 20230615);
     /// input.lat = 55.0;
@@ -368,7 +368,7 @@ impl FbpResult {
 /// # Examples
 ///
 /// ```
-/// use cffbps_rust::fbp::{run, FbpInput};
+/// use cffdrs_fire::fbp::{run, FbpInput};
 ///
 /// let input = FbpInput {
 ///     fuel_type: 2, // C-2 boreal spruce
@@ -616,7 +616,7 @@ pub(crate) fn run_stages(input: &FbpInput) -> FbpResult {
     s.into_result()
 }
 
-// The bit-level oracle's input generator (it names the crate `cffbps_rust`,
+// The bit-level oracle's input generator (it names the crate `cffdrs_fire`,
 // which `lib.rs` aliases for tests). Declared here, not inside `mod tests`, so
 // the path does not climb out of a directory that does not exist (Linux).
 #[cfg(test)]

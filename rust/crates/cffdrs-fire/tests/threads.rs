@@ -1,7 +1,7 @@
 //! Threaded grid pass: every thread count gives bit-identical results to the
 //! serial pass, and `run_grid` itself never starts threads.
 
-use cffbps_rust::grid::{run_grid, run_grid_with_threads, BehaviourGrids, GridInput};
+use cffdrs_fire::grid::{run_grid, run_grid_with_threads, BehaviourGrids, GridInput};
 
 const BASE_FUEL: [i32; 9] = [2, 13, 10, 11, 14, 15, 12, 19, 7];
 

@@ -36,7 +36,7 @@ jobs:
       # cffdrs-py has no Rust tests and links against Python; pytest covers it
       # in the python job below.
       - name: Tests
-        run: cargo test --manifest-path rust/Cargo.toml -p cffbps-rust
+        run: cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire
 
   # The MSRV is declared once, as rust-version in rust/Cargo.toml; read it from
   # there so this job cannot drift from the manifest.

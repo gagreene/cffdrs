@@ -18,7 +18,7 @@ use std::sync::Mutex;
 /// cell (checked by [`run_grid_fields`]).
 ///
 /// ```
-/// use cffbps_rust::grid::PerCell;
+/// use cffdrs_fire::grid::PerCell;
 ///
 /// let constant: PerCell<'_> = 90.0.into();
 /// let per_cell: PerCell<'_> = (&[88.0, 91.5][..]).into();
@@ -822,7 +822,7 @@ pub(crate) fn resolve_dj(
 /// # Examples
 ///
 /// ```
-/// use cffbps_rust::grid::{run_grid, GridError, GridInput};
+/// use cffdrs_fire::grid::{run_grid, GridError, GridInput};
 ///
 /// let input = GridInput {
 ///     fuel_type: &[2, 19], // C-2 and a non-fuel cell
@@ -887,8 +887,8 @@ pub fn run_grid(input: &GridInput<'_>) -> Result<BehaviourGrids, GridError> {
 /// # Examples
 ///
 /// ```
-/// use cffbps_rust::field::Field;
-/// use cffbps_rust::grid::{run_grid_fields, GridInput, NonModeled, PerCell};
+/// use cffdrs_fire::field::Field;
+/// use cffdrs_fire::grid::{run_grid_fields, GridInput, NonModeled, PerCell};
 ///
 /// let input = GridInput {
 ///     fuel_type: &[2, 19], // C-2 and a non-fuel cell

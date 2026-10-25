@@ -6,7 +6,7 @@
 //! wind" would let fire spread through missing data. Goldens captured from
 //! the Python package.
 
-use cffbps_rust::fbp::{run, FbpInput};
+use cffdrs_fire::fbp::{run, FbpInput};
 
 fn base() -> FbpInput {
     FbpInput {

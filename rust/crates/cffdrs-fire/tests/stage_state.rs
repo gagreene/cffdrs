@@ -7,10 +7,10 @@
 mod cases;
 
 use cases::{cases, same_bits};
-use cffbps_rust::fbp::{run, FbpInput, FbpResult};
-use cffbps_rust::field::Field;
-use cffbps_rust::stage::Stage;
-use cffbps_rust::state::CellState;
+use cffdrs_fire::fbp::{run, FbpInput, FbpResult};
+use cffdrs_fire::field::Field;
+use cffdrs_fire::stage::Stage;
+use cffdrs_fire::state::CellState;
 
 // ---- helpers ----
 fn generated_inputs() -> Vec<FbpInput> {
@@ -108,7 +108,7 @@ fn every_stage_writes_only_what_it_declares() {
 fn a_template_holds_the_python_initialize_values() {
     let s = CellState::template(
         2,
-        cffbps_rust::state::StageParams {
+        cffdrs_fire::state::StageParams {
             wx_date: 20_230_615,
             percentile_growth: 50.0,
             d0: None,

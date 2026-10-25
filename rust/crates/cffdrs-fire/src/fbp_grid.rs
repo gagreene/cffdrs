@@ -40,10 +40,10 @@
 //! # Examples
 //!
 //! ```
-//! use cffbps_rust::fbp_grid::{FbpGrid, StageError};
-//! use cffbps_rust::field::Field;
-//! use cffbps_rust::grid::GridInput;
-//! use cffbps_rust::stage::Stage;
+//! use cffdrs_fire::fbp_grid::{FbpGrid, StageError};
+//! use cffdrs_fire::field::Field;
+//! use cffdrs_fire::grid::GridInput;
+//! use cffdrs_fire::stage::Stage;
 //!
 //! let input = GridInput {
 //!     fuel_type: &[2, 6],

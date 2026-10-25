@@ -38,7 +38,7 @@ releases where an interpreter needs them).
 | CPython | 3.11, 3.12, 3.13, 3.14 (`requires-python >= 3.11`; Python 3.10 is no longer supported) | CI runs the full suite on 3.12 for every PR; the release workflow smoke-tests the wheel on 3.11-3.14 on each platform |
 | Wheels | one `cp311-abi3` wheel per platform: Linux x86-64 (manylinux 2_17), macOS x86-64 and arm64, Windows x86-64 | release workflow (manual dispatch or tag) |
 | Rust, building from source | **1.78 or newer** (the MSRV) | CI builds with the MSRV toolchain on every PR; consumers of the wheel need no Rust |
-| Rust crate `cffbps-rust` | 1.78 or newer, no runtime dependencies | CI |
+| Rust crate `cffdrs-fire` | 1.78 or newer, no runtime dependencies | CI |
 | PyO3 / rust-numpy | 0.27 | `Cargo.lock` |
 | NumPy / SciPy | tested with NumPy 2.4-2.5 and SciPy 1.17-1.18 (see `uv.lock`); older NumPy 1.24+ is allowed by the metadata but not tested here | CI uses `uv.lock` |
 | Free-threaded Python (3.14t) | not supported | n/a |
@@ -62,12 +62,12 @@ future NumPy/SciPy releases or untested dependency combinations.
 The repository is a mixed Python/Rust project. Python package sources live under
 `src/cffdrs`; the top-level `rust/` directory is a Cargo workspace containing:
 
-- `cffbps-rust`: dependency-free Rust FBP equations and the grid pass.
+- `cffdrs-fire`: dependency-free Rust FBP equations and the grid pass.
 - `cffdrs-py`: thin PyO3 bindings that install as `cffdrs._rust` in the same
   `cffdrs` wheel as the Python package.
 
 The Python implementation is the behavioral reference. The Python distribution
-(`cffdrs-py`) is **0.2.0**; the independent `cffbps-rust` core is **0.3.0**.
+(`cffdrs-py`) is **0.3.0**; the independent `cffdrs-fire` core is **0.4.0**.
 `cffdrs._rust.FbpGrid` is a low-level stateful grid in a private extension module;
 normal Python callers use `FBP`, which prepares inputs and exports reference-compatible
 results. Keeping `rust/` beside `src/` separates the Cargo workspace from Python imports.
@@ -81,6 +81,19 @@ support or untested dependency combinations. Free-threaded Python is unsupported
 The `FBP` class is a facade: initialize it with fuel, terrain, and weather inputs,
 run the model, and request any of the 54 output variables. The underlying equations
 live in `cffdrs.cffbps.python.equations` as pure, typed functions if you need them directly.
+
+### Breaking changes in 0.3.0
+
+Python users are not affected: the distribution is `cffdrs-fire` 0.3.0, the import stays `cffdrs`, and the
+public API is unchanged.
+
+- **Rust crate renamed.** The pure Rust crate `cffbps-rust` is now `cffdrs-fire` (library `cffdrs_fire`, crate
+  version 0.4.0), the name of the PyPI distribution. It was never published to crates.io. Rust consumers (a path or
+  git dependency, or a vendored copy) rename the package and the `use` paths: `cffbps-rust` / `cffbps_rust` to
+  `cffdrs-fire` / `cffdrs_fire`.
+- **certifi floor in the extras.** The `io`, `gpu` and `test` extras now require `certifi>=2026.10.19`. certifi
+  2026.10.18 removed the emSign root certificates after the eMudhra CA key compromise, and rasterio, which these
+  extras pull in, requires certifi without a minimum. Installing an extra upgrades an older certifi.
 
 ### Breaking changes in 0.2.0
 
@@ -346,7 +359,7 @@ uv sync --extra test --extra dev   # editable mixed Python/Rust install + toolin
 uv run --no-sync python -m pytest tests -q -p no:cacheprovider  # both backends
 uv run --no-sync ruff check src/ tests/cffbps  # lint
 uv run --no-sync mypy               # type-check the equation core
-cargo test --manifest-path rust/Cargo.toml -p cffbps-rust
+cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire
 uv run --no-sync python tools/compare_backends.py   # Python-vs-Rust differences
 ```
 
@@ -355,7 +368,7 @@ After a Rust-only change, rebuild the extension with
 
 The Python distribution version comes from `rust/crates/cffdrs-py/Cargo.toml`;
 update that crate version when preparing a release tag. The pure Rust core has
-its own version in `rust/crates/cffbps-rust/Cargo.toml` because it may be consumed
+its own version in `rust/crates/cffdrs-fire/Cargo.toml` because it may be consumed
 independently by Rust applications.
 
 Existing golden fixtures are the behavior-preservation oracle. Do not regenerate

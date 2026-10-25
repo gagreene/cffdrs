@@ -1,11 +1,11 @@
 //! `FbpGrid`: the pipeline stages over whole grids, freeing arrays once no
 //! planned stage needs them, against the fused pass and the scalar `run()`.
 
-use cffbps_rust::fbp::{run, FbpInput};
-use cffbps_rust::fbp_grid::{FbpGrid, ParamName, StageError};
-use cffbps_rust::field::Field;
-use cffbps_rust::grid::{GridError, GridInput, PerCell};
-use cffbps_rust::stage::Stage;
+use cffdrs_fire::fbp::{run, FbpInput};
+use cffdrs_fire::fbp_grid::{FbpGrid, ParamName, StageError};
+use cffdrs_fire::field::Field;
+use cffdrs_fire::grid::{GridError, GridInput, PerCell};
+use cffdrs_fire::stage::Stage;
 
 /// Every fuel: the 18 modeled codes, 19/20 and invalid codes.
 const MIXED: [i32; 23] = [

@@ -1,9 +1,9 @@
-//! Python bindings over cffbps-rust. Kept intentionally thin: the science
-//! lives in cffbps-rust; the cffdrs Python package remains the reference
+//! Python bindings over cffdrs-fire. Kept intentionally thin: the science
+//! lives in cffdrs-fire; the cffdrs Python package remains the reference
 //! implementation and the spec.
 
 mod fbp_grid;
-use cffbps_rust::grid::{run_grid_with_threads, GridInput, PerCell};
+use cffdrs_fire::grid::{run_grid_with_threads, GridInput, PerCell};
 use numpy::{PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -18,7 +18,7 @@ const GRASS_FUEL_LOAD_DEFAULT: f64 = 0.35;
 /// The compiled backend exposed as `cffdrs._rust` by the mixed Python/Rust wheel.
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("__core_version__", cffbps_rust::VERSION)?;
+    m.add("__core_version__", cffdrs_fire::VERSION)?;
     m.add_function(wrap_pyfunction!(run_fbp_grid, m)?)?;
     m.add_class::<fbp_grid::FbpGrid>()?;
     Ok(())

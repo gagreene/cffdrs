@@ -1,6 +1,6 @@
 //! Release-profile timing of `run()` for before/after comparison:
 //!
-//!     cargo run --release --manifest-path rust/Cargo.toml -p cffbps-rust --example bench_run
+//!     cargo run --release --manifest-path rust/Cargo.toml -p cffdrs-fire --example bench_run
 
 // Timing arithmetic on small, bounded counters; the casts are exact here.
 #![allow(
@@ -9,7 +9,7 @@
     clippy::cast_possible_wrap
 )]
 
-use cffbps_rust::fbp::{run, FbpInput};
+use cffdrs_fire::fbp::{run, FbpInput};
 use std::hint::black_box;
 use std::time::Instant;
 
