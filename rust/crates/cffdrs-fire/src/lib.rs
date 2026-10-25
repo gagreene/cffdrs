@@ -59,6 +59,11 @@
 //! [`grid::GridInput`] stay constructible by struct literal on purpose;
 //! [`fbp::FbpInput::new`] is the forward-compatible constructor.
 //!
+//! # Changes in 0.4.1
+//!
+//! First release on crates.io: package metadata and a README (its example is compiled as a doctest). No code
+//! change.
+//!
 //! # Changes in 0.4.0
 //!
 //! The crate is renamed from `cffbps-rust` to `cffdrs-fire` (library `cffdrs_fire`), the name of the Python
@@ -82,7 +87,7 @@
 //! [`grid::BehaviourGrids`]; `run_grid` now returns a `Result` instead of
 //! panicking on bad input.
 //!
-//! Current versions are core 0.4.0 and `cffdrs-py` 0.3.0 (the Python
+//! Current versions are core 0.4.1 and `cffdrs-py` 0.3.0 (the Python
 //! distribution). The historical core 0.2.0 release had an independent binding version.
 //!
 //! # Developing
@@ -113,6 +118,11 @@
 /// This crate's version (`CARGO_PKG_VERSION` of `cffdrs-fire`), for example
 /// to report which core a binding or engine was built against.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// Compiles the example of the crate README as a doctest, so it cannot go stale.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
 
 // Lets unit tests share the integration tests' input generator
 // (`tests/common/cases.rs`), which names this crate `cffdrs_fire`.

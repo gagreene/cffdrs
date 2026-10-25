@@ -1,0 +1,46 @@
+name: Release crate
+
+# Publishes the Rust crate cffdrs-fire to crates.io through Trusted Publishing (OIDC); no token is stored in the
+# repository. Start it by hand (workflow_dispatch): without `publish` it only checks and runs
+# `cargo publish --dry-run`; with `publish` it also uploads, through the `crates-io` environment, and the crate
+# version in rust/crates/cffdrs-fire/Cargo.toml must not be on crates.io yet (a version is uploaded only once).
+# The crate has its own version and tag (cffdrs-fire-vX.Y.Z), separate from the Python distribution (release.yml).
+# The first release of a crate cannot use Trusted Publishing (the crate must exist before a publisher can be
+# registered on crates.io), so it is uploaded by hand with `cargo publish` from the commit it is tagged on; every
+# later release uses this workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Upload to crates.io (otherwise only check and dry-run)"
+        type: boolean
+        default: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Tests (including the README example)
+        run: cargo test --manifest-path rust/Cargo.toml -p cffdrs-fire --locked
+      - name: Dry run
+        run: cargo publish --dry-run -p cffdrs-fire --manifest-path rust/Cargo.toml --locked
+
+  publish-crate:
+    if: inputs.publish
+    needs: [check]
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish
+        run: cargo publish -p cffdrs-fire --manifest-path rust/Cargo.toml --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
