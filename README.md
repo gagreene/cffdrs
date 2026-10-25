@@ -9,19 +9,23 @@ multiprocessing driver for large rasters.
 
 ## Installation
 
-cffdrs is **not published to PyPI yet** (publishing is disabled in the release
-workflow until the owner enables it), so `pip install cffdrs` does not work. Install
-one of:
+Install from PyPI. The prebuilt wheel already contains the compiled Rust extension,
+so no Rust compiler is needed:
 
-- a **prebuilt wheel** from the release workflow artifacts: it already contains the
-  compiled Rust extension, so no Rust compiler is needed (`pip install cffdrs-*.whl`);
-- a **source checkout**, which builds the extension and needs the Rust toolchain
-  described below: `pip install .` or `uv sync` from the repository root.
+```bash
+pip install cffdrs-fire
+```
+
+The PyPI distribution is named `cffdrs-fire`; the import name is still `cffdrs`
+(`from cffdrs.cffbps import FBP`).
+
+Or build a **source checkout**, which builds the extension and needs the Rust
+toolchain described below: `pip install .` or `uv sync` from the repository root.
 
 Optional extras:
 
 ```bash
-pip install "cffdrs[io]"    # rasterio + pandas, for raster/tabular workflows
+pip install "cffdrs-fire[io]"    # rasterio + pandas, for raster/tabular workflows
 ```
 
 Core dependencies: `numpy>=1.24`, `scipy>=1.10`, `psutil>=5.9` (pip chooses newer
@@ -108,7 +112,7 @@ consumption), and `calc_fire_type`, `calc_hfi` and `calc_fire_intensity_class` l
 The historical `calcC6hros` stage no longer exists. A custom stage sequence replaces it with `calcC6BlendCFB`,
 `calcC6BlendCFC`, `calcC6CROS` and `calcC6HROS` (in that order), computes `calcPercentileCFB` before
 `calcRosPercentileGrowth`, calls `calcCFB` again after growth, and runs `calcAccelParam` after the final CFB (see
-[Upgrading PyroCell](docs/CODEBASE.md#upgrading-pyrocell)). Replacing only the old method name is not enough.
+[Upgrading PyroCell](https://github.com/gagreene/cffdrs/blob/master/docs/CODEBASE.md#upgrading-pyrocell)). Replacing only the old method name is not enough.
 
 **C6 acceleration changes.** Acceleration is now computed from the final (post-blend) CFB, so for C-6 the head ROS is
 unchanged but `cfb`, `accel` and `hfi` change. For C-6 at ws 20, flat ground, 49.48 N, 115.69 W, 100 m,
@@ -145,11 +149,11 @@ reads, `runFBP(block=...)`, `getCBH_CFL(ftype=..., cbh=..., cfl=...)` overrides,
 and `fbpMultiprocessArray` require Python. Choose `backend='python'` before
 initialization for those workflows. For Rust canopy injection, run
 `getCBH_CFL()` and then `setParams({'cbh': ..., 'cfl': ...})` in a staged pipeline.
-Rust uses threads for parallel work. See [the lifecycle and stage reference](docs/CODEBASE.md)
+Rust uses threads for parallel work. See [the lifecycle and stage reference](https://github.com/gagreene/cffdrs/blob/master/docs/CODEBASE.md)
 for memory retention and supported update routes.
 
 Every difference between the two backends that is known today is tracked in
-[docs/BACKEND_DIFFERENCES.md](docs/BACKEND_DIFFERENCES.md); `tools/compare_backends.py`
+[docs/BACKEND_DIFFERENCES.md](https://github.com/gagreene/cffdrs/blob/master/docs/BACKEND_DIFFERENCES.md); `tools/compare_backends.py`
 re-checks them.
 
 ### Scalar example
@@ -267,7 +271,7 @@ All-scalar inputs export Python scalars. Legacy masked/non-modeled cases can
 export floating zero even for nominal integer fields; missing explicit dates
 export NaN. Rust expands every result to the full grid shape; Python can keep
 scalar-derived results at `(1,)` and has legacy 0-d export differences.
-See [the detailed output contract](docs/CODEBASE.md#outputs-and-intentional-differences)
+See [the detailed output contract](https://github.com/gagreene/cffdrs/blob/master/docs/CODEBASE.md#outputs-and-intentional-differences)
 for these measured exceptions.
 
 ### Experimental GPU backend
@@ -277,7 +281,7 @@ An experimental CuPy (GPU) variant of the FBP model lives at
 CUDA-capable environment):
 
 ```bash
-pip install "cffdrs[gpu]"
+pip install "cffdrs-fire[gpu]"
 # On CUDA, prefer the version-matched wheel instead, e.g.:
 #   pip install cupy-cuda12x
 #   pip install cupy-cuda13x
@@ -355,12 +359,12 @@ its own version in `rust/crates/cffbps-rust/Cargo.toml` because it may be consum
 independently by Rust applications.
 
 Existing golden fixtures are the behavior-preservation oracle. Do not regenerate
-them to accommodate a refactor. Release publishing remains disabled in the
-workflow; version tags and publication require owner authorization.
+them to accommodate a refactor. Releases are published by the
+`release` workflow (a `v*` tag publishes to PyPI); version tags and publication require owner authorization.
 
 ### Contributing
 
-Read [`docs/CONTRIBUTION_PROCEDURES.md`](docs/CONTRIBUTION_PROCEDURES.md) before opening a pull request: it
+Read [`docs/CONTRIBUTION_PROCEDURES.md`](https://github.com/gagreene/cffdrs/blob/master/docs/CONTRIBUTION_PROCEDURES.md) before opening a pull request: it
 covers branch routing (major and minor changes go to `pre_release`, patches to `master`), commit rules, the
 local checks and large tests that are recorded in every pull request, and the rules for numerical changes.
 Tests are run locally and never automatically on a schedule.

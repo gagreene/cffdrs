@@ -13,6 +13,6 @@ Import the pieces you need, e.g. ``from cffdrs.cffbps import FBP``.
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("cffdrs")
+    __version__ = version("cffdrs-fire")
 except PackageNotFoundError:  # fresh checkout that has never been installed
     __version__ = "0.0.0+unknown"

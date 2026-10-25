@@ -17,7 +17,7 @@ from ._scalar_masks import ScalarMasks
 try:
     _rust = importlib.import_module('cffdrs._rust')
 except ImportError as error:
-    raise ImportError('Rust FBP requires the cffdrs extension: install with pip install cffdrs '
+    raise ImportError('Rust FBP requires the cffdrs extension: install with pip install cffdrs-fire '
                       'or build the checkout with uv sync --extra test --extra dev') from error
 
 _INPUTS = ('lat', 'long', 'elevation', 'slope', 'aspect', 'ws', 'wd', 'ffmc', 'bui',

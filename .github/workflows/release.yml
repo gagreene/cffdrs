@@ -1,14 +1,11 @@
 name: Release
 
-# PUBLISHING IS CURRENTLY DISABLED. Both publish jobs below are switched off with
-# `if: false`, so a v* tag or a manual run only builds and tests the wheels; nothing
-# is uploaded to PyPI or TestPyPI. To enable publishing, create the `testpypi` /
-# `pypi` environments, register the trusted publishers on (Test)PyPI, and restore
-# each job's original condition (noted beside it).
-#
-# When enabled, publishing uses PyPI Trusted Publishing (OIDC); no API tokens are
-# stored in the repository. Manual runs publish to TestPyPI, while v* tags publish
-# to PyPI.
+# Publishing uses PyPI Trusted Publishing (OIDC); no API tokens are stored in the
+# repository. A manual run (workflow_dispatch) builds, tests and publishes to
+# TestPyPI; a v* tag builds, tests and publishes to PyPI. Both publish jobs need the
+# `testpypi` / `pypi` environments and a trusted publisher registered on the matching
+# index (repository gagreene/cffdrs, workflow release.yml). The tag must equal the
+# version in rust/crates/cffdrs-py/Cargo.toml (checked below).
 
 on:
   workflow_dispatch:
@@ -148,8 +145,7 @@ jobs:
           path: dist/*
 
   publish-testpypi:
-    # Disabled. Original condition: github.event_name == 'workflow_dispatch'
-    if: false
+    if: github.event_name == 'workflow_dispatch'
     needs: [build-and-test, rust-msrv, check-distributions]
     runs-on: ubuntu-latest
     environment: testpypi
@@ -165,8 +161,7 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    # Disabled. Original condition: startsWith(github.ref, 'refs/tags/v')
-    if: false
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-and-test, rust-msrv, check-distributions]
     runs-on: ubuntu-latest
     environment: pypi

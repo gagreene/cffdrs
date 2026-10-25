@@ -58,7 +58,7 @@ def check_public_facades():
 
 
 def main() -> None:
-    wheel_metadata = distribution("cffdrs").read_text("WHEEL")
+    wheel_metadata = distribution("cffdrs-fire").read_text("WHEEL")
     assert wheel_metadata is not None and any(
         line.startswith("Tag: cp311-abi3-") for line in wheel_metadata.splitlines()
     ), f"installed wheel does not contain a cp311-abi3 tag: {wheel_metadata}"

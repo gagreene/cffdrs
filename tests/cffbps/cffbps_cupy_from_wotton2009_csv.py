@@ -2,7 +2,7 @@
 
 Depends on the experimental CuPy backend (``cffdrs.cffbps.cupy``), which
 requires the optional ``gpu`` extra and a CUDA-capable environment
-(``pip install cffdrs[gpu]``). The backend is frozen at the pre-refactor monolith
+(``pip install cffdrs-fire[gpu]``). The backend is frozen at the pre-refactor monolith
 and is not held to reference parity, so this script is exploratory only.
 """
 import os
