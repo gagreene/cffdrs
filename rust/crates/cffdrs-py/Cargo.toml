@@ -5,6 +5,8 @@ version = "0.3.0"
 edition.workspace = true
 description = "Python bindings (cffdrs._rust) over cffdrs-fire."
 license.workspace = true
+# Never published to crates.io: the Python wheel is the delivery (the cffdrs-fire crate is published separately).
+publish = false
 rust-version.workspace = true
 repository.workspace = true
 

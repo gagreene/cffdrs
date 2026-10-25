@@ -205,7 +205,7 @@ importing from here, and `cffwis`/`diurnal_ffmc_lawson` bypass it entirely.
 A Cargo workspace beside `src/`, with no root `Cargo.toml` (always pass
 `--manifest-path rust/Cargo.toml`):
 
-- `crates/cffdrs-fire` (0.4.0, MSRV 1.78, no runtime dependencies): the module map is in
+- `crates/cffdrs-fire` (0.4.1, MSRV 1.78, no runtime dependencies): the module map is in
   the crate docs (`src/lib.rs`): `fbp` (scalar `run()`), `field`/`stage`/`state` (76
   fields, 23 stages, one cell), `grid` (per-cell or constant inputs, any requested
   outputs, threads), `fbp_grid` (stages over whole grids with freeing) and one module
@@ -524,10 +524,10 @@ These old paths are historical migration references, not current imports:
 
 There are no deep-import compatibility shims. The root FBP import now selects the
 backend once at initialization; explicit Python/Rust imports remain available.
-The distribution version is 0.3.0 (`cffdrs-py`); the core API version is 0.4.0. The pure Rust crate is named
+The distribution version is 0.3.0 (`cffdrs-py`); the core API version is 0.4.1. The pure Rust crate is named
 `cffdrs-fire`, like the PyPI distribution (which is built from the `cffdrs-py` binding crate). Version 0.4.0 of the
 crate and 0.3.0 of the distribution are the breaking rename: the crate was `cffbps-rust` in the 0.2.0 release (and
-`cffdrs-core` before), it has never been published to crates.io, and the Python import and API are unchanged.
+`cffdrs-core` before), it was first published to crates.io as 0.4.1 (`cargo add cffdrs-fire`), and the Python import and API are unchanged.
 `GridInput` numeric fields use `PerCell::Const` or `PerCell::Cells`, and optional
 per-cell d0/dj/fmc overrides. Its fuel field remains a code slice. Consumers of the
 old scalar/slice struct shape must adapt; `run_grid_fields` can select arbitrary fields.
@@ -570,7 +570,7 @@ golden rows (C-6, wind speed 20, wind direction 135 and 270) when it adopts this
 ## Versions, delivery and branch routing
 
 Maturin reads distribution 0.3.0 from `rust/crates/cffdrs-py/Cargo.toml`; the
-independent Rust core is 0.4.0. Release tag validation continues to read the
+independent Rust core is 0.4.1. Release tag validation continues to read the
 binding version. A manual `release.yml` run publishes to TestPyPI and a `v*` tag publishes to
 PyPI, both through Trusted Publishing. CI runs the Rust checks (`fmt`, `clippy`, docs, `cargo test -p cffdrs-fire`,
 MSRV) and the Python job (pytest, which covers both CPU backends, ruff, mypy and the function-order check); nothing

@@ -292,6 +292,21 @@ simple index can lag a few minutes behind the JSON API (retry before assuming a 
 Anything that changes the published metadata (for example `pyproject.toml`) is
 rehearsed again; a documentation-only change is not.
 
+The Rust crate `cffdrs-fire` is released separately from the Python distribution: it has
+its own version (`rust/crates/cffdrs-fire/Cargo.toml`) and its own tag, `cffdrs-fire-vX.Y.Z`.
+`release-crate.yml` runs only by hand: without its `publish` input it runs the crate tests
+(including the README example) and `cargo publish --dry-run`; with `publish` it uploads to
+crates.io through Trusted Publishing and the `crates-io` environment. crates.io accepts a
+version only once (a bad release can be yanked, never deleted or reused), so run the dry run
+first and publish only from a merged commit whose crate version is new. The very first
+release of a crate cannot use Trusted Publishing (the crate must exist before a publisher is
+registered), so `cargo publish -p cffdrs-fire --manifest-path rust/Cargo.toml --locked` is run
+by hand from the merged commit with a short-lived API token that is revoked afterwards. Bump
+the crate version for any change that is published, update the version references (README,
+`docs/CODEBASE.md`, the crate documentation, the core-version test) and tag the commit that was
+uploaded. Dispatching the workflow with `publish` and pushing a crate tag need the owner's direct
+permission, like any release.
+
 Local checks and the completed PR record remain required whether or not GitHub
 Actions runs. Coding agents must obtain direct permission before dispatching the
 release workflow or pushing release tags.

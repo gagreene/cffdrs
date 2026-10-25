@@ -1,12 +1,15 @@
 [package]
 name = "cffdrs-fire"
-version = "0.4.0"
+version = "0.4.1"
 edition.workspace = true
-description = "Pure-Rust implementation of the CFFBPS (FBP) equations: scalar core, grid pass and pipeline stages, mirroring the cffdrs Python package in this repository."
+description = "Pure-Rust Fire Behaviour Prediction (FBP) equations of the Canadian Forest Fire Danger Rating System: scalar core, grid pass and pipeline stages. FBP only, no Fire Weather Index."
+readme = "README.md"
+keywords = ["wildfire", "fire-behaviour", "cffdrs", "fbp", "forestry"]
+categories = ["science"]
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
-include = ["src/**/*.rs", "Cargo.toml", "LICENSE*"]
+include = ["src/**/*.rs", "Cargo.toml", "LICENSE*", "README.md"]
 
 [lints]
 workspace = true
