@@ -66,6 +66,33 @@ the `cffdrs-py` version above, and the release workflow checks this. The tag
 `v0.1.0` exists. Tags are created on `master` after the merge, and only with the
 owner's direct permission.
 
+## Code style: function order
+
+Every module keeps its functions in alphabetical order (case-insensitive). The rule
+covers module-level functions, the methods of a class or `impl` block, and the
+definitions inside a conditional block (Python `if` / `try`) or an inline Rust `mod`,
+in source, tools and tests alike. Each block is ordered on its own.
+
+- **Python:** names that start with an underscore come first (dunder methods lead,
+  then the other private helpers), then the public names. A property and its setter count as one
+  entry and stay together.
+- **Rust:** functions without `pub` come first, then `pub` functions.
+- **Order that must stay:** a function used when the module is imported (in a
+  decorator, a default argument or a module constant) stays above its user. Mark it
+  with `# order-exempt: <reason>` (Rust: `// order-exempt: <reason>`) on the line above
+  its `def` / `fn` or on that line; the reason is required, and a marker without one
+  exempts nothing. Constants, fixtures and types go before the functions.
+- **Tests:** helpers come first, in the same order, under a `# ---- helpers ----`
+  comment (Rust: `// ---- helpers ----`). The tests follow in groups, each starting with a
+  `# ---- <label> ----` comment; every test is in a group, no helper comes after the
+  first test, the group labels are alphabetical (`other tests` last) and the tests keep
+  their order inside a group. A test file whose tests need a fixed order is excluded
+  from the within-group order only, and the PR says why.
+- **Reordering is its own commit.** A pure reorder never shares a commit with a change
+  of behaviour, so a reviewer can read it with `git diff -w --color-moved`.
+
+Check it with `uv run --no-sync python tools/check_function_order.py` (CI runs it too). The checker also reports malformed Rust (unbalanced braces, an unterminated string), and its own behaviour is pinned by `tests/test_check_function_order.py`.
+
 ## Local checks before every PR merge
 
 Run the full default checks locally against the **latest PR commit** before
@@ -77,6 +104,7 @@ uv run --no-sync python -m pytest tests -q -p no:cacheprovider
 uv run --no-sync ruff check src/ tests/cffbps
 uv run --no-sync mypy
 uv lock --check
+uv run --no-sync python tools/check_function_order.py
 ```
 
 Always run Python through `uv run --no-sync` so the project environment is the
