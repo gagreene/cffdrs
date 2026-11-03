@@ -1,7 +1,7 @@
 [package]
 name = "cffdrs-py"
 # Python distribution version; 0.2.0 exposed the stateful pipeline API, 0.3.0 follows the rename of the core crate.
-version = "0.3.0"
+version = "0.3.1"
 edition.workspace = true
 description = "Python bindings (cffdrs._rust) over cffdrs-fire."
 license.workspace = true

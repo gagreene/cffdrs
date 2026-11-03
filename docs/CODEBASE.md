@@ -210,7 +210,7 @@ A Cargo workspace beside `src/`, with no root `Cargo.toml` (always pass
   fields, 23 stages, one cell), `grid` (per-cell or constant inputs, any requested
   outputs, threads), `fbp_grid` (stages over whole grids with freeing) and one module
   per equation family mirroring `python/equations/`.
-- `crates/cffdrs-py` (0.3.0): PyO3 bindings that build as `cffdrs._rust`
+- `crates/cffdrs-py` (0.3.1): PyO3 bindings that build as `cffdrs._rust`
   (`run_fbp_grid` and the `FbpGrid` class); the Python wrapper is `cffbps/rust/core.py`.
 
 ## Data flow
@@ -524,7 +524,7 @@ These old paths are historical migration references, not current imports:
 
 There are no deep-import compatibility shims. The root FBP import now selects the
 backend once at initialization; explicit Python/Rust imports remain available.
-The distribution version is 0.3.0 (`cffdrs-py`); the core API version is 0.4.1. The pure Rust crate is named
+The distribution version is 0.3.1 (`cffdrs-py`); the core API version is 0.4.1. The pure Rust crate is named
 `cffdrs-fire`, like the PyPI distribution (which is built from the `cffdrs-py` binding crate). Version 0.4.0 of the
 crate and 0.3.0 of the distribution are the breaking rename: the crate was `cffbps-rust` in the 0.2.0 release (and
 `cffdrs-core` before), it was first published to crates.io as 0.4.1 (`cargo add cffdrs-fire`), and the Python import and API are unchanged.
@@ -569,7 +569,7 @@ golden rows (C-6, wind speed 20, wind direction 135 and 270) when it adopts this
 
 ## Versions, delivery and branch routing
 
-Maturin reads distribution 0.3.0 from `rust/crates/cffdrs-py/Cargo.toml`; the
+Maturin reads distribution 0.3.1 from `rust/crates/cffdrs-py/Cargo.toml`; the
 independent Rust core is 0.4.1. Release tag validation continues to read the
 binding version. A manual `release.yml` run publishes to TestPyPI and a `v*` tag publishes to
 PyPI, both through Trusted Publishing. CI runs the Rust checks (`fmt`, `clippy`, docs, `cargo test -p cffdrs-fire`,
@@ -580,7 +580,7 @@ A prebuilt wheel avoids Rust compiler installation for Python consumers. Source
 builds require Rust 1.78 or newer (the MSRV, enforced in CI) and platform build tools.
 The ABI3 wheel tag is cp311-abi3 (PyO3 0.27); supported Python is 3.11-3.14
 (`requires-python >= 3.11`), CI runs the suite on 3.12 and the release workflow
-smoke-tests wheels on 3.11-3.14 for Linux x86-64, macOS x86-64 and arm64, and Windows
+smoke-tests wheels on 3.11-3.14 for Linux x86-64 and aarch64/ARM64, macOS x86-64 and arm64, and Windows
 x86-64. Future CPython ABI compatibility
 is not certification of future NumPy/SciPy dependencies. Free-threaded builds
 are unsupported.
