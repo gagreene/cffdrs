@@ -67,7 +67,7 @@ The repository is a mixed Python/Rust project. Python package sources live under
   `cffdrs` wheel as the Python package.
 
 The Python implementation is the behavioral reference. The Python distribution
-(`cffdrs-py`) is **0.3.0**; the independent `cffdrs-fire` core is **0.4.0**.
+(`cffdrs-py`) is **0.3.0**; the independent `cffdrs-fire` core is **0.4.1**.
 `cffdrs._rust.FbpGrid` is a low-level stateful grid in a private extension module;
 normal Python callers use `FBP`, which prepares inputs and exports reference-compatible
 results. Keeping `rust/` beside `src/` separates the Cargo workspace from Python imports.
@@ -88,7 +88,7 @@ Python users are not affected: the distribution is `cffdrs-fire` 0.3.0, the impo
 public API is unchanged.
 
 - **Rust crate renamed.** The pure Rust crate `cffbps-rust` is now `cffdrs-fire` (library `cffdrs_fire`, crate
-  version 0.4.0), the name of the PyPI distribution. It was never published to crates.io. Rust consumers (a path or
+  version 0.4.0), the name of the PyPI distribution. It was not on crates.io before 0.4.1. Rust consumers (a path or
   git dependency, or a vendored copy) rename the package and the `use` paths: `cffbps-rust` / `cffbps_rust` to
   `cffdrs-fire` / `cffdrs_fire`.
 - **certifi floor in the extras.** The `io`, `gpu` and `test` extras now require `certifi>=2026.10.19`. certifi
