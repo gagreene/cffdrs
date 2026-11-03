@@ -36,7 +36,7 @@ releases where an interpreter needs them).
 | Component | Supported | Checked by |
 |---|---|---|
 | CPython | 3.11, 3.12, 3.13, 3.14 (`requires-python >= 3.11`; Python 3.10 is no longer supported) | CI runs the full suite on 3.12 for every PR; the release workflow smoke-tests the wheel on 3.11-3.14 on each platform |
-| Wheels | one `cp311-abi3` wheel per platform: Linux x86-64 (manylinux 2_17), macOS x86-64 and arm64, Windows x86-64 | release workflow (manual dispatch or tag) |
+| Wheels | one `cp311-abi3` wheel per platform: Linux x86-64 and aarch64/ARM64 (manylinux 2_17), macOS x86-64 and arm64, Windows x86-64 | release workflow (manual dispatch or tag) |
 | Rust, building from source | **1.78 or newer** (the MSRV) | CI builds with the MSRV toolchain on every PR; consumers of the wheel need no Rust |
 | Rust crate `cffdrs-fire` | 1.78 or newer, no runtime dependencies | CI |
 | PyO3 / rust-numpy | 0.27 | `Cargo.lock` |
@@ -67,7 +67,7 @@ The repository is a mixed Python/Rust project. Python package sources live under
   `cffdrs` wheel as the Python package.
 
 The Python implementation is the behavioral reference. The Python distribution
-(`cffdrs-py`) is **0.3.0**; the independent `cffdrs-fire` core is **0.4.1**.
+(`cffdrs-py`) is **0.3.1**; the independent `cffdrs-fire` core is **0.4.1**.
 `cffdrs._rust.FbpGrid` is a low-level stateful grid in a private extension module;
 normal Python callers use `FBP`, which prepares inputs and exports reference-compatible
 results. Keeping `rust/` beside `src/` separates the Cargo workspace from Python imports.
@@ -81,6 +81,11 @@ support or untested dependency combinations. Free-threaded Python is unsupported
 The `FBP` class is a facade: initialize it with fuel, terrain, and weather inputs,
 run the model, and request any of the 54 output variables. The underlying equations
 live in `cffdrs.cffbps.python.equations` as pure, typed functions if you need them directly.
+
+### Changes in 0.3.1
+
+- **Linux ARM64 wheels.** The release workflow builds a native `aarch64` manylinux 2_17 wheel
+  and smoke-tests it on Python 3.11–3.14. The Python API and Rust core version are unchanged.
 
 ### Breaking changes in 0.3.0
 
