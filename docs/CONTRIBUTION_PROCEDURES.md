@@ -49,17 +49,17 @@ Version numbers use `MAJOR.MINOR.PATCH`. Route every versioned change as follows
 
 | Change for the next version | Work branch starts from | PR target |
 | --- | --- | --- |
-| Major or minor version change | `pre_release` | `pre_release` |
-| Patch version change | `master` | `master` |
+| Major, minor, or patch version change | `pre_release` | `pre_release` |
 
-Patch changes go only to `master`; do not target `master` for a major or minor
-change as a substitute for `pre_release`. When the major or minor release is
-ready, the repository owner reviews a PR from `pre_release` into `master` and
-merges it. This promotion requires a PR just like every other branch merge.
-After a patch release lands on `master`, bring `master` back into `pre_release`
-(through a PR) so the two do not drift. Decide which of major, minor or patch a
-change is for the Python distribution when choosing the PR target; the crate
-version follows its own rule above.
+All version changes, including patches, go through `pre_release`. This applies
+to both the Python distribution and the independently versioned Rust crate;
+the version increment does not change the branch routing. Do not target
+`master` directly for a version change.
+
+When a release is ready, the repository owner reviews a PR from `pre_release`
+into `master` and merges it. This promotion requires a PR just like every other
+branch merge. If `master` contains changes missing from `pre_release`, synchronize
+them through a PR before starting the next release's work.
 
 Release tags use the `vMAJOR.MINOR.PATCH` form (for example, `v0.2.0`), must equal
 the `cffdrs-py` version above, and the release workflow checks this. The tag

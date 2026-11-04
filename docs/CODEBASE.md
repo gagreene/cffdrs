@@ -585,6 +585,6 @@ x86-64. Future CPython ABI compatibility
 is not certification of future NumPy/SciPy dependencies. Free-threaded builds
 are unsupported.
 
-Releases follow `docs/CONTRIBUTION_PROCEDURES.md`: major and minor versions are merged into `pre_release`
-(this work was PR #14) and the owner reviews `pre_release` into `master`; patches go to `master`. Commits,
+Releases follow `docs/CONTRIBUTION_PROCEDURES.md`: all version changes (major, minor, and patch) start from
+and target `pre_release`; the owner reviews the release promotion from `pre_release` into `master`. Commits,
 pushes, tags and publication still require separate authorization.
