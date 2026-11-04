@@ -383,7 +383,7 @@ them to accommodate a refactor. Releases are published by the
 ### Contributing
 
 Read [`docs/CONTRIBUTION_PROCEDURES.md`](https://github.com/gagreene/cffdrs/blob/master/docs/CONTRIBUTION_PROCEDURES.md) before opening a pull request: it
-covers branch routing (major and minor changes go to `pre_release`, patches to `master`), commit rules, the
+covers branch routing (all version changes go through `pre_release`, then a release PR into `master`), commit rules, the
 local checks and large tests that are recorded in every pull request, and the rules for numerical changes.
 Tests are run locally and never automatically on a schedule.
 
